@@ -370,6 +370,7 @@
 .dashboard-thumbnail { display: block; overflow: hidden; border-radius: 5px; background: #111827; }
 .recent-projects__item .dashboard-thumbnail { width: 112px; height: 73px; }
 .dashboard-thumbnail img { width: 100%; height: 100%; object-fit: cover; }
+.dashboard-shell img[hidden] { display: none; }
 .dashboard-thumbnail__fallback { display: grid; place-items: center; width: 100%; height: 100%; padding: 8px; background: linear-gradient(145deg, #18243b, #0b1323); color: #8290a8; font-size: 12px; text-align: center; }
 .recent-projects__details { display: grid; gap: 10px; min-width: 0; }
 .recent-projects__details strong { overflow: hidden; font-size: 16px; font-weight: 520; text-overflow: ellipsis; white-space: nowrap; }

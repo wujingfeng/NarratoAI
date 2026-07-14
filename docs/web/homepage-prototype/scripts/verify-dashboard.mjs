@@ -193,6 +193,42 @@ try {
     check(await accountAction.evaluate((element) => document.activeElement === element), "账户区操作可获得键盘焦点");
   }
 
+  const dashboardImages = page.locator(".dashboard-shell img");
+  check((await dashboardImages.count()) > 0, "Dashboard 存在允许的项目或灵感内容图片");
+  await dashboardImages.evaluateAll((images) => {
+    images.forEach((image) => {
+      image.hidden = true;
+    });
+  });
+  const imageHiddenMetrics = await page.evaluate(() => ({
+    imagesHidden: [...document.querySelectorAll(".dashboard-shell img")].every(
+      (image) => image.hidden && getComputedStyle(image).display === "none",
+    ),
+    logo: Boolean(document.querySelector(".dashboard-shell a[href='/']")),
+    banner: Boolean(document.querySelector("[data-dashboard-banner]")),
+    heading: document.querySelector("h1")?.textContent.trim(),
+    projectStates: document.querySelectorAll("[data-project-status]").length,
+    progress: document.querySelector("progress")?.value,
+    balance: document.body.textContent.includes("1,280"),
+    monthlyCredits: document.body.textContent.includes("240 创作点"),
+  }));
+  check(imageHiddenMetrics.imagesHidden, "设置 hidden 后所有 Dashboard 内容图片均不可见");
+  check(
+    imageHiddenMetrics.logo &&
+      imageHiddenMetrics.banner &&
+      imageHiddenMetrics.heading === "工作台概览" &&
+      imageHiddenMetrics.projectStates === 3 &&
+      imageHiddenMetrics.progress === 66 &&
+      imageHiddenMetrics.balance &&
+      imageHiddenMetrics.monthlyCredits,
+    "隐藏全部内容图片后 Dashboard 主体结构仍完整",
+  );
+  await dashboardImages.evaluateAll((images) => {
+    images.forEach((image) => {
+      image.hidden = false;
+    });
+  });
+
   for (const width of [1280, 1025]) {
     await page.setViewportSize({ width, height: 1058 });
     const responsiveMetrics = await page.evaluate(() => {
