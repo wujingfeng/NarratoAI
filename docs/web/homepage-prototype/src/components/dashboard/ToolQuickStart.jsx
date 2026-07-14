@@ -7,7 +7,7 @@ export function ToolQuickStart({ tools, onUnavailable }) {
         <p>选择工具</p>
         <h2 id="quick-start-title">快速开始</h2>
       </div>
-      <div className="tool-quick-start__grid">
+      <div className="tool-quick-start__grid dashboard-tool-list">
         {tools.map((tool) => {
           const Icon = tool.icon;
           return (

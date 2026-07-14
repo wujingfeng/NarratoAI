@@ -27,6 +27,7 @@ export function RecentProjects({ projects, onUnavailable }) {
               <span>{project.statusLabel}</span>
               <small className="recent-projects__credits">消耗 {project.credits}</small>
             </span>
+            <ArrowRight className="recent-projects__arrow" aria-hidden="true" />
           </button>
         ))}
       </div>

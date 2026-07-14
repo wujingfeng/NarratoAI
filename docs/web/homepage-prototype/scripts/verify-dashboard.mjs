@@ -130,7 +130,7 @@ try {
     check(await accountAction.evaluate((element) => document.activeElement === element), "账户区操作可获得键盘焦点");
   }
 
-  for (const width of [1280, 1025, 1024]) {
+  for (const width of [1280, 1025]) {
     await page.setViewportSize({ width, height: 1058 });
     const responsiveMetrics = await page.evaluate(() => {
       const sidebar = document.querySelector(".dashboard-sidebar").getBoundingClientRect();
@@ -159,6 +159,101 @@ try {
     check(responsiveMetrics.minimumToolWidth >= 120, `${width} 工具卡保持可读宽度`);
     check(responsiveMetrics.mobileNavDisplay === "none", `${width} 桌面隐藏移动底栏`);
   }
+
+  for (const viewport of [
+    { width: 390, height: 844 },
+    { width: 320, height: 720 },
+    { width: 768, height: 1024 },
+    { width: 1024, height: 1058 },
+  ]) {
+    await page.setViewportSize(viewport);
+    await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+    const mobileMetrics = await page.evaluate(() => {
+      const sidebar = document.querySelector(".dashboard-sidebar");
+      const mobileNav = document.querySelector(".dashboard-mobile-nav");
+      const tools = document.querySelector(".tool-quick-start__grid");
+      const main = document.querySelector(".dashboard-main");
+      const navTargets = [...mobileNav.querySelectorAll("a, button")].map((element) => {
+        const rect = element.getBoundingClientRect();
+        return { width: rect.width, height: rect.height };
+      });
+      const lastContent = document.querySelector(".credits-overview").getBoundingClientRect();
+      const navRect = mobileNav.getBoundingClientRect();
+      return {
+        pageWidth: document.documentElement.scrollWidth,
+        viewportWidth: innerWidth,
+        sidebarDisplay: getComputedStyle(sidebar).display,
+        mobileNavDisplay: getComputedStyle(mobileNav).display,
+        toolsClient: tools.clientWidth,
+        toolsScroll: tools.scrollWidth,
+        toolsOverflow: getComputedStyle(tools).overflowX,
+        toolsTemplate: getComputedStyle(tools).gridTemplateColumns,
+        toolWidths: [...tools.children].map((element) => element.getBoundingClientRect().width),
+        bodyPaddingBottom: parseFloat(getComputedStyle(main).paddingBottom),
+        navHeight: navRect.height,
+        navTargets,
+        inspirationDisplay: getComputedStyle(document.querySelector(".inspiration-panel")).display,
+        creditsRingDisplay: document.querySelector(".credits-ring")
+          ? getComputedStyle(document.querySelector(".credits-ring")).display
+          : "missing",
+        lastContentBottom: lastContent.bottom,
+        navTop: navRect.top,
+      };
+    });
+    const size = `${viewport.width}×${viewport.height}`;
+    check(mobileMetrics.pageWidth <= mobileMetrics.viewportWidth + 1, `${size} 移动页面无横向溢出`);
+    check(mobileMetrics.sidebarDisplay === "none", `${size} 移动隐藏桌面侧栏`);
+    check(mobileMetrics.mobileNavDisplay !== "none", `${size} 移动显示底部导航`);
+    check(
+      mobileMetrics.toolsScroll > mobileMetrics.toolsClient && ["auto", "scroll"].includes(mobileMetrics.toolsOverflow),
+      `${size} 工具只在内部横向滚动（client=${mobileMetrics.toolsClient}, scroll=${mobileMetrics.toolsScroll}, overflow=${mobileMetrics.toolsOverflow}, template=${mobileMetrics.toolsTemplate}, cards=${mobileMetrics.toolWidths.join("/")}）`,
+    );
+    check(mobileMetrics.bodyPaddingBottom >= mobileMetrics.navHeight, `${size} 底部 padding 覆盖固定导航`);
+    check(
+      mobileMetrics.navTargets.every(({ width, height }) => width >= 44 && height >= 44),
+      `${size} 移动导航触控目标至少 44px`,
+    );
+    check(mobileMetrics.inspirationDisplay === "none", `${size} 移动隐藏创作灵感`);
+    check(mobileMetrics.creditsRingDisplay === "none", `${size} 移动隐藏完整创作点圆环`);
+    check(mobileMetrics.lastContentBottom <= mobileMetrics.navTop, `${size} 最后一项不被固定底栏遮挡`);
+    check(
+      (await page.locator(".dashboard-mobile-nav a[aria-current='page']").textContent()).includes("概览"),
+      `${size} 移动概览标记当前页面`,
+    );
+    await page.getByText("处理中 66%", { exact: true }).waitFor({ state: "visible" });
+  }
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  check(
+    await page.locator("a.dashboard-header--mobile[aria-label='影创工坊'][href='/']").count() === 1,
+    "移动 Header Logo 使用具名首页 Link",
+  );
+  const unlabeledIconButtons = await page.locator("button").evaluateAll((buttons) =>
+    buttons.filter((button) => !button.textContent.trim() && !button.getAttribute("aria-label")).length,
+  );
+  check(unlabeledIconButtons === 0, "纯图标按钮均有 aria-label");
+
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.getByRole("button", { name: /新建创作/ }).first().click();
+  await page.getByRole("status").filter({ hasText: "新建创作功能建设中" }).waitFor();
+  const reducedMotion = await page.evaluate(() =>
+    ["[data-dashboard-banner]", ".dashboard-toast", ".tool-quick-start__card"].map((selector) => {
+      const element = document.querySelector(selector);
+      if (!element) return null;
+      const style = getComputedStyle(element);
+      return { animationName: style.animationName, transitionDuration: style.transitionDuration };
+    }),
+  );
+  check(
+    reducedMotion.filter(Boolean).every(({ animationName }) => animationName === "none"),
+    "减少动态效果时 Banner、Toast 与卡片不播放动画",
+  );
+  check(
+    reducedMotion.filter(Boolean).every(({ transitionDuration }) => parseFloat(transitionDuration) <= 0.01),
+    "减少动态效果时过渡降级为近静态",
+  );
+  await page.getByRole("button", { name: "关闭提示" }).click();
+  await page.emulateMedia({ reducedMotion: "no-preference" });
   await page.setViewportSize({ width: 1487, height: 1058 });
   check(await page.locator("h1").count() === 1, "Dashboard 只有一个 h1");
   check(await page.getByRole("navigation", { name: "工作台主导航" }).count() === 1, "桌面主导航存在");

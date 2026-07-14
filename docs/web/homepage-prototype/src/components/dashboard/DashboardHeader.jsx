@@ -1,8 +1,13 @@
 import { UserCircle } from "@phosphor-icons/react";
+import { Link } from "react-router-dom";
+import { BrandMark } from "../BrandMark.jsx";
 
 export function DashboardHeader({ credits, onUnavailable }) {
   return (
     <header className="dashboard-header">
+      <Link className="dashboard-header--mobile" to="/" aria-label="影创工坊">
+        <BrandMark />
+      </Link>
       <div className="dashboard-account" aria-label="账户快捷操作">
         <button
           className="dashboard-account__balance"
