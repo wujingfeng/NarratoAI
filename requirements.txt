@@ -19,6 +19,11 @@ dashscope>=1.24.6
 
 # 图像处理依赖
 Pillow>=10.3.0
+imagehash>=4.3.0
+
+# PDF报告生成依赖
+reportlab>=4.0.0
+matplotlib>=3.7.0
 
 # 进度条和重试机制
 tqdm>=4.66.6

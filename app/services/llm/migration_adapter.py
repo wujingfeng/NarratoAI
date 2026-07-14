@@ -292,6 +292,7 @@ class SubtitleAnalyzerAdapter:
         temperature: float = 0.7,
         narration_language: str = "简体中文（中国）",
         drama_genre: str = "逆袭/复仇",
+        narration_char_range: str = "",
     ) -> Dict[str, Any]:
         """Generate editable narration copy before timeline matching."""
         try:
@@ -303,8 +304,11 @@ class SubtitleAnalyzerAdapter:
                     "plot_analysis": plot_analysis,
                     "subtitle_content": subtitle_content,
                     "narration_language": narration_language,
+                    "narration_char_range": narration_char_range,
                 },
             )
+            logger.info(f"生成解说文案的prompt={prompt}")
+
             narration_copy = self._generate_plain_text(prompt, system_prompt, temperature)
             return {
                 "status": "success",

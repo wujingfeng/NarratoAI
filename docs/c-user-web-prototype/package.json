@@ -1,0 +1,25 @@
+{
+  "name": "c-user-web-prototype",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "build": "vite build",
+    "preview": "vite preview --host 127.0.0.1",
+    "visual:capture": "node scripts/capture-screenshots.mjs",
+    "visual:diff": "node scripts/diff-screenshots.mjs",
+    "visual:check": "npm run visual:capture && npm run visual:diff"
+  },
+  "dependencies": {
+    "@vitejs/plugin-react": "5.0.4",
+    "react": "19.2.0",
+    "react-dom": "19.2.0",
+    "vite": "6.4.2"
+  },
+  "devDependencies": {
+    "pixelmatch": "^7.2.0",
+    "playwright": "^1.61.1",
+    "pngjs": "^7.0.0"
+  }
+}

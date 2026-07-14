@@ -10,6 +10,7 @@ from loguru import logger
 
 from app.config import config
 from app.models.schema import VideoClipParams
+from app.services.script_diagnosis import ScriptDiagnosisService
 from app.services.subtitle_text import decode_subtitle_bytes, read_subtitle_text
 from app.utils import utils, check_script
 from webui.tools.generate_script_docu import generate_script_docu
@@ -1153,6 +1154,213 @@ def render_video_script_editor(tr):
         video_script_dialog()
 
 
+def _current_original_sound_ratio(script_path):
+    if script_path in SUMMARY_SCRIPT_MODES:
+        summary_config = _summary_mode_config(script_path)
+        key = _summary_state_key(summary_config, "original_sound_ratio")
+        return int(st.session_state.get(key, 30))
+
+    for summary_config in SUMMARY_MODE_CONFIGS.values():
+        key = _summary_state_key(summary_config, "original_sound_ratio")
+        if key in st.session_state:
+            return int(st.session_state.get(key, 30))
+    return 30
+
+
+def _script_diagnosis_signature(
+    script_data,
+    original_sound_ratio,
+    subtitle_paths,
+    video_paths,
+    content_type="",
+    plot_analysis="",
+    narration_copy="",
+):
+    return json.dumps(
+        {
+            "script_data": script_data,
+            "original_sound_ratio": original_sound_ratio,
+            "subtitle_paths": _normalize_video_paths(subtitle_paths),
+            "video_paths": _normalize_video_paths(video_paths),
+            "content_type": content_type,
+            "plot_analysis": plot_analysis,
+            "narration_copy": narration_copy,
+        },
+        ensure_ascii=False,
+        sort_keys=True,
+        default=str,
+    )
+
+
+def _resolve_script_diagnosis_content_type(script_path):
+    if script_path == MODE_FILM_SUMMARY:
+        return "film_tv_narration"
+    if script_path == MODE_SHORT_SUMMARY:
+        return "short_drama_narration"
+    if script_path == MODE_SHORT:
+        return "short_drama_mix"
+    if script_path == MODE_AUTO:
+        return "documentary"
+    return "short_drama_narration"
+
+
+def _script_diagnosis_context(script_path):
+    if script_path == MODE_FILM_SUMMARY:
+        summary_config = SUMMARY_MODE_CONFIGS[MODE_FILM_SUMMARY]
+    elif script_path in {MODE_SHORT_SUMMARY, MODE_SHORT}:
+        summary_config = SUMMARY_MODE_CONFIGS[MODE_SHORT_SUMMARY]
+    else:
+        return "", ""
+
+    plot_analysis = st.session_state.get(_summary_state_key(summary_config, "plot_analysis"), "") or ""
+    narration_copy = st.session_state.get(_summary_state_key(summary_config, "narration_copy"), "") or ""
+    return str(plot_analysis), str(narration_copy)
+
+
+def render_script_diagnosis_panel(tr):
+    """渲染剪辑脚本分镜诊断入口和结果。"""
+    script_data = st.session_state.get('video_clip_json', [])
+    if not isinstance(script_data, list) or not script_data:
+        return
+
+    script_path = st.session_state.get('video_clip_json_path', '')
+    original_sound_ratio = _current_original_sound_ratio(script_path)
+    subtitle_paths = _selected_subtitle_paths()
+    video_paths = _selected_video_paths()
+    content_type = _resolve_script_diagnosis_content_type(script_path)
+    plot_analysis, narration_copy = _script_diagnosis_context(script_path)
+    current_signature = _script_diagnosis_signature(
+        script_data,
+        original_sound_ratio,
+        subtitle_paths,
+        video_paths,
+        content_type,
+        plot_analysis,
+        narration_copy,
+    )
+
+    st.markdown("---")
+    st.markdown(f"**{tr('分镜脚本诊断')}**  :gray[{tr('基于剧情理解、当前脚本、字幕和原片占比评估每个分镜')}]")
+
+    action_cols = st.columns([1.1, 2.4], vertical_alignment="center")
+    with action_cols[0]:
+        diagnose_clicked = st.button(
+            tr("分析分镜合理性"),
+            key="diagnose_script_segments",
+            use_container_width=True,
+        )
+    with action_cols[1]:
+        st.caption(
+            tr("默认使用 LLM 批量分析剧情价值，不抽关键帧；需要看画面的片段会标记为建议视觉复核")
+        )
+
+    if diagnose_clicked:
+        subtitle_content = st.session_state.get('subtitle_content') or ""
+        if subtitle_paths:
+            subtitle_content, _subtitle_contents = _build_combined_subtitle_content(
+                subtitle_paths,
+                video_paths,
+            )
+
+        with st.spinner(tr("正在分析分镜脚本...")):
+            result = ScriptDiagnosisService().diagnose(
+                items=script_data,
+                subtitle_content=subtitle_content,
+                video_paths=video_paths,
+                original_sound_ratio=original_sound_ratio,
+                content_type=content_type,
+                plot_analysis=plot_analysis,
+                narration_copy=narration_copy,
+                analysis_mode="llm",
+            )
+        st.session_state["script_diagnosis_result"] = result.to_dict()
+        st.session_state["script_diagnosis_signature"] = current_signature
+
+    result = st.session_state.get("script_diagnosis_result")
+    if not isinstance(result, dict):
+        return
+
+    if st.session_state.get("script_diagnosis_signature") != current_signature:
+        st.info(tr("脚本、字幕、视频或原片占比已变化，请重新分析分镜。"))
+        return
+
+    overall = result.get("overall", {})
+    metric_cols = st.columns(4)
+    with metric_cols[0]:
+        st.metric(tr("目标原片占比"), f"{overall.get('target_original_sound_ratio', 0)}%")
+    with metric_cols[1]:
+        st.metric(tr("当前原片占比"), f"{overall.get('current_original_sound_ratio', 0):.1f}%")
+    with metric_cols[2]:
+        st.metric(
+            tr("原声片段"),
+            f"{overall.get('current_original_sound_count', 0)}/{overall.get('total_segments', 0)}",
+        )
+    with metric_cols[3]:
+        ratio_status = {"ok": "合理", "low": "偏低", "high": "偏高"}.get(
+            overall.get("ratio_status"),
+            overall.get("ratio_status", "-"),
+        )
+        st.metric(tr("占比状态"), ratio_status)
+
+    for suggestion in overall.get("ratio_adjustment_suggestions", []):
+        st.info(suggestion)
+
+    warnings = result.get("warnings", [])
+    for warning in warnings:
+        st.warning(warning)
+
+    errors = result.get("errors", [])
+    if errors:
+        with st.expander(tr("规则校验问题"), expanded=False):
+            for error in errors[:12]:
+                st.warning(error)
+            if len(errors) > 12:
+                st.caption(f"... 还有 {len(errors) - 12} 条")
+
+    segments = result.get("segments", [])
+    if not segments:
+        return
+
+    table_rows = []
+    for segment in segments:
+        table_rows.append({
+            "_id": segment.get("item_id"),
+            "状态": {"keep": "保留", "adjust": "需调整", "delete": "建议删除", "error": "错误"}.get(
+                segment.get("status"),
+                segment.get("status"),
+            ),
+            "价值分": segment.get("highlight_score"),
+            "综合分": segment.get("score"),
+            "视觉复核": "建议" if segment.get("needs_visual_review") else "-",
+            "建议动作": segment.get("decision"),
+            "原因": segment.get("reason"),
+        })
+
+    st.dataframe(pd.DataFrame(table_rows), hide_index=True, use_container_width=True)
+
+    with st.expander(tr("查看逐分镜详细建议"), expanded=False):
+        for segment in segments:
+            st.markdown(
+                f"**#{segment.get('item_id')} | 价值分 {segment.get('highlight_score')} | {segment.get('decision')}**"
+            )
+            st.write(segment.get("reason", ""))
+            if segment.get("needs_visual_review"):
+                st.warning(tr("该分镜建议进入关键帧/VLM 复核后再做最终取舍。"))
+
+            evidence = segment.get("evidence", [])
+            if evidence:
+                st.caption(tr("主要依据"))
+                for item in evidence[:5]:
+                    st.write(f"- {item}")
+
+            suggestions = segment.get("suggestions", [])
+            if suggestions:
+                st.caption(tr("调整建议"))
+                for suggestion in suggestions:
+                    st.write(f"- `{suggestion.get('type')}`: {suggestion.get('reason', '')}")
+            st.markdown("---")
+
+
 def render_fun_asr_transcription(tr):
     """使用 Fun-ASR 从本地音视频转写生成字幕。"""
     def clear_fun_asr_subtitle_state():
@@ -1307,26 +1515,52 @@ def render_fun_asr_transcription(tr):
         text_base_url = config.app.get(f'text_{text_provider}_base_url')
 
         corrected_paths = []
+        overall_progress_bar = None
+        current_file_progress_bar = None
+        progress_message = None
         try:
             spinner_text = tr("Calibrating subtitles...")
             with st.spinner(spinner_text):
-                progress_bar = st.progress(0) if len(subtitle_paths) > 1 else None
+                total_files = len(subtitle_paths)
+                overall_progress_bar = st.progress(0)
+                current_file_progress_bar = st.progress(0)
+                progress_message = st.empty()
                 for index, subtitle_path in enumerate(subtitle_paths, start=1):
                     subtitle_name = f"{os.path.splitext(os.path.basename(subtitle_path))[0]}_corrected.srt"
                     output_path = _unique_file_path(utils.subtitle_dir(), subtitle_name)
+
+                    def update_correction_progress(
+                        completed,
+                        total,
+                        message,
+                        file_index=index,
+                        file_path=subtitle_path,
+                    ):
+                        total_steps = total or 0
+                        file_ratio = 0 if total_steps <= 0 else min(max(completed / total_steps, 0), 1)
+                        overall_ratio = ((file_index - 1) + file_ratio) / total_files if total_files else file_ratio
+                        message_detail = f" · {message}" if message else ""
+                        overall_progress_bar.progress(min(max(overall_ratio, 0), 1))
+                        current_file_progress_bar.progress(file_ratio)
+                        progress_message.info(
+                            f"{file_index}/{total_files} {os.path.basename(file_path)}"
+                            f" · {completed}/{total_steps or '?'}"
+                            f"{message_detail}"
+                        )
+
+                    current_file_progress_bar.progress(0)
+                    progress_message.info(f"{index}/{total_files} {os.path.basename(subtitle_path)}")
                     corrected_path = subtitle_corrector.correct_subtitle_file(
                         subtitle_file=subtitle_path,
                         output_file=output_path,
                         provider=text_provider,
                         api_key=text_api_key,
                         base_url=text_base_url,
+                        progress_callback=update_correction_progress,
                     )
                     corrected_paths.append(corrected_path)
-                    if progress_bar:
-                        progress_bar.progress(index / len(subtitle_paths))
-
-                if progress_bar:
-                    progress_bar.empty()
+                    overall_progress_bar.progress(index / total_files)
+                    current_file_progress_bar.progress(1)
 
             _set_subtitle_state(corrected_paths)
             success_placeholder = st.empty()
@@ -1346,6 +1580,10 @@ def render_fun_asr_transcription(tr):
         except Exception as e:
             logger.error(f"字幕校准失败: {traceback.format_exc()}")
             st.error(f"{tr('Subtitle calibration failed')}: {str(e)}")
+        finally:
+            for progress_component in (overall_progress_bar, current_file_progress_bar, progress_message):
+                if progress_component is not None:
+                    progress_component.empty()
         return
 
     if translate_clicked:
@@ -1718,6 +1956,7 @@ def render_script_buttons(tr, params):
                     video_paths=_selected_video_paths(),
                     narration_language=narration_language,
                     drama_genre=drama_genre,
+                    original_sound_ratio=original_sound_ratio,
                     prompt_category=summary_config["prompt_category"],
                     search_keywords=summary_config["search_keywords"],
                     empty_title_message_key=summary_config["empty_title_message_key"],
@@ -1831,6 +2070,7 @@ def render_script_buttons(tr, params):
             load_script(tr, script_path)
 
     render_video_script_editor(tr)
+    render_script_diagnosis_panel(tr)
 
 
 def load_script(tr, script_path):

@@ -1,5 +1,6 @@
 import unittest
 
+from webui.tools import generate_short_summary
 from webui.tools.generate_short_summary import _format_progress_status, parse_and_fix_json
 
 
@@ -21,6 +22,16 @@ class GenerateShortSummaryJsonTests(unittest.TestCase):
         )
 
         self.assertEqual(1, parsed["items"][0]["_id"])
+
+    def test_narration_char_range_uses_category_ratio_and_original_sound_ratio(self):
+        char_range = generate_short_summary.build_narration_char_range(
+            source_duration_seconds=600,
+            prompt_category=generate_short_summary.SHORT_DRAMA_PROMPT_CATEGORY,
+            original_sound_ratio=40,
+            chars_per_second=5,
+        )
+
+        self.assertEqual("270-450", char_range)
 
 
 if __name__ == "__main__":

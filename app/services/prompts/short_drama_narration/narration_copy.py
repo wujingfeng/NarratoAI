@@ -13,6 +13,8 @@ from ..base import ParameterizedPrompt, PromptMetadata, ModelType, OutputFormat
 class NarrationCopyPrompt(ParameterizedPrompt):
     """短剧解说正文生成提示词"""
 
+    DEFAULT_NARRATION_CHAR_RANGE = "100-650"
+
     def __init__(self):
         metadata = PromptMetadata(
             name="narration_copy",
@@ -30,6 +32,12 @@ class NarrationCopyPrompt(ParameterizedPrompt):
             "你是一位短剧解说文案创作者。你只输出可供用户审核修改的解说正文，"
             "不要输出JSON、时间戳、编号、标题、解释或Markdown。"
         )
+
+    def render(self, parameters=None) -> str:
+        parameters = dict(parameters or {})
+        if not str(parameters.get("narration_char_range") or "").strip():
+            parameters["narration_char_range"] = self.DEFAULT_NARRATION_CHAR_RANGE
+        return super().render(parameters)
 
     def get_template(self) -> str:
         return """# 短剧解说正文创作任务
@@ -81,7 +89,7 @@ ${drama_genre}
 4. 每句话只表达一个信息点，适合后续按句匹配画面。
 5. 句子尽量短，单句优先 15-35 字；信息复杂时拆成多句。
 6. 每 2-3 句要有明确因果承接，让观众知道为什么从上一幕来到下一幕。
-7. 总长度控制在 300-650 字；短素材取下限，长素材取上限。
+7. 总长度控制在 ${narration_char_range} 字；短素材取下限，长素材取上限。
 8. 不要使用编号、项目符号、章节标题或括号说明。
 
 ## 输出要求

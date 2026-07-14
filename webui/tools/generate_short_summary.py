@@ -9,9 +9,11 @@
 '''
 import os
 import json
+import math
 import time
 import traceback
 import html
+import subprocess
 import streamlit as st
 from loguru import logger
 
@@ -37,6 +39,13 @@ SHORT_DRAMA_PROMPT_CATEGORY = "short_drama_narration"
 FILM_TV_PROMPT_CATEGORY = "film_tv_narration"
 SHORT_DRAMA_SEARCH_KEYWORDS = "短剧 剧情 介绍 人物 结局"
 FILM_TV_SEARCH_KEYWORDS = "影视 剧情 介绍 人物 结局 电影 电视剧"
+DEFAULT_NARRATION_CHARS_PER_SECOND = 5
+NARRATION_DURATION_COEFFICIENTS = {
+    SHORT_DRAMA_PROMPT_CATEGORY: (0.15, 0.25),
+    FILM_TV_PROMPT_CATEGORY: (0.12, 0.25),
+    "short_drama_editing": (0.2, 0.35),
+    "documentary": (0.2, 0.4),
+}
 
 
 def _normalize_paths(paths):
@@ -56,6 +65,84 @@ def _normalize_paths(paths):
         normalized_paths.append(path)
         seen.add(path)
     return normalized_paths
+
+
+def build_narration_char_range(
+    source_duration_seconds,
+    prompt_category: str,
+    original_sound_ratio: int,
+    chars_per_second: float = DEFAULT_NARRATION_CHARS_PER_SECOND,
+):
+    try:
+        source_duration_seconds = float(source_duration_seconds or 0)
+        chars_per_second = float(chars_per_second or 0)
+        original_sound_ratio = int(original_sound_ratio or 0)
+    except (TypeError, ValueError):
+        return ""
+
+    if source_duration_seconds <= 0 or chars_per_second <= 0:
+        return ""
+
+    ratio = min(max(original_sound_ratio, 0), 100) / 100
+    narration_ratio = max(0.0, 1.0 - ratio)
+    if narration_ratio <= 0:
+        return ""
+
+    min_coefficient, max_coefficient = NARRATION_DURATION_COEFFICIENTS.get(
+        prompt_category,
+        NARRATION_DURATION_COEFFICIENTS[SHORT_DRAMA_PROMPT_CATEGORY],
+    )
+    min_chars = math.floor(source_duration_seconds * min_coefficient * narration_ratio * chars_per_second)
+    max_chars = math.ceil(source_duration_seconds * max_coefficient * narration_ratio * chars_per_second)
+
+    if max_chars <= 0:
+        return ""
+    min_chars = max(1, min_chars)
+    max_chars = max(min_chars, max_chars)
+    return f"{min_chars}-{max_chars}"
+
+
+def _get_media_duration_seconds(video_path: str) -> float:
+    result = subprocess.run(
+        [
+            "ffprobe",
+            "-v",
+            "error",
+            "-show_entries",
+            "format=duration",
+            "-of",
+            "csv=p=0",
+            video_path,
+        ],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    return float(result.stdout.strip())
+
+
+def build_narration_char_range_for_video_paths(
+    video_paths,
+    prompt_category: str,
+    original_sound_ratio: int,
+    chars_per_second: float = DEFAULT_NARRATION_CHARS_PER_SECOND,
+):
+    total_duration = 0.0
+    for video_path in _normalize_paths(video_paths):
+        if not os.path.exists(video_path):
+            continue
+        try:
+            total_duration += _get_media_duration_seconds(video_path)
+        except Exception as e:
+            logger.warning(f"获取视频时长失败，跳过动态解说字数范围: {video_path}, error={str(e)}")
+            return ""
+
+    return build_narration_char_range(
+        total_duration,
+        prompt_category=prompt_category,
+        original_sound_ratio=original_sound_ratio,
+        chars_per_second=chars_per_second,
+    )
 
 
 def _build_combined_subtitle_content(subtitle_paths, video_paths=None):
@@ -359,6 +446,7 @@ def generate_short_drama_narration_copy(
     video_paths=None,
     narration_language: str = "简体中文（中国）",
     drama_genre: str = "逆袭/复仇",
+    original_sound_ratio: int = 30,
     prompt_category: str = SHORT_DRAMA_PROMPT_CATEGORY,
     search_keywords: str = SHORT_DRAMA_SEARCH_KEYWORDS,
     empty_title_message_key: str = "Please enter short drama name before web search",
@@ -382,6 +470,14 @@ def generate_short_drama_narration_copy(
     if not subtitle_content:
         st.error(tr("Subtitle file is empty or unreadable"))
         return None
+
+    narration_char_range = build_narration_char_range_for_video_paths(
+        selected_video_paths,
+        prompt_category=prompt_category,
+        original_sound_ratio=original_sound_ratio,
+    )
+    if narration_char_range:
+        logger.info(f"动态解说文案字数范围: {narration_char_range}")
 
     analysis_text = str(plot_analysis or "").strip()
     if not analysis_text:
@@ -422,6 +518,7 @@ def generate_short_drama_narration_copy(
             temperature=temperature,
             narration_language=narration_language,
             drama_genre=drama_genre,
+            narration_char_range=narration_char_range,
         )
     except Exception as e:
         logger.warning(f"使用新LLM服务生成文案失败，回退到旧实现: {str(e)}")
@@ -436,6 +533,7 @@ def generate_short_drama_narration_copy(
             provider=text_provider,
             narration_language=narration_language,
             drama_genre=drama_genre,
+            narration_char_range=narration_char_range,
             prompt_category=prompt_category,
         )
 

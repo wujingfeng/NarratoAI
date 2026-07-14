@@ -5,6 +5,7 @@ from unittest import mock
 from app.services.llm.migration_adapter import SubtitleAnalyzerAdapter
 from app.services.llm.unified_service import UnifiedLLMService
 from app.services.prompts import PromptManager
+from app.services.SDE import short_drama_explanation
 
 
 class SubtitleAnalyzerAdapterPipelineTests(unittest.TestCase):
@@ -29,7 +30,52 @@ class SubtitleAnalyzerAdapterPipelineTests(unittest.TestCase):
         self.assertEqual("success", result["status"])
         self.assertIn("反击", result["narration_copy"])
         self.assertIn("家庭伦理", call.call_args.kwargs["prompt"])
+        self.assertIn("总长度控制在 100-650 字", call.call_args.kwargs["prompt"])
+        self.assertNotIn("总长度控制在  字", call.call_args.kwargs["prompt"])
         self.assertNotIn("response_format", call.call_args.kwargs)
+
+    def test_generate_narration_copy_uses_dynamic_char_range_when_provided(self):
+        adapter = SubtitleAnalyzerAdapter(
+            api_key="sk-test",
+            model="test-model",
+            base_url="https://example.test/v1",
+            provider="openai",
+        )
+
+        with mock.patch.object(adapter, "_run_async_safely", return_value="她决定反击。") as call:
+            result = adapter.generate_narration_copy(
+                short_name="测试短剧",
+                plot_analysis="女主被家人误会后反击。",
+                subtitle_content="# 视频 1: 1.mp4\n00:00:01,000 --> 00:00:04,000\n女主被误会。",
+                temperature=0.7,
+                narration_language="简体中文（中国）",
+                drama_genre="家庭伦理",
+                narration_char_range="270-450",
+            )
+
+        self.assertEqual("success", result["status"])
+        self.assertIn("总长度控制在 270-450 字", call.call_args.kwargs["prompt"])
+        self.assertNotIn("总长度控制在 100-650 字", call.call_args.kwargs["prompt"])
+
+    def test_legacy_generate_narration_copy_passes_dynamic_char_range(self):
+        with mock.patch.object(
+            short_drama_explanation.SubtitleAnalyzer,
+            "generate_narration_copy",
+            return_value={"status": "success", "narration_copy": "她决定反击。"},
+        ) as call:
+            result = short_drama_explanation.generate_narration_copy(
+                short_name="测试短剧",
+                plot_analysis="女主被家人误会后反击。",
+                subtitle_content="女主被误会。",
+                api_key="sk-test",
+                model="test-model",
+                base_url="https://example.test/v1",
+                provider="openai",
+                narration_char_range="270-450",
+            )
+
+        self.assertEqual("success", result["status"])
+        self.assertEqual("270-450", call.call_args.kwargs["narration_char_range"])
 
     def test_generate_narration_copy_can_use_film_tv_prompt_category(self):
         self.assertTrue(PromptManager.exists("film_tv_narration", "narration_copy"))
@@ -54,6 +100,8 @@ class SubtitleAnalyzerAdapterPipelineTests(unittest.TestCase):
         self.assertEqual("success", result["status"])
         self.assertIn("影视解说正文创作任务", call.call_args.kwargs["prompt"])
         self.assertIn("用户选择的影视类型", call.call_args.kwargs["prompt"])
+        self.assertIn("总长度控制在 350-750 字", call.call_args.kwargs["prompt"])
+        self.assertNotIn("总长度控制在  字", call.call_args.kwargs["prompt"])
         self.assertNotIn("短剧解说正文创作任务", call.call_args.kwargs["prompt"])
 
     def test_film_tv_script_prompts_exclude_intro_outro_and_ads(self):
@@ -93,6 +141,9 @@ class SubtitleAnalyzerAdapterPipelineTests(unittest.TestCase):
                 self.assertIn("片尾", prompt)
                 self.assertIn("广告", prompt)
                 self.assertIn("绝对不能", prompt)
+                if prompt_name == "script_matching":
+                    self.assertIn("OST=1 的 items 数量 / 全部 items 数量", prompt)
+                    self.assertIn("不要按 timestamp 总时长计算", prompt)
 
     def test_match_narration_copy_to_script_uses_json_prompt_with_selected_type(self):
         adapter = SubtitleAnalyzerAdapter(
@@ -134,6 +185,8 @@ class SubtitleAnalyzerAdapterPipelineTests(unittest.TestCase):
         self.assertEqual(1, json.loads(result["narration_script"])["items"][0]["_id"])
         self.assertIn("家庭伦理", call.call_args.kwargs["prompt"])
         self.assertIn("60%", call.call_args.kwargs["prompt"])
+        self.assertIn("OST=1 的 items 数量 / 全部 items 数量", call.call_args.kwargs["prompt"])
+        self.assertIn("不要按 timestamp 总时长计算", call.call_args.kwargs["prompt"])
         self.assertEqual("json", call.call_args.kwargs["response_format"])
 
     def test_match_narration_copy_to_script_uses_streaming_when_callback_exists(self):

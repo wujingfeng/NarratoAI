@@ -42,9 +42,13 @@ class VideoProcessor:
         self.height = int(self.video_info.get('height', 0))
         self.total_frames = int(self.fps * self.duration)
 
-    def _get_video_info(self) -> Dict[str, str]:
+    @staticmethod
+    def get_video_info(video_path: str) -> Dict[str, str]:
         """
-        使用ffprobe获取视频信息
+        使用ffprobe获取视频信息(静态方法,无需实例化)
+
+        Args:
+            video_path: 视频文件路径
 
         Returns:
             Dict[str, str]: 包含视频基本信息的字典
@@ -55,7 +59,7 @@ class VideoProcessor:
             "-select_streams", "v:0",
             "-show_entries", "stream=width,height,r_frame_rate,duration",
             "-of", "default=noprint_wrappers=1:nokey=0",
-            self.video_path
+            video_path
         ]
 
         try:
@@ -85,6 +89,48 @@ class VideoProcessor:
                 'fps': '25',
                 'duration': '0'
             }
+
+    @staticmethod
+    def extract_frame_at_time(video_path: str, timestamp: float, output_path: str) -> bool:
+        """
+        在指定时间点提取一帧并保存为图片
+
+        Args:
+            video_path: 视频文件路径
+            timestamp: 时间戳(秒)
+            output_path: 输出图片路径
+
+        Returns:
+            bool: 是否成功提取
+        """
+        cmd = [
+            "ffmpeg",
+            "-hide_banner",
+            "-loglevel", "error",
+            "-ss", str(timestamp),
+            "-i", video_path,
+            "-vframes", "1",
+            "-q:v", "2",
+            "-pix_fmt", "yuv420p",
+            "-y",
+            output_path
+        ]
+
+        try:
+            subprocess.run(cmd, capture_output=True, text=True, check=True, timeout=30)
+            return os.path.exists(output_path) and os.path.getsize(output_path) > 0
+        except (subprocess.CalledProcessError, subprocess.TimeoutExpired, Exception) as e:
+            logger.warning(f"提取帧 {timestamp:.1f}s 失败: {e}")
+            return False
+
+    def _get_video_info(self) -> Dict[str, str]:
+        """
+        使用ffprobe获取视频信息
+
+        Returns:
+            Dict[str, str]: 包含视频基本信息的字典
+        """
+        return self.get_video_info(self.video_path)
 
     def extract_frames_by_interval(self, output_dir: str, interval_seconds: float = 5.0,
                                   use_hw_accel: bool = True) -> List[int]:

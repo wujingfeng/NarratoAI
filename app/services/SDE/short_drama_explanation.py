@@ -409,6 +409,7 @@ class SubtitleAnalyzer:
         temperature: float = 0.7,
         narration_language: str = "简体中文（中国）",
         drama_genre: str = "逆袭/复仇",
+        narration_char_range: str = "",
     ) -> Dict[str, Any]:
         """生成供用户审核修改的解说正文。"""
         try:
@@ -420,6 +421,7 @@ class SubtitleAnalyzer:
                     "plot_analysis": plot_analysis,
                     "subtitle_content": subtitle_content,
                     "narration_language": narration_language,
+                    "narration_char_range": narration_char_range,
                 },
             )
             return self._generate_plain_text(prompt, system_prompt, temperature)
@@ -963,6 +965,7 @@ def generate_narration_copy(
     provider: Optional[str] = None,
     narration_language: str = "简体中文（中国）",
     drama_genre: str = "逆袭/复仇",
+    narration_char_range: str = "",
     prompt_category: str = "short_drama_narration",
 ) -> Dict[str, Any]:
     """生成可供用户审核修改的解说正文。"""
@@ -982,6 +985,7 @@ def generate_narration_copy(
         temperature=temperature,
         narration_language=narration_language,
         drama_genre=drama_genre,
+        narration_char_range=narration_char_range,
     )
 
 

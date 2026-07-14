@@ -6,7 +6,7 @@ from html import escape
 from loguru import logger
 from app.config import config
 from webui.components import basic_settings, video_settings, audio_settings, subtitle_settings, script_settings, \
-    system_settings
+    system_settings, video_diagnosis
 # from webui.utils import cache, file_utils
 from app.utils import utils
 from app.utils import ffmpeg_utils
@@ -688,6 +688,28 @@ def main():
         utils.init_resources()
     except Exception as e:
         logger.warning(f"资源初始化时出现警告: {e}")
+
+    # 侧边栏导航
+    if 'current_page' not in st.session_state:
+        st.session_state['current_page'] = 'main'
+
+    with st.sidebar:
+        st.markdown("### 🧭 导航菜单")
+        nav_col1, nav_col2 = st.columns(2)
+        with nav_col1:
+            if st.button("📽️ 视频生成", use_container_width=True, key="nav_main"):
+                st.session_state['current_page'] = 'main'
+                st.rerun()
+        with nav_col2:
+            if st.button("🎬 视频诊断", use_container_width=True, key="nav_diagnosis"):
+                st.session_state['current_page'] = 'video_diagnosis'
+                st.rerun()
+        st.markdown("---")
+
+    # 页面路由
+    if st.session_state.get('current_page') == 'video_diagnosis':
+        video_diagnosis.render_video_diagnosis_page()
+        return
 
     st.title(f"Narrato:blue[AI]:sunglasses: 📽️")
     st.write(get_help_text())
