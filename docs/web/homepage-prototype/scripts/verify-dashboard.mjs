@@ -177,6 +177,27 @@ try {
         const rect = element.getBoundingClientRect();
         return { width: rect.width, height: rect.height };
       });
+      const visiblePageTargets = [
+        ...document.querySelectorAll(
+          ".dashboard-header a, .dashboard-header button, .dashboard-main a, .dashboard-main button, .dashboard-mobile-nav a, .dashboard-mobile-nav button",
+        ),
+      ]
+        .filter((element) => {
+          const rect = element.getBoundingClientRect();
+          const style = getComputedStyle(element);
+          return rect.width > 0 && rect.height > 0 && style.visibility !== "hidden";
+        })
+        .map((element) => {
+          const rect = element.getBoundingClientRect();
+          return {
+            label: element.getAttribute("aria-label") || element.textContent.trim() || element.className,
+            width: rect.width,
+            height: rect.height,
+          };
+        });
+      const creditActionIcon = document
+        .querySelector(".credits-overview__action svg")
+        .getBoundingClientRect();
       const lastContent = document.querySelector(".credits-overview").getBoundingClientRect();
       const navRect = mobileNav.getBoundingClientRect();
       return {
@@ -192,6 +213,8 @@ try {
         bodyPaddingBottom: parseFloat(getComputedStyle(main).paddingBottom),
         navHeight: navRect.height,
         navTargets,
+        visiblePageTargets,
+        creditActionIcon: { width: creditActionIcon.width, height: creditActionIcon.height },
         inspirationDisplay: getComputedStyle(document.querySelector(".inspiration-panel")).display,
         creditsRingDisplay: document.querySelector(".credits-ring")
           ? getComputedStyle(document.querySelector(".credits-ring")).display
@@ -212,6 +235,19 @@ try {
     check(
       mobileMetrics.navTargets.every(({ width, height }) => width >= 44 && height >= 44),
       `${size} 移动导航触控目标至少 44px`,
+    );
+    const undersizedTarget = mobileMetrics.visiblePageTargets.find(({ width, height }) => width < 44 || height < 44);
+    check(
+      !undersizedTarget,
+      `${size} 页面内主要可见交互目标至少 44px${
+        undersizedTarget
+          ? `（${undersizedTarget.label}: ${undersizedTarget.width}×${undersizedTarget.height}）`
+          : ""
+      }`,
+    );
+    check(
+      mobileMetrics.creditActionIcon.width >= 18 && mobileMetrics.creditActionIcon.height >= 18,
+      `${size} 月耗操作箭头清晰可见`,
     );
     check(mobileMetrics.inspirationDisplay === "none", `${size} 移动隐藏创作灵感`);
     check(mobileMetrics.creditsRingDisplay === "none", `${size} 移动隐藏完整创作点圆环`);
@@ -245,11 +281,15 @@ try {
     }),
   );
   check(
-    reducedMotion.filter(Boolean).every(({ animationName }) => animationName === "none"),
+    reducedMotion.length === 3 && reducedMotion.every(Boolean),
+    "减少动态效果采样完整覆盖 Banner、Toast 与工具卡",
+  );
+  check(
+    reducedMotion.every(({ animationName }) => animationName === "none"),
     "减少动态效果时 Banner、Toast 与卡片不播放动画",
   );
   check(
-    reducedMotion.filter(Boolean).every(({ transitionDuration }) => parseFloat(transitionDuration) <= 0.01),
+    reducedMotion.every(({ transitionDuration }) => parseFloat(transitionDuration) <= 0.01),
     "减少动态效果时过渡降级为近静态",
   );
   await page.getByRole("button", { name: "关闭提示" }).click();

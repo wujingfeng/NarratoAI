@@ -404,7 +404,7 @@
 .credits-overview__usage { position: absolute; bottom: 26px; left: 18px; display: flex; align-items: center; gap: 8px; margin: 0; color: var(--dashboard-text-muted); font-size: 13px; }
 .credits-overview__usage span { width: 8px; height: 8px; border-radius: 50%; background: #7840e7; }
 .credits-overview__action { position: absolute; right: 11px; bottom: 19px; width: 40px; height: 32px; overflow: hidden; border: 0; background: transparent; color: transparent; font-size: 0; cursor: pointer; }
-.credits-overview__action svg { color: var(--dashboard-text-muted); }
+.credits-overview__action svg { width: 20px; height: 20px; color: var(--dashboard-text-muted); }
 .credits-overview__action:hover svg { color: #fff; transform: translateX(2px); }
 
 .inspiration-panel__list { display: grid; gap: 10px; margin-top: 17px; }
@@ -546,9 +546,9 @@
   }
   .tool-quick-start__grid {
     display: grid;
-    grid-template-columns: repeat(3, max(250px, 82vw));
+    grid-template-columns: repeat(3, max(250px, 78vw));
     grid-auto-flow: column;
-    grid-auto-columns: max(250px, 82vw);
+    grid-auto-columns: max(250px, 78vw);
     gap: 14px;
     height: auto;
     margin-inline: -1px;
@@ -567,6 +567,7 @@
 
   .recent-projects,
   .credits-overview { min-height: 0; padding: 20px 16px; }
+  .dashboard-section-heading button { min-height: 44px; }
   .recent-projects__list { gap: 10px; }
   .recent-projects__item {
     position: relative;
@@ -658,7 +659,7 @@
   .creation-entry-card__icon { width: 45px; height: 45px; }
   .creation-entry-card button { width: 44px; height: 44px; }
   .creation-entry-card h2 { font-size: 22px; }
-  .tool-quick-start__grid { grid-auto-columns: max(250px, 82vw); }
+  .tool-quick-start__grid { grid-auto-columns: max(250px, 78vw); }
   .recent-projects { padding-inline: 12px; }
   .recent-projects__item { grid-template-columns: 78px minmax(0, 1fr) minmax(54px, auto); gap: 9px; padding-right: 29px; }
   .recent-projects__item .dashboard-thumbnail { width: 78px; height: 70px; }
