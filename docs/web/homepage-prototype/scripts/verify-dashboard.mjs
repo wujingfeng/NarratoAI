@@ -46,6 +46,59 @@ async function expectToast(trigger, message) {
 try {
   await page.goto(`${baseUrl}/dashboard`, { waitUntil: "domcontentloaded" });
   await page.getByRole("heading", { name: "工作台概览" }).waitFor();
+  const desktopMetrics = await page.evaluate(() => {
+    const sidebar = document.querySelector(".dashboard-sidebar").getBoundingClientRect();
+    const main = document.querySelector(".dashboard-main").getBoundingClientRect();
+    const banner = document.querySelector("[data-dashboard-banner]").getBoundingClientRect();
+    return {
+      pageWidth: document.documentElement.scrollWidth,
+      viewportWidth: innerWidth,
+      sidebarWidth: sidebar.width,
+      sidebarLeft: sidebar.left,
+      mainLeft: main.left,
+      bannerWidth: banner.width,
+      mobileNavDisplay: getComputedStyle(document.querySelector(".dashboard-mobile-nav")).display,
+      background: getComputedStyle(document.querySelector(".dashboard-shell")).backgroundColor,
+    };
+  });
+  check(desktopMetrics.pageWidth <= desktopMetrics.viewportWidth + 1, "桌面不得横向溢出");
+  check(desktopMetrics.sidebarWidth >= 220 && desktopMetrics.sidebarWidth <= 280, "1487 桌面侧栏宽度接近参考稿");
+  check(desktopMetrics.sidebarLeft === 0, "桌面侧栏贴齐左侧");
+  check(desktopMetrics.mainLeft >= desktopMetrics.sidebarWidth, "主内容不得压到侧栏");
+  check(desktopMetrics.bannerWidth >= 900, "促销 Banner 占据主内容主宽度");
+  check(desktopMetrics.mobileNavDisplay === "none", "桌面隐藏移动底栏");
+  check(desktopMetrics.background === "rgb(5, 8, 18)", "工作台使用深色背景 Token");
+
+  for (const width of [1280, 1025, 1024]) {
+    await page.setViewportSize({ width, height: 1058 });
+    const responsiveMetrics = await page.evaluate(() => {
+      const sidebar = document.querySelector(".dashboard-sidebar").getBoundingClientRect();
+      const main = document.querySelector(".dashboard-main").getBoundingClientRect();
+      const creation = document.querySelector(".creation-entry-card").getBoundingClientRect();
+      const tools = [...document.querySelectorAll(".tool-quick-start__card")].map((element) =>
+        element.getBoundingClientRect().width,
+      );
+      return {
+        pageWidth: document.documentElement.scrollWidth,
+        viewportWidth: innerWidth,
+        sidebarWidth: sidebar.width,
+        mainLeft: main.left,
+        creationWidth: creation.width,
+        minimumToolWidth: Math.min(...tools),
+        mobileNavDisplay: getComputedStyle(document.querySelector(".dashboard-mobile-nav")).display,
+      };
+    });
+    check(
+      responsiveMetrics.pageWidth <= responsiveMetrics.viewportWidth + 1,
+      `${width} 桌面不得横向溢出`,
+    );
+    check(responsiveMetrics.sidebarWidth >= 220, `${width} 保留可用桌面侧栏`);
+    check(responsiveMetrics.mainLeft >= responsiveMetrics.sidebarWidth, `${width} 主内容避让侧栏`);
+    check(responsiveMetrics.creationWidth >= 280, `${width} 新建创作卡保持可读宽度`);
+    check(responsiveMetrics.minimumToolWidth >= 120, `${width} 工具卡保持可读宽度`);
+    check(responsiveMetrics.mobileNavDisplay === "none", `${width} 桌面隐藏移动底栏`);
+  }
+  await page.setViewportSize({ width: 1487, height: 1058 });
   check(await page.locator("h1").count() === 1, "Dashboard 只有一个 h1");
   check(await page.getByRole("navigation", { name: "工作台主导航" }).count() === 1, "桌面主导航存在");
   check(await page.getByRole("link", { name: "影创工坊" }).getAttribute("href") === "/", "品牌链接返回官网");
