@@ -45,27 +45,40 @@ async function expectDashboardAfterClick(locator, label) {
 
 async function verifyCreationEntries() {
   await page.goto(`${baseUrl}/`, { waitUntil: "domcontentloaded" });
+  const startButtons = page.getByRole("button", { name: /^开始创作/ });
+  const startButtonCount = await startButtons.count();
+  if (startButtonCount !== 2) {
+    throw new Error(`开始创作入口应为 2 个，实际为 ${startButtonCount} 个`);
+  }
   await expectDashboardAfterClick(
-    page.getByRole("button", { name: /^开始创作/ }).first(),
+    startButtons.first(),
     "Hero 开始创作",
   );
 
   for (const toolId of ["narration", "translation", "remix"]) {
     await page.locator(`#tool-tab-${toolId}`).click();
     const templates = page.getByRole("button", { name: /使用相同模板创作/ });
-    for (let index = 0; index < await templates.count(); index += 1) {
+    const templateCount = await templates.count();
+    if (templateCount !== 3) {
+      throw new Error(`${toolId} 模板入口应为 3 个，实际为 ${templateCount} 个`);
+    }
+    for (let index = 0; index < templateCount; index += 1) {
       await expectDashboardAfterClick(templates.nth(index), `${toolId} 模板 ${index + 1}`);
       await page.locator(`#tool-tab-${toolId}`).click();
     }
   }
 
   const tryButtons = page.getByRole("button", { name: /立即体验/ });
-  for (let index = 0; index < await tryButtons.count(); index += 1) {
+  const tryButtonCount = await tryButtons.count();
+  if (tryButtonCount !== 3) {
+    throw new Error(`能力入口应为 3 个，实际为 ${tryButtonCount} 个`);
+  }
+  for (let index = 0; index < tryButtonCount; index += 1) {
     await expectDashboardAfterClick(tryButtons.nth(index), `能力入口 ${index + 1}`);
   }
 
   await expectDashboardAfterClick(
-    page.getByRole("button", { name: /^开始创作/ }).last(),
+    startButtons.last(),
     "底部开始创作",
   );
 }
@@ -81,7 +94,7 @@ async function verifyPreservedWebsiteBehaviors() {
     throw new Error("Demo Tab 无法切换");
   }
 
-  await page.locator(".case-card__image").first().click();
+  await page.getByRole("button", { name: /^播放案例：/ }).first().click();
   await page.getByRole("dialog").waitFor({ state: "visible" });
   await page.getByRole("button", { name: "关闭案例", exact: true }).click();
 
