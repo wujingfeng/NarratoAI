@@ -169,7 +169,7 @@ export function HeroSection({ onStart, onViewDemo }) {
       <div className="hero-main page-container">
         <div className="hero-copy">
           <div className="eyebrow">AI 视频创作 · 小白也能做专业视频</div>
-          <h1><span>专为自媒体小白打造的</span><strong>AI 出片工作台</strong></h1>
+          <h1 data-route-heading tabIndex="-1"><span>专为自媒体小白打造的</span><strong>AI 出片工作台</strong></h1>
           <p>
             <span className="hero-description--desktop">上传素材，AI 自动完成剪辑、文案、配音、字幕与合成。短剧解说、视频翻译、智能混剪，一个工作台搞定。</span>
             <span className="hero-description--mobile">上传素材，AI 自动完成剪辑、文案、配音、字幕与合成。</span>

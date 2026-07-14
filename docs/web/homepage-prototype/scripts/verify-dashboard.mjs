@@ -1,6 +1,70 @@
+import { readFile, readdir } from "node:fs/promises";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
 
 const baseUrl = process.env.BASE_URL || "http://127.0.0.1:4173";
+const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const scanRoot = process.env.DASHBOARD_SCAN_ROOT
+  ? path.resolve(process.env.DASHBOARD_SCAN_ROOT)
+  : projectRoot;
+const authoredTargets = [
+  "src/pages/DashboardPage.jsx",
+  "src/components/dashboard",
+  "src/styles/dashboard.css",
+  "src/data/dashboardData.js",
+  "public",
+];
+const forbidden = [
+  ["参考图文件名", /(?:04-dashboard-desktop|28-dashboard-mobile)\.png/i],
+  ["data image", /data:image/i],
+  ["base64", /base64/i],
+  ["canvas", /<canvas\b|CanvasRenderingContext2D|drawImage\s*\(/i],
+  ["CSS url 背景", /background-image\s*:\s*url\s*\(/i],
+  ["SVG 内嵌位图", /<image\b|xlink:href\s*=|href\s*=\s*["']data:image/i],
+];
+
+async function collectFiles(target) {
+  const entries = await readdir(target, { withFileTypes: true });
+  const files = [];
+  for (const entry of entries) {
+    const entryPath = path.join(target, entry.name);
+    if (entry.isDirectory()) files.push(...(await collectFiles(entryPath)));
+    else if (entry.isFile()) files.push(entryPath);
+  }
+  return files;
+}
+
+async function verifyAuthoredSources() {
+  const files = [];
+  for (const target of authoredTargets) {
+    const absoluteTarget = path.join(scanRoot, target);
+    try {
+      const entries = await collectFiles(absoluteTarget);
+      files.push(...entries);
+    } catch (error) {
+      if (error.code === "ENOTDIR") files.push(absoluteTarget);
+      else if (error.code !== "ENOENT") throw error;
+    }
+  }
+
+  const violations = [];
+  for (const file of files) {
+    const source = await readFile(file, "utf8");
+    for (const [label, pattern] of forbidden) {
+      const match = source.match(pattern);
+      if (match) violations.push(`${path.relative(scanRoot, file)}: ${label} (${match[0]})`);
+    }
+  }
+  if (violations.length > 0) {
+    throw new Error(`Dashboard authored source 反贴图扫描失败:\n${violations.join("\n")}`);
+  }
+  console.log(`Dashboard authored source 反贴图扫描通过（${files.length} files）`);
+}
+
+await verifyAuthoredSources();
+if (process.env.DASHBOARD_SCAN_ONLY === "1") process.exit(0);
+
 const executablePath =
   process.env.CHROME_PATH || "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
 const browser = await chromium.launch({ executablePath, headless: true });

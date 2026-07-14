@@ -43,6 +43,73 @@ async function expectDashboardAfterClick(locator, label) {
   await page.waitForURL(`${baseUrl}/`);
 }
 
+async function expectRouteState({ pathname, title, heading }) {
+  await page.waitForURL(`${baseUrl}${pathname}`);
+  await page.waitForFunction((expectedTitle) => document.title === expectedTitle, title);
+  const routeHeading = page.locator("[data-route-heading]");
+  await routeHeading.filter({ hasText: heading }).waitFor();
+  await page.waitForFunction(() => document.activeElement === document.querySelector("[data-route-heading]"));
+}
+
+async function expectHomeRouteState() {
+  await expectRouteState({
+    pathname: "/",
+    title: "影创工坊｜AI 出片工作台",
+    heading: "专为自媒体小白打造的AI 出片工作台",
+  });
+}
+
+async function verifyRouteHistoryAndNotFound() {
+  await page.goto(`${baseUrl}/dashboard`, { waitUntil: "domcontentloaded" });
+  await expectRouteState({
+    pathname: "/dashboard",
+    title: "工作台概览｜影创工坊",
+    heading: "工作台概览",
+  });
+
+  await page.reload({ waitUntil: "domcontentloaded" });
+  await expectRouteState({
+    pathname: "/dashboard",
+    title: "工作台概览｜影创工坊",
+    heading: "工作台概览",
+  });
+
+  await page.getByRole("link", { name: "影创工坊" }).click();
+  await expectHomeRouteState();
+
+  await page.goBack();
+  await expectRouteState({
+    pathname: "/dashboard",
+    title: "工作台概览｜影创工坊",
+    heading: "工作台概览",
+  });
+
+  await page.goForward();
+  await expectHomeRouteState();
+
+  await page.goto(`${baseUrl}/missing-route`, { waitUntil: "domcontentloaded" });
+  await expectRouteState({
+    pathname: "/missing-route",
+    title: "页面未找到｜影创工坊",
+    heading: "页面未找到",
+  });
+
+  await page.getByRole("link", { name: "返回官网" }).click();
+  await expectHomeRouteState();
+  await page.goBack();
+  await expectRouteState({
+    pathname: "/missing-route",
+    title: "页面未找到｜影创工坊",
+    heading: "页面未找到",
+  });
+  await page.getByRole("link", { name: "前往工作台" }).click();
+  await expectRouteState({
+    pathname: "/dashboard",
+    title: "工作台概览｜影创工坊",
+    heading: "工作台概览",
+  });
+}
+
 async function verifyCreationEntries() {
   await page.goto(`${baseUrl}/`, { waitUntil: "domcontentloaded" });
   const startButtons = page.getByRole("button", { name: /^开始创作/ });
@@ -109,12 +176,7 @@ async function verifyPreservedWebsiteBehaviors() {
 try {
   await verifyCreationEntries();
   await verifyPreservedWebsiteBehaviors();
-  await page.goto(`${baseUrl}/dashboard`, { waitUntil: "domcontentloaded" });
-  if ((await page.locator("h1").textContent()) !== "工作台概览") {
-    throw new Error("/dashboard 应渲染工作台概览而不是官网");
-  }
-  await page.goto(`${baseUrl}/missing-route`, { waitUntil: "domcontentloaded" });
-  await page.getByRole("heading", { name: "页面未找到" }).waitFor();
+  await verifyRouteHistoryAndNotFound();
   if (failures.length > 0) throw new Error(`路由访问存在浏览器错误:\n${failures.join("\n")}`);
 } finally {
   await browser.close();
