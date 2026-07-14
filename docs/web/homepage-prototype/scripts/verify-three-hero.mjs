@@ -298,10 +298,11 @@ function checkCommonLayout(metrics, label) {
 async function verifyCtaClick(page, label) {
   try {
     await page.locator(".hero-actions .primary-button").click({ timeout: 3000 });
-    await page.locator(".toast[role='status']").waitFor({ state: "visible", timeout: 3000 });
-    check(true, `${label} DOM CTA 可点击`);
+    await page.waitForURL((url) => url.pathname === "/dashboard", { timeout: 3000 });
+    await page.getByRole("heading", { name: "工作台概览" }).waitFor({ state: "attached", timeout: 3000 });
+    check(true, `${label} DOM CTA 导航到工作台`);
   } catch (error) {
-    check(false, `${label} DOM CTA 可点击`, error.message);
+    check(false, `${label} DOM CTA 导航到工作台`, error.message);
   }
 }
 
