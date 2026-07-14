@@ -17,8 +17,6 @@ const browser = await chromium.launch({ executablePath, headless: true });
 const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
 const failures = [];
 
-await page.route("**/favicon.ico", (route) => route.fulfill({ status: 204 }));
-
 page.on("console", (message) => {
   if (message.type() === "error") {
     const location = message.location().url;
@@ -46,9 +44,17 @@ async function expectDashboardAfterClick(locator, label) {
 async function expectRouteState({ pathname, title, heading }) {
   await page.waitForURL(`${baseUrl}${pathname}`);
   await page.waitForFunction((expectedTitle) => document.title === expectedTitle, title);
-  const routeHeading = page.locator("[data-route-heading]");
-  await routeHeading.filter({ hasText: heading }).waitFor();
-  await page.waitForFunction(() => document.activeElement === document.querySelector("[data-route-heading]"));
+  const routeHeadings = page.locator("[data-route-heading]");
+  await routeHeadings.first().waitFor();
+  const headingCount = await routeHeadings.count();
+  if (headingCount !== 1) throw new Error(`${pathname} 应有且仅有一个路由标题，实际 ${headingCount} 个`);
+  const routeHeading = routeHeadings.first();
+  const actualHeading = await routeHeading.textContent();
+  if (actualHeading !== heading) {
+    throw new Error(`${pathname} 路由标题文本不匹配：expected=${heading}, actual=${actualHeading}`);
+  }
+  const headingElement = await routeHeading.elementHandle();
+  await page.waitForFunction((element) => document.activeElement === element, headingElement);
 }
 
 async function expectHomeRouteState() {

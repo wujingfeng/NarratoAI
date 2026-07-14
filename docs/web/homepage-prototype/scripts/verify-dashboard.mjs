@@ -73,7 +73,6 @@ const failures = [];
 const failedThumbnailUrl = new URL("/assets/documentary-thumb.webp", baseUrl).href;
 let thumbnail404Observed = false;
 
-await page.route("**/favicon.ico", (route) => route.fulfill({ status: 204 }));
 await page.route("**/assets/documentary-thumb.webp", (route) => {
   route.fulfill({ status: 404, contentType: "image/webp", body: "" });
 });

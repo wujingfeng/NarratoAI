@@ -12,7 +12,6 @@ const browser = await chromium.launch({ executablePath, headless: true });
 
 async function capture(name, viewport, fullPage) {
   const page = await browser.newPage({ viewport, deviceScaleFactor: 1 });
-  await page.route("**/favicon.ico", (route) => route.fulfill({ status: 204 }));
   page.on("console", (message) => {
     if (message.type() === "error") {
       const location = message.location().url;
