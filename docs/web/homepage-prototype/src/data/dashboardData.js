@@ -1,12 +1,10 @@
 import {
-  BookOpenText,
   ClockCounterClockwise,
   Coins,
   FilmSlate,
   House,
   MagicWand,
   Scissors,
-  Sparkle,
   Translate,
   UserCircle,
 } from "@phosphor-icons/react";
@@ -71,7 +69,6 @@ export const inspirations = [
     title: "解说节奏指南",
     description: "掌握悬念、转折与高潮的叙事密度",
     image: "/assets/short-drama-thumb.webp",
-    icon: BookOpenText,
     unavailableMessage: "解说节奏指南功能建设中",
   },
   {
@@ -79,7 +76,6 @@ export const inspirations = [
     title: "热门混剪灵感",
     description: "从近期热门题材中找到创作方向",
     image: "/assets/film-action-thumb.webp",
-    icon: Sparkle,
     unavailableMessage: "热门混剪灵感功能建设中",
   },
 ];
