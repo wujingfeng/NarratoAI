@@ -106,7 +106,121 @@ async function expectToast(trigger, message) {
   check(page.url() === `${baseUrl}/dashboard`, `${message} 不得改变路由`);
 }
 
+async function verifyImagesHiddenWithoutFallback() {
+  const imagePage = await browser.newPage({ viewport: { width: 1487, height: 1058 } });
+  const imagePageFailures = [];
+  imagePage.on("console", (message) => {
+    if (message.type() === "error") imagePageFailures.push(`console.error: ${message.text()}`);
+  });
+  imagePage.on("pageerror", (error) => imagePageFailures.push(`pageerror: ${error.message}`));
+  imagePage.on("requestfailed", (request) => {
+    imagePageFailures.push(`requestfailed: ${request.method()} ${request.url()} ${request.failure()?.errorText}`);
+  });
+  imagePage.on("response", (response) => {
+    if (response.status() >= 400) imagePageFailures.push(`response ${response.status()}: ${response.url()}`);
+  });
+
+  try {
+    await imagePage.goto(`${baseUrl}/dashboard`, { waitUntil: "networkidle" });
+    await imagePage.getByRole("heading", { name: "工作台概览" }).waitFor();
+    const dashboardImages = imagePage.locator(".dashboard-shell img");
+    check((await dashboardImages.count()) === 5, "正常 Dashboard 精确包含 5 个项目或灵感内容图片");
+
+    await dashboardImages.evaluateAll((images) => {
+      images.forEach((image) => {
+        image.hidden = true;
+      });
+    });
+
+    const hiddenMetrics = await imagePage.evaluate(() => {
+      const visibleRect = (element) => {
+        if (!element) return false;
+        const style = getComputedStyle(element);
+        const rect = element.getBoundingClientRect();
+        return style.display !== "none" &&
+          style.visibility !== "hidden" &&
+          Number.parseFloat(style.opacity || "1") > 0 &&
+          rect.width > 0 &&
+          rect.height > 0 &&
+          rect.right > 0 &&
+          rect.bottom > 0 &&
+          rect.left < innerWidth &&
+          rect.top < innerHeight;
+      };
+      const allVisible = (selector, expectedCount) => {
+        const elements = [...document.querySelectorAll(selector)];
+        return elements.length === expectedCount && elements.every(visibleRect);
+      };
+      const textVisible = (selector, expectedTexts) => {
+        const elements = [...document.querySelectorAll(selector)];
+        return elements.length === expectedTexts.length &&
+          elements.every((element, index) =>
+            visibleRect(element) && element.textContent.trim().includes(expectedTexts[index]),
+          );
+      };
+
+      return {
+        images: [...document.querySelectorAll(".dashboard-shell img")].map((image) => ({
+          hidden: image.hidden,
+          display: getComputedStyle(image).display,
+        })),
+        logo: visibleRect(document.querySelector(".dashboard-sidebar__brand")),
+        banner: visibleRect(document.querySelector("[data-dashboard-banner]")),
+        navigation: visibleRect(document.querySelector("nav[aria-label='工作台主导航']")),
+        accountButtons: allVisible(".dashboard-account button", 3),
+        membershipButton: allVisible(".dashboard-membership-card", 1),
+        creationButton: allVisible(".creation-entry-card button", 1),
+        toolButtons: allVisible(".tool-quick-start__card", 3),
+        bannerButtons: allVisible("[data-dashboard-banner] button", 2),
+        projectButtons: allVisible("[data-project-status]", 3),
+        projectTitles: textVisible(".recent-projects__details strong", [
+          "霸总短剧解说 01",
+          "都市逆袭 · 混剪",
+          "悬疑短剧翻译",
+        ]),
+        projectStatuses: textVisible(".recent-projects__status > span", ["已完成", "处理中 66%", "草稿"]),
+        progress: visibleRect(document.querySelector("progress[value='66'][max='100']")),
+        balance: visibleRect(document.querySelector(".credits-overview__balance-value")),
+        monthlyCredits: visibleRect(document.querySelector(".credits-overview__usage")),
+        creditsRing: visibleRect(document.querySelector(".credits-ring")),
+        footer: visibleRect(document.querySelector(".dashboard-footer")),
+        pageWidth: document.documentElement.scrollWidth,
+        viewportWidth: innerWidth,
+      };
+    });
+
+    check(
+      hiddenMetrics.images.length === 5 &&
+        hiddenMetrics.images.every(({ hidden, display }) => hidden && display === "none"),
+      "设置 hidden 后 5 个 Dashboard 内容图片逐项不可见",
+    );
+    for (const [name, value] of Object.entries(hiddenMetrics)) {
+      if (["images", "pageWidth", "viewportWidth"].includes(name)) continue;
+      check(value === true, `隐藏全部内容图片后 ${name} 保持可见且具有非零几何尺寸`);
+    }
+    check(hiddenMetrics.pageWidth <= hiddenMetrics.viewportWidth + 1, "隐藏图片后 Dashboard 不得横向溢出");
+
+    await dashboardImages.evaluateAll((images) => {
+      images.forEach((image) => {
+        image.hidden = false;
+      });
+    });
+    const restoredDisplays = await dashboardImages.evaluateAll((images) =>
+      images.map((image) => ({ hidden: image.hidden, display: getComputedStyle(image).display })),
+    );
+    check(
+      restoredDisplays.length === 5 &&
+        restoredDisplays.every(({ hidden, display }) => !hidden && display !== "none"),
+      "隐藏验收后 5 个 Dashboard 内容图片均恢复",
+    );
+    check(imagePageFailures.length === 0, `图片隐藏独立页面存在浏览器错误:\n${imagePageFailures.join("\n")}`);
+  } finally {
+    await imagePage.close();
+  }
+}
+
 try {
+  await verifyImagesHiddenWithoutFallback();
   await page.goto(`${baseUrl}/dashboard`, { waitUntil: "domcontentloaded" });
   await page.getByRole("heading", { name: "工作台概览" }).waitFor();
   const desktopMetrics = await page.evaluate(() => {
@@ -192,42 +306,6 @@ try {
     await accountAction.focus();
     check(await accountAction.evaluate((element) => document.activeElement === element), "账户区操作可获得键盘焦点");
   }
-
-  const dashboardImages = page.locator(".dashboard-shell img");
-  check((await dashboardImages.count()) > 0, "Dashboard 存在允许的项目或灵感内容图片");
-  await dashboardImages.evaluateAll((images) => {
-    images.forEach((image) => {
-      image.hidden = true;
-    });
-  });
-  const imageHiddenMetrics = await page.evaluate(() => ({
-    imagesHidden: [...document.querySelectorAll(".dashboard-shell img")].every(
-      (image) => image.hidden && getComputedStyle(image).display === "none",
-    ),
-    logo: Boolean(document.querySelector(".dashboard-shell a[href='/']")),
-    banner: Boolean(document.querySelector("[data-dashboard-banner]")),
-    heading: document.querySelector("h1")?.textContent.trim(),
-    projectStates: document.querySelectorAll("[data-project-status]").length,
-    progress: document.querySelector("progress")?.value,
-    balance: document.body.textContent.includes("1,280"),
-    monthlyCredits: document.body.textContent.includes("240 创作点"),
-  }));
-  check(imageHiddenMetrics.imagesHidden, "设置 hidden 后所有 Dashboard 内容图片均不可见");
-  check(
-    imageHiddenMetrics.logo &&
-      imageHiddenMetrics.banner &&
-      imageHiddenMetrics.heading === "工作台概览" &&
-      imageHiddenMetrics.projectStates === 3 &&
-      imageHiddenMetrics.progress === 66 &&
-      imageHiddenMetrics.balance &&
-      imageHiddenMetrics.monthlyCredits,
-    "隐藏全部内容图片后 Dashboard 主体结构仍完整",
-  );
-  await dashboardImages.evaluateAll((images) => {
-    images.forEach((image) => {
-      image.hidden = false;
-    });
-  });
 
   for (const width of [1280, 1025]) {
     await page.setViewportSize({ width, height: 1058 });
