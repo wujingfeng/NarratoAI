@@ -7,10 +7,10 @@ export function InspirationPanel({ inspirations, onUnavailable }) {
       <div className="dashboard-section-heading"><p>探索更多</p><h2 id="inspiration-title">创作灵感</h2></div>
       <div className="inspiration-panel__list">
         {inspirations.map((item) => (
-          <button type="button" onClick={() => onUnavailable(item.unavailableMessage)} key={item.id}>
+          <button className="inspiration-panel__item" type="button" onClick={() => onUnavailable(item.unavailableMessage)} key={item.id}>
             <DashboardThumbnail src={item.image} alt={`${item.title}封面`} fallbackLabel={item.title} />
-            <span><strong>{item.title}</strong><small>{item.description}</small></span>
-            <ArrowUpRight aria-hidden="true" />
+            <span className="inspiration-panel__content"><strong>{item.title}</strong><small>{item.description}</small></span>
+            <ArrowUpRight className="inspiration-panel__arrow" aria-hidden="true" />
           </button>
         ))}
       </div>

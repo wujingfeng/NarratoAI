@@ -20,11 +20,12 @@ export function RecentProjects({ projects, onUnavailable }) {
             <DashboardThumbnail src={project.image} alt={`${project.title}封面`} fallbackLabel={project.tool} />
             <span className="recent-projects__details">
               <strong>{project.title}</strong>
-              <small>{project.tool} · 消耗 {project.credits} 创作点</small>
+              <small>{project.tool}</small>
             </span>
             <span className={`recent-projects__status recent-projects__status--${project.status}`}>
               {project.progress !== null && <progress value={project.progress} max="100">{project.progress}%</progress>}
               <span>{project.statusLabel}</span>
+              <small className="recent-projects__credits">消耗 {project.credits}</small>
             </span>
           </button>
         ))}

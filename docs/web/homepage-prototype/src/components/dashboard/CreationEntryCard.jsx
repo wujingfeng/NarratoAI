@@ -6,8 +6,9 @@ export function CreationEntryCard({ action, onUnavailable }) {
     <article className="creation-entry-card">
       <span className="creation-entry-card__icon" aria-hidden="true"><Icon /></span>
       <div>
-        <p>从一个想法开始</p>
-        <h2>创建你的下一支爆款视频</h2>
+        <p className="creation-entry-card__eyebrow">开始一次新的 AI 创作</p>
+        <h2>新建创作</h2>
+        <p className="creation-entry-card__description">上传素材，跟随引导完成专业出片</p>
       </div>
       <button type="button" onClick={() => onUnavailable(action.unavailableMessage)}>
         {action.label}<ArrowUpRight aria-hidden="true" />

@@ -50,6 +50,14 @@ try {
     const sidebar = document.querySelector(".dashboard-sidebar").getBoundingClientRect();
     const main = document.querySelector(".dashboard-main").getBoundingClientRect();
     const banner = document.querySelector("[data-dashboard-banner]").getBoundingClientRect();
+    const membership = document.querySelector(".dashboard-membership-card")?.getBoundingClientRect();
+    const creation = document.querySelector(".creation-entry-card").getBoundingClientRect();
+    const toolCards = [...document.querySelectorAll(".tool-quick-start__card")].map((element) =>
+      element.getBoundingClientRect(),
+    );
+    const recent = document.querySelector(".recent-projects").getBoundingClientRect();
+    const credits = document.querySelector(".credits-overview").getBoundingClientRect();
+    const inspiration = document.querySelector(".inspiration-panel").getBoundingClientRect();
     return {
       pageWidth: document.documentElement.scrollWidth,
       viewportWidth: innerWidth,
@@ -57,6 +65,11 @@ try {
       sidebarLeft: sidebar.left,
       mainLeft: main.left,
       bannerWidth: banner.width,
+      bannerHeight: banner.height,
+      membership: membership && { left: membership.left, right: membership.right },
+      creation: { left: creation.left, right: creation.right, top: creation.top },
+      toolCards: toolCards.map(({ left, right, top }) => ({ left, right, top })),
+      lowerCards: [recent, credits, inspiration].map(({ left, right, top }) => ({ left, right, top })),
       mobileNavDisplay: getComputedStyle(document.querySelector(".dashboard-mobile-nav")).display,
       background: getComputedStyle(document.querySelector(".dashboard-shell")).backgroundColor,
     };
@@ -66,8 +79,56 @@ try {
   check(desktopMetrics.sidebarLeft === 0, "桌面侧栏贴齐左侧");
   check(desktopMetrics.mainLeft >= desktopMetrics.sidebarWidth, "主内容不得压到侧栏");
   check(desktopMetrics.bannerWidth >= 900, "促销 Banner 占据主内容主宽度");
+  check(desktopMetrics.bannerHeight >= 145 && desktopMetrics.bannerHeight <= 165, "促销 Banner 高度接近参考稿");
   check(desktopMetrics.mobileNavDisplay === "none", "桌面隐藏移动底栏");
   check(desktopMetrics.background === "rgb(5, 8, 18)", "工作台使用深色背景 Token");
+  check(desktopMetrics.membership, "侧栏存在真实会员入口");
+  check(
+    desktopMetrics.membership.left >= desktopMetrics.sidebarLeft &&
+      desktopMetrics.membership.right <= desktopMetrics.sidebarWidth,
+    "会员入口不得越过侧栏",
+  );
+  check(desktopMetrics.toolCards.length === 3, "桌面首排存在三张工具卡");
+  check(desktopMetrics.creation.right <= desktopMetrics.toolCards[0].left, "创建卡与工具卡不得相交");
+  check(
+    desktopMetrics.toolCards.every((card) => Math.abs(card.top - desktopMetrics.creation.top) <= 1),
+    "桌面首排四卡顶部对齐",
+  );
+  check(
+    desktopMetrics.toolCards.slice(1).every((card, index) => desktopMetrics.toolCards[index].right <= card.left),
+    "桌面工具卡不得相交",
+  );
+  check(
+    desktopMetrics.lowerCards[0].right <= desktopMetrics.lowerCards[1].left &&
+      desktopMetrics.lowerCards[1].right <= desktopMetrics.lowerCards[2].left,
+    "桌面下排保持最近项目、创作点、灵感三列关系",
+  );
+  check(
+    desktopMetrics.lowerCards.every((card) => Math.abs(card.top - desktopMetrics.lowerCards[0].top) <= 1),
+    "桌面下排模块顶部对齐",
+  );
+  check(await page.getByRole("button", { name: /升级会员/ }).count() === 1, "会员入口使用真实 button");
+  check(await page.getByRole("button", { name: "查看创作点余额 1,280" }).count() === 1, "顶部展示可聚焦余额");
+  check(await page.getByRole("button", { name: "去充值" }).count() === 1, "顶部展示充值入口");
+  check(await page.getByRole("button", { name: "账户中心" }).count() >= 1, "顶部展示账户入口");
+  check(
+    (await page.locator(".dashboard-sidebar__group-title").allTextContents()).join(",") === "工具,账户",
+    "侧栏分组标题使用真实文本节点",
+  );
+  check(await page.getByText("上传素材，跟随引导完成专业出片", { exact: true }).count() === 1, "创建说明使用真实文本");
+  check(await page.locator(".recent-projects__credits").filter({ hasText: /^消耗 \d+$/ }).count() === 3, "项目消耗使用真实文本");
+  check(await page.getByText("影创工坊 · 让 AI 创作更简单", { exact: true }).count() === 1, "桌面存在品牌 Footer");
+  const membershipEntry = page.getByRole("button", { name: /升级会员/ });
+  await membershipEntry.focus();
+  check(await membershipEntry.evaluate((element) => document.activeElement === element), "会员入口可获得键盘焦点");
+  for (const accountAction of [
+    page.getByRole("button", { name: "查看创作点余额 1,280" }),
+    page.getByRole("button", { name: "去充值" }),
+    page.locator(".dashboard-account__avatar"),
+  ]) {
+    await accountAction.focus();
+    check(await accountAction.evaluate((element) => document.activeElement === element), "账户区操作可获得键盘焦点");
+  }
 
   for (const width of [1280, 1025, 1024]) {
     await page.setViewportSize({ width, height: 1058 });
@@ -138,6 +199,10 @@ try {
 
   await expectToast(page.getByRole("button", { name: "视频翻译" }).first(), "视频翻译功能建设中");
   await expectToast(page.getByRole("button", { name: "短剧解说" }).first(), "短剧解说功能建设中");
+  await expectToast(membershipEntry, "升级会员功能建设中");
+  await expectToast(page.getByRole("button", { name: "查看创作点余额 1,280" }), "创作点明细功能建设中");
+  await expectToast(page.getByRole("button", { name: "去充值" }), "充值功能建设中");
+  await expectToast(page.locator(".dashboard-account__avatar"), "账户中心功能建设中");
   await page.getByRole("button", { name: "关闭提示" }).click();
   check(await page.getByRole("status").count() === 0, "关闭提示后 Toast 移除 DOM");
 

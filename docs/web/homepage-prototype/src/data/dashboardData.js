@@ -19,7 +19,8 @@ const navItem = (id, label, icon, group, to = null) => ({
 });
 
 export const dashboardNavItems = [
-  navItem("overview", "概览", House, "main", "/dashboard"),
+  navItem("overview", "工作台概览", House, "main", "/dashboard"),
+  navItem("create", "新建创作", MagicWand, "main"),
   navItem("projects", "我的项目", ClockCounterClockwise, "main"),
   navItem("narration", "短剧解说", FilmSlate, "tools"),
   navItem("translation", "视频翻译", Translate, "tools"),

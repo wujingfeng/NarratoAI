@@ -36,11 +36,13 @@ export function DashboardPage() {
       <h1 className="sr-only" data-route-heading tabIndex="-1">工作台概览</h1>
       <DashboardSidebar items={dashboardNavItems} onUnavailable={showUnavailable} />
       <div className="dashboard-workspace">
-        <DashboardHeader primaryAction={dashboardPrimaryAction} onUnavailable={showUnavailable} />
+        <DashboardHeader credits={dashboardCredits} onUnavailable={showUnavailable} />
         <main className="dashboard-main">
           {bannerVisible && <PromotionBanner onClose={() => setBannerVisible(false)} onUnavailable={showUnavailable} />}
-          <CreationEntryCard action={dashboardPrimaryAction} onUnavailable={showUnavailable} />
-          <ToolQuickStart tools={dashboardTools} onUnavailable={showUnavailable} />
+          <div className="dashboard-primary-grid">
+            <CreationEntryCard action={dashboardPrimaryAction} onUnavailable={showUnavailable} />
+            <ToolQuickStart tools={dashboardTools} onUnavailable={showUnavailable} />
+          </div>
           <div className="dashboard-content-grid">
             <RecentProjects projects={recentProjects} onUnavailable={showUnavailable} />
             <div className="dashboard-content-grid__side">
@@ -49,6 +51,7 @@ export function DashboardPage() {
             </div>
           </div>
         </main>
+        <footer className="dashboard-footer">影创工坊 · 让 AI 创作更简单</footer>
       </div>
       <DashboardMobileNav items={dashboardNavItems} onUnavailable={showUnavailable} />
       {toast.message && <DashboardToast key={toast.id} message={toast.message} onClose={() => setToast(({ id }) => ({ id, message: "" }))} />}
