@@ -10,13 +10,17 @@
     "screenshot": "node scripts/capture-home.mjs",
     "verify:hero": "node scripts/verify-hero.mjs",
     "verify:demo": "node scripts/verify-demo.mjs",
-    "verify:three-hero": "node scripts/verify-three-hero.mjs"
+    "verify:three-hero": "node scripts/verify-three-hero.mjs",
+    "verify:routing": "node scripts/verify-routing.mjs",
+    "verify:dashboard": "node scripts/verify-dashboard.mjs",
+    "screenshot:dashboard": "node scripts/capture-dashboard.mjs"
   },
   "dependencies": {
     "@phosphor-icons/react": "^2.1.10",
     "@vitejs/plugin-react": "5.0.4",
     "react": "19.2.0",
     "react-dom": "19.2.0",
+    "react-router-dom": "^7.18.1",
     "three": "0.185.1",
     "vite": "6.4.2"
   },
