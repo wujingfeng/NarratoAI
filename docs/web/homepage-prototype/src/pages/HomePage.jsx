@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { SiteHeader } from "../components/SiteHeader.jsx";
 import { HeroSection } from "../components/HeroSection.jsx";
-import { DemoSection, TOOL_DATA } from "../components/DemoSection.jsx";
+import { DemoSection } from "../components/DemoSection.jsx";
 import { CapabilitySection } from "../components/CapabilitySection.jsx";
 import { FaqSection } from "../components/FaqSection.jsx";
 import { FinalCtaSection } from "../components/FinalCtaSection.jsx";
@@ -10,6 +11,7 @@ import { VideoModal } from "../components/VideoModal.jsx";
 import { Toast } from "../components/Toast.jsx";
 
 export function HomePage() {
+  const navigate = useNavigate();
   const [activeTool, setActiveTool] = useState("narration");
   const [menuOpen, setMenuOpen] = useState(false);
   const [activeSection, setActiveSection] = useState("hero");
@@ -24,13 +26,7 @@ export function HomePage() {
     toastTimer.current = window.setTimeout(() => setToast(""), 3200);
   }, []);
 
-  const chooseTool = useCallback(
-    (toolId, message) => {
-      setActiveTool(toolId);
-      if (message) showToast(message);
-    },
-    [showToast],
-  );
+  const startCreation = useCallback(() => navigate("/dashboard"), [navigate]);
 
   const scrollTo = useCallback((id) => {
     document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -82,30 +78,17 @@ export function HomePage() {
         isInert={modalOpen}
       />
       <main inert={pageContentHidden ? true : undefined} aria-hidden={pageContentHidden ? "true" : undefined}>
-        <HeroSection
-          onStart={() => chooseTool("narration", "已选择：短剧解说，正式工作台接入后继续")}
-          onViewDemo={() => scrollTo("demo")}
-        />
+        <HeroSection onStart={startCreation} onViewDemo={() => scrollTo("demo")} />
         <DemoSection
           activeTool={activeTool}
           onToolChange={setActiveTool}
           onOpenCase={openCase}
-          onTemplate={(caseItem) =>
-            showToast(`已选择：${caseItem.toolName}，正式工作台接入后继续`)
-          }
+          onTemplate={startCreation}
         />
-        <CapabilitySection
-          activeTool={activeTool}
-          onChooseTool={(toolId) => {
-            chooseTool(toolId, `已选择：${TOOL_DATA[toolId].label}，正式工作台接入后继续`);
-            scrollTo("demo");
-          }}
-        />
+        <CapabilitySection activeTool={activeTool} onChooseTool={startCreation} />
         <section className="lower-grid page-container" aria-label="常见问题与开始创作">
           <FaqSection />
-          <FinalCtaSection
-            onStart={() => chooseTool("narration", "已选择：短剧解说，正式工作台接入后继续")}
-          />
+          <FinalCtaSection onStart={startCreation} />
         </section>
       </main>
       <SiteFooter onNavigate={scrollTo} onFeedback={showToast} isInert={pageContentHidden} />
