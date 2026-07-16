@@ -540,6 +540,70 @@
 
 - **需求复核：** PASS。逐项对照 design 文档、Gate A 验收范围及 R1-R4 修复证据，Core 独立运行、持久 callback 投递、Events 查询合同、TOCTOU 防护、迁移与发布边界均符合要求；无范围外扩张，Critical 0、Important 0。
 - **代码质量审查：** PASS。最终独立审查确认 callback monotonic deadline、独立 Session claim heartbeat、单调 `next_attempt_at`、失败保持 pending、线程 stop/join 及数据库条件更新实现闭合；无遗留 Critical/Important，未要求继续修改生产代码或测试。
-- **Commit：** Gate 独立提交 `test: pass core api gate a`（本 R5 结论与本日志随同该提交 amend，最终 hash 以分支 HEAD 为准）。
+- **Commit：** `bbf6e30 test: pass core api gate a`。
 - **最终验证证据：** Core Python 3.12 全量 `384 passed, 12 warnings`；legacy `python3.11 -m pytest app/services -q` 为 `130 passed, 1 skipped, 4 warnings`，唯一 skip 为无真实 TwelveLabs 凭据的可选 live test。`alembic upgrade head && alembic check`、`.venv/bin/ruff check .`、`.venv/bin/mypy core_api`（59 files）、`.venv/bin/pip check`、`compileall`、`git diff --check` 全部 PASS。
 - **Gate 结论：** Gate A 正式关闭并自动进入下一 Gate。真实 callback receiver、真实 PostgreSQL/OSS/TTS/SMTP/供应商 Smoke 继续按 design 在后续 Gate 或部署条件具备时验证，不构成本 Gate 未完成项。
+
+## Task 10：创建 narratoApi FastAPI 骨架
+
+- **状态：** 完成（最终需求复核 PASS，最终代码质量审查 PASS；Critical 0、Important 0）。
+- **Commit：** `feat: scaffold narrato business api`；R6 最终审查基线 `62749dd`，本条正式收口日志继续 amend 于同一 Task 10 提交，最终 hash 以分支 Git 历史为准。
+- **RED：** 在任何业务包实现前创建健康检查与 HTTP 契约测试，使用 Python 3.12 运行时两个测试模块均在 collection 阶段真实失败：`ModuleNotFoundError: No module named 'narrato_api'`。随后才进入最小骨架实现。
+- **实现：** 新建可独立发布的 `docs/api/narratoApi` Python 3.12 项目、FastAPI `/api/v1/health/live|ready`、类型化 `ApiResponse[T]`、严格 DTO、统一 404/405/422/500/503、受信 Request ID、TOML/环境配置、独立 SQLAlchemy/Redis/Celery、空 Alembic `0001_business_base`、JSON 日志和自动 secret 脱敏。readiness 将 PostgreSQL 与 Redis 并发检查，数据库同步探针只进入固定容量 executor；超时任务占用的槽在线程真实退出前不会释放，满载/关闭均 fail closed，lifespan 释放线程资源。narratoApi AST import guard 确认不导入 `core_api` 或 `app.services`。
+- **GREEN：** Task 10 专项及全量均为 `14 passed, 1 warning`；`.venv/bin/ruff check .` PASS；`.venv/bin/mypy narrato_api` 为 `Success: no issues found in 13 source files`；`pip check`、`compileall`、`git diff --check` PASS。fresh SQLite `upgrade head + alembic check` PASS；PostgreSQL offline DDL 成功生成空基线。Core Python 3.12 全量 `384 passed, 12 warnings`；根 NarratoAI `python3.11 -m pytest app/services -q` 为 `130 passed, 1 skipped, 4 warnings`，唯一 skip 仍为无真实 TwelveLabs 凭据的可选 live test。
+- **发布验证：** direct wheel 与 sdist→wheel 均成功构建；两个发布包分别安装到仓库外干净 venv，从 `/tmp` 导入 `narrato_api`、创建应用并核对仅有两条 Task 10 路由，两个环境 `pip check` 均 PASS，不依赖根 `PYTHONPATH`。
+- **关键决策：** 业务服务使用独立 Redis DB/key prefix、Celery broker/key/queue prefix、Core request/callback 双 Token，Celery 明确禁用 Result Backend。Core URL 强制无 userinfo 的 HTTPS；数据库/Redis/Broker URL 与 Token/SMTP/OSS secret 均不进入 settings repr。健康检查公开消息固定英文且不返回 SQL、Redis、路径、凭据或异常正文。
+- **计划差异：** 在计划指定文件外最小增加 `.gitignore`、`README.md`、JSON logging 与 Alembic `script.py.mako`，分别用于隔离本地 venv/build/cache、消除 sdist 发布警告、满足结构化日志/脱敏验收及保证后续迁移可生成；未提前加入 Task 11+ 业务路由或模型。
+- **剩余风险：** 当前环境未提供真实 narratoApi PostgreSQL/Redis，已完成 SQLite 集成、Redis failure/timeout/capacity 自动化与 PostgreSQL offline DDL；真实双依赖 Smoke 留在 Gate B/D 环境验证，不影响本 Task 骨架完成。
+
+### Task 10 独立审查 R1 修复
+
+- **R1 RED：** 独立审查发现 4 个 Important。新增请求日志上下文、通用配置脱敏、数据库底层 deadline、连接池/Redis/executor shutdown 测试后首次为 `6 failed, 13 passed`：请求期日志仍为 `request_id=null`、500 无安全错误日志、三类连接 URL 的 userinfo 密钥泄漏、PostgreSQL 无 statement timeout、SQLite 无 busy timeout、lifespan 后数据库 pool 仍保留连接。
+- **请求日志关联：** 新增 ContextVar request context 与根 Handler Filter；中间件在请求前 set、所有退出路径 reset，正常请求内日志自动带相同 `request_id`，连续两请求不串号，请求外恢复 `null`。未知异常只记录固定消息、稳定 `error_code`、异常类名和安全 request ID，不记录异常字符串、stack 或请求体；公开 500 envelope 继续隐藏路径、SQL/Redis 和 secret。
+- **统一日志脱敏：** Formatter 从 Settings 所有 `repr=False` 字段自动收集真实 secret，并结构化解析 database/Redis/Celery Broker URL 的原始及 percent-decoded username/password；格式化后的 message/args 与允许输出的 extra 共用同一 redactor，exception 仅记录类型而不序列化异常正文。三类带 userinfo URL、Core/SMTP/OSS secret 及 Settings repr 自动化均不再出现原文。
+- **数据库真实 deadline：** 新增独立 `database_read_timeout_seconds`；Engine 将 connect/read deadline 向下约束到 readiness 总期限。PostgreSQL 同时设置驱动 `connect_timeout` 与会话 `statement_timeout/lock_timeout`，SQLite 设置 DBAPI timeout 和每连接 `PRAGMA busy_timeout`，同步线程 HTTP 超时后仍只在线程真实结束时归还容量。Executor 跟踪所有 Future，关闭先拒绝新任务、取消未运行任务，并在 lifespan 内进行有界 drain。
+- **生命周期资源回收：** 所有缓存 Engine 纳入线程安全 registry；lifespan 在有界 executor drain 后对 pool 执行 `dispose()` 并清除 cache。Redis 继续使用短生命周期 client，成功、失败、取消均在探针 `finally` 执行 `aclose()`。自动化确认 ready 后 SQLite checked-in connection 从 1 降为 0、Redis 已关闭、shutdown 后旧 checker 固定 503 且下一 app 获得新 Engine。
+- **R1 GREEN：** narratoApi 定向与全量均为 `19 passed, 1 warning`；Ruff、Mypy strict 13 files、pip check、compileall、`git diff --check` PASS。fresh SQLite upgrade/check 与 PostgreSQL offline DDL PASS；最新 direct wheel 和 sdist→wheel 在仓库外两个干净 venv import/create_app/OpenAPI/pip check PASS。Core 全量 `384 passed, 12 warnings`；legacy `130 passed, 1 skipped, 4 warnings`。
+- **剩余风险：** 当前没有真实 PostgreSQL/Redis 运行条件；底层 timeout 参数由 SQLAlchemy/DBAPI 参数与 SQLite 集成探针验证，真实 PostgreSQL 慢查询/断网 Smoke 仍在 Gate B/D 执行。R1 未新增 Task 11 业务能力。
+
+### Task 10 独立审查 R2 修复
+
+- **R2 RED：** 独立复审确认 R1 的 request context、500 安全日志、DB deadline 和单 app dispose 已闭合，但发现 3 个 Important。新增全字段/secret request ID、多 app 日志、不同/相同 settings 嵌套 Engine 生命周期测试，首次为 `4 failed, 19 passed`：secret 可作为合法 `X-Request-ID` 原样进入日志；第二个 app 覆盖第一 app 的脱敏规则并删除第三方 Handler；关闭任一 app 会全局 dispose/clear 仍运行 app 的 Engine。
+- **全字段安全边界：** JsonFormatter 现在对 timestamp、level、service、request_id、message 及所有允许 metadata 使用同一个动态 redactor；异常仍仅保留类型。请求 ID 校验额外查询进程密钥 registry，等于或包含任一 secret 的合法格式 Header 也会替换为新 `req_` ID，因此响应 Header/body/请求日志继续一致且不泄密。第三方现有 Handler 由进程 redaction filter 在格式化前脱敏 message/args/字符串 metadata，并移除可能携带正文的 exception/stack，仅保留异常类型。
+- **多 app 日志治理：** 使用线程安全、单调 union 的进程级 RedactionRegistry 和唯一带 ownership 标记的 managed JSON Handler。重复或并发 `configure_logging()` 只合并新 app secret、更新 root level，不覆盖旧 app 规则，不删除非 managed Handler；双 app 并发请求分别输出自身 token 时 managed/既有第三方 Handler 均只看到 `[REDACTED]`，ContextVar request ID 保持逐请求隔离。
+- **Engine per-app ownership：** 移除全局 LRU 与无差别 `cache_clear/dispose`，改为按 `(database_url, effective connect timeout, effective read timeout)` 键控的线程安全 registry。每个 lifespan 启动时 acquire 并增加 `_EngineEntry.owners`，shutdown 在 readiness drain 后 release；仅最后 owner 原子移除该 key 并 dispose 对应 pool。不同 settings/数据库完全隔离，同 settings 共享 Engine 并引用计数。嵌套 A/B 自动化确认 B 关闭后 A 的 Engine identity 和查询均不变，最后 A 关闭才使 checked-in pool 降为 0。Redis 无共享 pool，仍为每探针 client 且 `finally aclose()`。
+- **R2 GREEN：** narratoApi 定向与全量 `24 passed, 1 warning`；Ruff、Mypy strict 13 files、pip check、compileall、`git diff --check` PASS。fresh SQLite upgrade/check、PostgreSQL offline DDL PASS；最新 direct wheel 与 sdist→wheel 在仓库外两个干净 venv import/create_app/OpenAPI/pip check PASS。Core `384 passed, 12 warnings`；legacy `130 passed, 1 skipped, 4 warnings`。
+- **剩余风险：** 进程级 secret registry 按安全设计只增不减，密钥轮换后旧值保留到进程退出以防迟到日志泄漏；真实 PostgreSQL/Redis 并发生命周期 Smoke 继续在 Gate B/D 执行。R2 未新增 Task 11 路由、模型或业务行为。
+
+### Task 10 独立审查 R3 修复
+
+- **R3 RED：** 独立复审确认 R2 的多应用 Engine ownership 已闭合，但发现 2 个 Important：脱敏 registry 在 `create_app()` 时单调增长，25 个未启动应用即可把活动值从 4 增至 79，启动失败也无法回收；同时进程级 filter 会修改所有 root Handler 和共享 `LogRecord`，导致隔离第三方 logger 的原始 `msg/args/exc_info/stack_info` 被破坏，且业务日志传播到 foreign root Handler。新增未启动应用、嵌套 lifespan 共享引用、启动失败和隔离第三方 record 契约测试覆盖这些边界。
+- **Lifespan 引用计数：** RedactionRegistry 改为线程安全的 value refcount；`create_app()` 只配置 owned Handler，不注册密钥。每个实际启动的 lifespan 在数据库资源前 acquire 当前 Settings 的去重脱敏值，并在所有正常、异常和数据库启动失败路径 release；共享 callback/URL 密钥在最后 owner 退出前保持有效。自动化确认 25 个未启动应用零增长、嵌套 A/B 退出顺序正确、startup failure 无残留，请求 ID 仅能使用当前活动应用密钥集合做拒绝判断。
+- **日志 ownership：** managed JSON Handler 只挂载到 `narrato_api` namespace，`propagate=False`，所有业务 logger 均位于 `narrato_api.*`；不再遍历、添加 filter 或删除 root/第三方 Handler，也不再原地修改共享 LogRecord。JsonFormatter 在自身格式化阶段 copy-on-format，并对全部 JSON 字段使用活动 registry 脱敏；foreign 非传播 logger 的 `msg/args/exc_info/stack_info` 保持原值，业务日志不会进入 foreign root Handler。
+- **R3 GREEN：** narratoApi 定向与全量 `28 passed, 1 warning`；Ruff、Mypy strict 13 files、pip check、compileall、`git diff --check` PASS。fresh SQLite upgrade/check 与 PostgreSQL offline DDL PASS；direct wheel 和 sdist→wheel 分别安装到仓库外干净 venv，从 `/tmp` import/create_app/OpenAPI 并执行两次 `TASK10_R3_RUNTIME_OK`，两个环境 `pip check` PASS。Core 全量 `384 passed, 12 warnings`；legacy `130 passed, 1 skipped, 4 warnings`。Core 首轮仅因临时验证 venv 缺少构建后端 setuptools 导致 packaging case 失败，补齐测试环境依赖后未改代码重跑全绿。
+- **剩余风险：** 专属 namespace 已覆盖 narratoApi 自有 logger；生产 Uvicorn access/error logger 的部署级格式与脱敏整合仍需 Gate D 的 Supervisor/Nginx/Uvicorn 配置验证，不能把显式隔离且不传播的任意 vendor logger 声明为全局可治理对象。真实 PostgreSQL/Redis Smoke 继续按 Goal 留在 Gate B/D；R3 未新增 Task 11 能力。
+
+### Task 10 独立审查 R4 修复
+
+- **R4 RED：** 独立复审确认 R3 secret/Engine 引用计数及 foreign namespace 隔离已闭合，但发现 3 个 Important。新增 owned namespace 预存 Handler、未启动 app 日志级别、同/不同级别嵌套 lifespan，以及 executor 与 Engine dispose 同时失败测试，首次为 `3 failed`：预存 `narrato_api` Handler 收到未脱敏原始 record；未启动 ERROR app 立即把活动 INFO app 压到 ERROR；dispose 异常跳过 logging release 并留下活动 secret。
+- **Owned 日志管线：** `configure_logging()` 现在精确把应用拥有的 `narrato_api.handlers` 替换为唯一 managed JSON Handler，detach 其他 Handler 但不 close、不改 formatter/filter/level 或对象状态；root 与其他 namespace 继续完全不动，`propagate=False`。自动化确认预存 Handler 不再收到应用 record，managed 输出仍为 JSON 且 token 已脱敏，外部 Handler 对象保持可用。
+- **活动级别 ownership：** app 构造只保证 owned Handler，不再改变已配置 namespace level；lifespan 启动以标准 numeric level acquire，退出按 level refcount release。多个活动 app 取 numeric minimum（最详细）避免任何 owner 的日志被压制；同级双 owner 退出一个后保持原级别，不同 INFO/ERROR 嵌套始终为 INFO，未启动 CRITICAL app 零影响，最后 owner 退出恢复安全默认 WARNING。
+- **故障隔离 cleanup：** lifespan 将 executor close、Engine release/dispose 和 logging release 拆为独立 cleanup 边界；前一资源失败仍继续后续释放。每个失败只记录固定 `application cleanup failed`、异常类型与稳定资源错误码，不序列化异常正文，全部 cleanup 完成后仅向调用方抛稳定同文错误。故障注入让 executor 与 dispose 同时携带 secret 抛错，验证两条安全日志、Engine registry 已先移除、logging secret/refcount 已归零且公开异常不含 secret。
+- **R4 GREEN：** narratoApi 全量 `31 passed, 1 warning`；Ruff、Mypy strict 13 files、pip check、compileall、`git diff --check` PASS。fresh SQLite upgrade/check、PostgreSQL offline DDL PASS；direct wheel 与 sdist→wheel 安装到两个仓库外 venv，两次 `TASK10_R4_RUNTIME_OK` 且 `pip check` PASS。Core 全量 `384 passed, 12 warnings`；legacy `130 passed, 1 skipped, 4 warnings`。
+- **剩余风险：** Uvicorn access/error logger 的部署级格式仍按 Gate D 配置验证；真实 PostgreSQL/Redis 运行 Smoke 继续按 Goal 后续条件执行。Task 10 owned namespace、活动配置与故障 cleanup 已无已知未关闭边界，R4 未新增 Task 11 能力。
+
+### Task 10 独立审查 R5 修复
+
+- **R5 RED：** 独立复审发现 1 个 Important：`asyncio.CancelledError` 继承 `BaseException`，R4 的 `except Exception` 无法捕获；shutdown 时 executor `aclose()` 抛取消会立即跳出 finally，跳过 Engine 与 logging owner 释放。新增真实 lifespan 取消故障测试首次 `1 failed`，并观察到 TestClient/portal 会转换取消类型，因此专项改为直接运行 ASGI lifespan 以验证原始取消对象和资源事实。
+- **BaseException cleanup：** lifespan 显式保存 body 异常，并为 executor close、Engine release/dispose、logging release 建立三个无条件执行的独立 `BaseException` 边界；任何前置取消、`SystemExit` 或普通异常都不会跳过后续资源。cleanup 次级非取消异常仍仅记录固定消息、类型和稳定资源错误码，不覆盖取消；选择传播错误时任一原始 `CancelledError` 优先，其次恢复原 body BaseException，普通 cleanup 错误继续对外收敛为稳定 `application cleanup failed`。
+- **取消语义证据：** executor 注入唯一 `CancelledError` 实例后，lifespan 对外重抛同一对象，不转换 500、不吞取消；同时 Engine 最后 owner 被移除并 dispose、secret registry 不再匹配该 token、活动 INFO level 回到安全 WARNING。R4 的 executor + dispose 双普通失败测试继续验证两项次级错误均被安全记录且 logging release 不被跳过。
+- **R5 GREEN：** narratoApi 全量 `32 passed, 1 warning`；Ruff、Mypy strict 13 files、pip check、compileall、`git diff --check` PASS。fresh SQLite upgrade/check、PostgreSQL offline DDL PASS；direct wheel 与 sdist→wheel 两个仓库外 runtime 均输出 `TASK10_R5_RUNTIME_OK` 且 `pip check` PASS。Core 全量 `384 passed, 12 warnings`；legacy `130 passed, 1 skipped, 4 warnings`。
+- **剩余风险：** Redis readiness client 本身已在探针 `finally` 独立 `aclose()`，本服务没有跨 lifespan 持有的 Redis pool；真实依赖与 Uvicorn 部署日志仍按 Gate B/D 验证。R5 未新增 Task 11 能力。
+
+### Task 10 独立审查 R6（最终）
+
+- **需求复核：** PASS。独立复审逐项对照 design 文档、Task 10 执行清单及 R1-R5 修复证据，确认独立 FastAPI 服务边界、typed envelope、健康检查、配置/密钥、JSON 日志、request ID、数据库/Redis/Celery 隔离、迁移与发布包均符合要求；未提前实现 Task 11+ 能力，Critical 0、Important 0。
+- **代码质量审查：** PASS。最终复审确认 owned logger pipeline、活动 secret/level 引用计数、多 app Engine ownership、readiness deadline、连接池释放、foreign Handler/LogRecord 边界，以及普通异常与 `CancelledError` 下的无条件 cleanup 均闭合；无遗留 Critical/Important，不要求继续修改生产代码或测试。
+- **Commit：** R6 审查基线 `62749dd`，提交主题 `feat: scaffold narrato business api`；R6 仅更新本进度日志并 amend 同一 Task 10 提交。
+- **最终验证证据：** narratoApi Python 3.12 全量 `32 passed, 1 warning`；Core 全量 `384 passed, 12 warnings`；legacy `130 passed, 1 skipped, 4 warnings`。Ruff、Mypy strict 13 files、pip check、compileall、`git diff --check`、fresh SQLite upgrade/check、PostgreSQL offline DDL、direct wheel、sdist→wheel、两个仓库外 runtime/OpenAPI 与 `pip check` 全部 PASS。
+- **Task 结论：** Task 10 正式完成，可以按计划进入 Task 11。真实 PostgreSQL/Redis、Uvicorn/Supervisor/Nginx 与外部供应商 Smoke 继续按 design 在后续 Gate/部署条件具备时验证，不构成 Task 10 未完成项。
