@@ -12,6 +12,80 @@ DraftPathPlaceholder = "##_draftpath_placeholder_0E685133-18CE-45ED-8CB8-2904A21
 
 
 class JianyingTaskTests(unittest.TestCase):
+    def test_core_and_legacy_pure_jianying_template_sources_are_byte_synced(self):
+        root = Path(__file__).resolve().parents[2]
+        self.assertEqual(
+            (root / "app/services/jianying_manifest_template.py").read_bytes(),
+            (root / "coreApi/core_api/adapters/narrato/jianying_template.py").read_bytes(),
+        )
+
+    def test_stable_manifest_builder_generates_base_files_from_snapshot(self):
+        resources = [
+            jianying_draft_builder.ManifestResource(
+                zip_path=f"assets/{kind}/final.{ {'video': 'mp4', 'subtitle': 'srt', 'voice': 'wav', 'timeline': 'json'}[kind] }", url=f"https://cdn.example.test/{kind}",
+                size=1, checksum="sha256:" + "a" * 64,
+                content_type="application/octet-stream", kind=kind,
+                width=640 if kind == "video" else None,
+                height=360 if kind == "video" else None,
+                duration=1.0 if kind == "video" else None,
+            )
+            for kind in ("video", "subtitle", "voice", "timeline")
+        ]
+        request = jianying_draft_builder.JianyingBuildRequest(
+            snapshot_id="revision_1",
+            timeline=[{"source_asset_id": "asset_a", "start": 0, "end": 1, "narration": "A"}],
+            resources=resources,
+        )
+        base_files = jianying_draft_builder.build_jianying_base_files(request)
+        manifest = jianying_draft_builder.build_jianying_resource_manifest(request)
+        self.assertTrue({"draft_info.json", "draft_meta_info.json", "draft_settings", "template.tmp", "template-2.tmp", "draft_cover.jpg", "attachment_editing.json"}.issubset(base_files))
+        draft = json.loads(base_files["draft_info.json"])
+        self.assertEqual("NarratoAI_revision_1", draft["name"])
+        self.assertEqual(54, len(draft["materials"]))
+        self.assertEqual(["video", "audio", "text"], [track["type"] for track in draft["tracks"]])
+        self.assertEqual(resources, manifest)
+
+        reference = jianying_draft_builder._create_draft_template(
+            "0" * 32, "reference", "", 640, 360
+        )
+        video = jianying_draft_builder._create_video_material(
+            "assets/video/final.mp4", 1_000_000, 640, 360
+        )
+        audio = jianying_draft_builder._create_audio_material(
+            "assets/voice/final.wav", 1_000_000
+        )
+        video_track = jianying_draft_builder._create_track("video", "Video")
+        audio_track = jianying_draft_builder._create_track("audio", "Audio")
+        video_track["segments"] = [
+            jianying_draft_builder._create_video_segment(
+                video["id"], 0, 1_000_000, 0, 1.0
+            )
+        ]
+        audio_track["segments"] = [
+            jianying_draft_builder._create_audio_segment(
+                audio["id"], 1_000_000, 0, 1.0
+            )
+        ]
+        reference["materials"]["videos"] = [video]
+        reference["materials"]["audios"] = [audio]
+        reference["tracks"] = [video_track, audio_track]
+        normalized = jianying_draft_builder._create_draft_info(
+            reference, "reference", ""
+        )
+        self.assertEqual(set(normalized), set(draft))
+        self.assertEqual(
+            set(normalized["materials"]["videos"][0]),
+            set(draft["materials"]["videos"][0]),
+        )
+        self.assertEqual(
+            set(normalized["materials"]["audios"][0]),
+            set(draft["materials"]["audios"][0]),
+        )
+        self.assertEqual(
+            set(normalized["tracks"][0]["segments"][0]),
+            set(draft["tracks"][0]["segments"][0]),
+        )
+
     def test_normalize_indextts_uses_valid_param_reference(self):
         with tempfile.NamedTemporaryFile(suffix=".wav") as ref:
             params = VideoClipParams(tts_engine="indextts", voice_name=ref.name)

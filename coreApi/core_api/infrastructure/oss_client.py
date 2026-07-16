@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import hashlib
 import ipaddress
-import os
 import posixpath
 import re
 import time
@@ -126,6 +125,10 @@ class OssClient(Protocol):
 
         ...
 
+    def delete_object(self, object_key: str) -> None:
+        """补偿删除尚未登记的 attempt 私有对象。"""
+        ...
+
 
 class CdnUrlPolicy:
     """只允许精确 HTTPS CDN Host 与业务对象前缀。"""
@@ -219,7 +222,9 @@ class CdnUrlPolicy:
         if "\\" in decoded or any(part == ".." for part in decoded.split("/")):
             raise InputSecurityError("SOURCE_URL_REJECTED")
         normalized_path = posixpath.normpath(decoded)
-        if not decoded.startswith(self.prefix) or not normalized_path.startswith(self.prefix):
+        if not decoded.startswith(self.prefix) or not normalized_path.startswith(
+            self.prefix
+        ):
             raise InputSecurityError("SOURCE_URL_REJECTED")
         if decoded != normalized_path:
             raise InputSecurityError("SOURCE_URL_REJECTED")
@@ -242,7 +247,10 @@ class HttpCdnDownloader:
         self.policy = policy
         self.transport = transport
         self.timeout = httpx.Timeout(
-            connect=connect_timeout, read=read_timeout, write=read_timeout, pool=connect_timeout
+            connect=connect_timeout,
+            read=read_timeout,
+            write=read_timeout,
+            pool=connect_timeout,
         )
         self.total_timeout = total_timeout
         self.max_redirects = max_redirects
@@ -272,7 +280,10 @@ class HttpCdnDownloader:
                             location = response.headers.get("Location", "")
                             current = self.policy.validate(urljoin(current, location))
                             continue
-                        if response.status_code >= 500 or response.status_code in {408, 429}:
+                        if response.status_code >= 500 or response.status_code in {
+                            408,
+                            429,
+                        }:
                             raise DownloadTemporaryError("SOURCE_DOWNLOAD_FAILED")
                         if response.status_code != 200:
                             raise InputSecurityError("SOURCE_NOT_AVAILABLE")
@@ -282,12 +293,16 @@ class HttpCdnDownloader:
                                 if int(declared) > max_bytes:
                                     raise DownloadTooLargeError("SOURCE_TOO_LARGE")
                             except ValueError as exc:
-                                raise InputSecurityError("SOURCE_LENGTH_INVALID") from exc
+                                raise InputSecurityError(
+                                    "SOURCE_LENGTH_INVALID"
+                                ) from exc
                         size = 0
                         with destination.open("xb") as handle:
                             for chunk in response.iter_bytes(64 * 1024):
                                 if time.monotonic() - started > self.total_timeout:
-                                    raise DownloadTemporaryError("SOURCE_DOWNLOAD_TIMEOUT")
+                                    raise DownloadTemporaryError(
+                                        "SOURCE_DOWNLOAD_TIMEOUT"
+                                    )
                                 size += len(chunk)
                                 if size > max_bytes:
                                     raise DownloadTooLargeError("SOURCE_TOO_LARGE")
@@ -397,3 +412,21 @@ class Oss2Client:
             bucket.get_bucket_info()
         except Exception as exc:
             raise OssTemporaryError("OSS_NOT_READY") from exc
+
+    def delete_object(self, object_key: str) -> None:
+        """仅允许补偿删除 Core 命名空间对象，不暴露供应商响应。"""
+        if not object_key.startswith("narrato/coreApi/"):
+            raise ValueError("Core 产物对象键前缀无效")
+        try:
+            self._bucket().delete_object(object_key)
+        except Exception as exc:
+            raise OssTemporaryError("OSS_CLEANUP_FAILED") from exc
+
+    def object_exists(self, object_key: str) -> bool:
+        """Confirm remote absence before a cleanup tombstone may retire."""
+        if not object_key.startswith("narrato/coreApi/"):
+            raise ValueError("Core 产物对象键前缀无效")
+        try:
+            return bool(self._bucket().object_exists(object_key))
+        except Exception as exc:
+            raise OssTemporaryError("OSS_HEAD_FAILED") from exc

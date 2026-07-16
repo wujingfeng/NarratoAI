@@ -72,13 +72,17 @@ def test_asr_post_creates_async_task_once(app, settings):
 
 
 class FakeDownloader:
-    def download(self, url: str, destination: Path, *, max_bytes: int) -> DownloadReceipt:
+    def download(
+        self, url: str, destination: Path, *, max_bytes: int
+    ) -> DownloadReceipt:
         destination.parent.mkdir(parents=True, exist_ok=True)
         destination.write_bytes(b"fake-media")
         return DownloadReceipt(url=url, size=10, content_type="video/mp4")
 
 
 class FakeOss:
+    public_base_url = "https://cdn.example.test"
+
     def __init__(self) -> None:
         self.keys: list[str] = []
 
@@ -135,11 +139,15 @@ def test_asr_handler_uploads_and_registers_srt_artifact(session, tmp_path):
     assert artifact["kind"] == "subtitle"
     assert artifact["object_key"] == fake_oss.keys[0]
     assert "local_path" not in artifact and "/private/" not in str(artifact)
-    row = session.scalar(select(CoreArtifact).where(CoreArtifact.core_task_id == task.id))
+    row = session.scalar(
+        select(CoreArtifact).where(CoreArtifact.core_task_id == task.id)
+    )
     assert row is not None and row.object_key == artifact["object_key"]
 
 
-@pytest.mark.parametrize("srt", ["", "invalid", "1\n00:00:02,000 --> 00:00:01,000\nbad\n"])
+@pytest.mark.parametrize(
+    "srt", ["", "invalid", "1\n00:00:02,000 --> 00:00:01,000\nbad\n"]
+)
 def test_asr_handler_rejects_empty_or_invalid_srt(session, tmp_path, srt):
     task_service = TaskService(session)
     task = task_service.create_core_task(
@@ -208,7 +216,10 @@ def test_stale_attempt_cannot_register_artifact(session):
             lease_version=old.lease_version,
         )
 
-    assert session.scalar(select(CoreArtifact).where(CoreArtifact.id == "art_stale")) is None
+    assert (
+        session.scalar(select(CoreArtifact).where(CoreArtifact.id == "art_stale"))
+        is None
+    )
 
 
 def test_workspace_rejects_output_directory_replaced_by_symlink(tmp_path):
@@ -231,13 +242,16 @@ def test_artifact_store_uses_opened_regular_file_when_path_is_replaced(tmp_path)
     outside.write_bytes(b"SECRET-OUTSIDE")
 
     class RacingOss:
+        public_base_url = "https://cdn.test"
         uploaded = b""
 
         def upload_stream(self, stream, object_key, *, content_type, size):
             target.unlink()
             target.symlink_to(outside)
             self.uploaded = stream.read()
-            return OssUploadResult("bucket", object_key, f"https://cdn.test/{object_key}")
+            return OssUploadResult(
+                "bucket", object_key, f"https://cdn.test/{object_key}"
+            )
 
     oss = RacingOss()
     artifact = ArtifactStore(oss).upload(

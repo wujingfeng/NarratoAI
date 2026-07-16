@@ -10,6 +10,13 @@ from core_api.adapters.narrato.short_drama import (
     ShortDramaAdapter,
     create_short_drama_provider,
 )
+from core_api.adapters.narrato.tts import TtsAdapter, create_tts_provider
+from core_api.adapters.narrato.render import (
+    FakeRenderBackend,
+    FfmpegRenderBackend,
+    RenderAdapter,
+)
+from core_api.runtime.process_runner import ProcessRunner
 from core_api.celery_app import celery_app
 from core_api.config import get_cached_settings
 from core_api.database import get_engine
@@ -23,6 +30,10 @@ from core_api.tasks.handlers import AtomicTaskHandler
 from core_api.tasks.dispatch import DispatchOutboxPublisher
 from core_api.tasks.service import TaskService
 from core_api.tasks.recovery import TaskRecoveryScanner
+from core_api.tasks.artifact_reconciliation import (
+    ArtifactReconciliationJournal,
+    ArtifactReconciliationScanner,
+)
 
 
 class CeleryWakeDispatcher:
@@ -100,6 +111,8 @@ def _run_atomic_task(
             )
 
         short_drama_adapter = None
+        tts_adapter = None
+        render_adapter = None
         task = service.get_task(task_id)
         if task.task_type in {"video_analysis", "script_generation"}:
             model_snapshot = task.input_snapshot.get("model_snapshot")
@@ -165,6 +178,45 @@ def _run_atomic_task(
                 artifact_downloader=artifact_downloader,
                 artifact_store=ArtifactStore(oss_client),
             )
+        if task.task_type in {"tts", "video_render"}:
+            voice_snapshot = task.input_snapshot.get("voice_snapshot", {})
+            provider_code = (
+                voice_snapshot.get("provider_code")
+                if isinstance(voice_snapshot, dict)
+                else ""
+            )
+            secret_ref = (
+                voice_snapshot.get("secret_ref")
+                if isinstance(voice_snapshot, dict)
+                else ""
+            )
+            provider = create_tts_provider(
+                str(provider_code or ""),
+                voice_snapshot=voice_snapshot
+                if isinstance(voice_snapshot, dict)
+                else {},
+                api_key=str(settings.provider_secrets.get(str(secret_ref or ""), "")),
+            )
+            tts_adapter = TtsAdapter(
+                provider=provider, artifact_store=ArtifactStore(oss_client)
+            )
+            if task.task_type == "video_render":
+                render_adapter = RenderAdapter(
+                    downloader=downloader,
+                    backend=FfmpegRenderBackend(
+                        provider=provider,
+                        voice_snapshot=voice_snapshot,
+                        runner=ProcessRunner(heartbeat_interval_seconds=5),
+                    ),
+                    artifact_store=ArtifactStore(oss_client),
+                )
+        elif task.task_type == "subtitle":
+            # 字幕任务只使用 RenderAdapter 的纯 SRT 路径，不执行 Fake 渲染。
+            render_adapter = RenderAdapter(
+                downloader=downloader,
+                backend=FakeRenderBackend(),
+                artifact_store=ArtifactStore(oss_client),
+            )
         handler = AtomicTaskHandler(
             task_service=service,
             work_root=settings.work_root,
@@ -177,7 +229,10 @@ def _run_atomic_task(
                 artifact_store=ArtifactStore(oss_client),
             ),
             short_drama_adapter=short_drama_adapter,
+            tts_adapter=tts_adapter,
+            render_adapter=render_adapter,
             heartbeat_once=heartbeat_once,
+            reconciliation_store=ArtifactStore(oss_client),
         )
         handler.run(
             task_id,
@@ -223,3 +278,22 @@ def recover_stalled_core_tasks() -> None:
         TaskRecoveryScanner(session).recover()
         # 同一次生产扫描立即发布已恢复及原本到期的 retry_wait 事件。
         DispatchOutboxPublisher(session).publish_pending(CeleryWakeDispatcher())
+
+
+@celery_app.task(name="core.tasks.reconcile_artifacts", ignore_result=True)
+def reconcile_artifacts() -> None:
+    """独立周期扫描提交结果未知的 OSS 对象并按数据库事实收敛。"""
+    settings = get_cached_settings()
+    oss_client = Oss2Client(
+        endpoint=settings.oss_endpoint,
+        bucket=settings.oss_bucket,
+        access_key_id=settings.oss_access_key_id,
+        access_key_secret=settings.oss_access_key_secret,
+        public_base_url=settings.oss_public_base_url,
+    )
+    with Session(get_engine(settings), expire_on_commit=False) as session:
+        ArtifactReconciliationScanner(
+            session,
+            ArtifactReconciliationJournal(settings.work_root),
+            ArtifactStore(oss_client),
+        ).scan()

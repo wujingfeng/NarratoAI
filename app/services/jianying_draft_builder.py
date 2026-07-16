@@ -5,12 +5,14 @@ import shutil
 import subprocess
 import time
 import uuid
+from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Set, Tuple
 
 from loguru import logger
 
 from app.models.schema import VideoClipParams
 from app.services import script_subtitle
+from app.services.jianying_manifest_template import build_jianying_template_files
 
 
 MICROSECONDS = 1_000_000
@@ -103,6 +105,57 @@ DEFAULT_DRAFT_COVER_BYTES = bytes([
     0x01, 0xFF, 0xDA, 0x00, 0x08, 0x01, 0x01, 0x00, 0x00, 0x3F, 0x00, 0x7F,
     0xFF, 0xD9,
 ])
+
+
+@dataclass(frozen=True)
+class ManifestResource:
+    """前端剪映组包所需的公开 CDN 资源映射。"""
+
+    zip_path: str
+    url: str
+    size: int
+    checksum: str
+    content_type: str
+    kind: str
+    width: int | None = None
+    height: int | None = None
+    duration: float | None = None
+
+
+@dataclass(frozen=True)
+class JianyingBuildRequest:
+    """无状态剪映基础文件和已登记资源输入。"""
+
+    snapshot_id: str
+    timeline: List[Dict[str, Any]]
+    resources: List[ManifestResource]
+
+
+def build_jianying_base_files(request: JianyingBuildRequest) -> Dict[str, str | bytes]:
+    """生成剪映基础文件，但不复制 CDN 资源、不创建 ZIP。"""
+
+    if not request.snapshot_id or not request.timeline:
+        raise ValueError("剪映编辑快照不能为空")
+    resource_paths = {item.kind: item.zip_path for item in request.resources}
+    if set(resource_paths) != {
+        "video", "subtitle", "voice", "timeline"
+    }:
+        raise ValueError("剪映资源不完整")
+    video = next(item for item in request.resources if item.kind == "video")
+    if video.width is None or video.height is None or video.duration is None:
+        raise ValueError("最终视频元数据不完整")
+    return build_jianying_template_files(
+        request.snapshot_id,
+        request.timeline,
+        resource_paths,
+        {"width": video.width, "height": video.height, "duration": video.duration},
+    )
+
+
+def build_jianying_resource_manifest(request: JianyingBuildRequest) -> List[ManifestResource]:
+    """将已完成任务的媒体映射成前端组包资源清单。"""
+
+    return list(request.resources)
 
 
 def _write_json_file(file_path: str, data: Dict[str, Any]) -> None:

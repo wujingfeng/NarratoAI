@@ -15,3 +15,7 @@ def test_worker_lost_delivery_and_recovery_scanner_are_configured(settings):
         "task": "core.tasks.recover_stalled",
         "schedule": 15.0,
     }
+    assert app.conf.beat_schedule["reconcile-core-artifacts"] == {
+        "task": "core.tasks.reconcile_artifacts",
+        "schedule": 15.0,
+    }

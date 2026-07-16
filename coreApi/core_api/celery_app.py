@@ -29,6 +29,10 @@ def create_celery_app(settings: Settings | None = None) -> Celery:
                 "task": "core.tasks.recover_stalled",
                 "schedule": 15.0,
             },
+            "reconcile-core-artifacts": {
+                "task": "core.tasks.reconcile_artifacts",
+                "schedule": 15.0,
+            },
         },
     )
     return app

@@ -307,8 +307,8 @@
 
 ## Task 8：实现剧情分析、文案生成和脚本校验任务
 
-- **状态：** 完成，待独立审查。
-- **Commit：** `feat: expose short drama analysis tasks`（本 Task 独立提交；精确哈希由 Task 9 回填，避免提交自引用改变哈希）。
+- **状态：** 完成；独立复审 R7 的需求符合性与代码质量均 PASS，Critical/Important 为 0。
+- **Commit：** `de9b075 feat: expose short drama analysis tasks`。
 - **Task 7 Gate 回填：** 独立复审 R5 对 `6e9fca1` 的 Spec Compliance 与 Code Quality 均为 PASS，Critical/Important 均为 0；可靠 dispatch 的持久 `recover_after` 公平性缺口已关闭。
 - **TDD RED：**
   - 初次执行 `.venv/bin/pytest tests/unit/test_short_drama_adapter.py -q`，真实在收集阶段失败于 `ModuleNotFoundError: No module named 'core_api.adapters.narrato.short_drama'`（1 个 collection error），确认目标 Adapter 尚不存在。
@@ -383,3 +383,114 @@
 - **可重复发布源：** 将严格四文件 legacy runtime 以受控 `vendor_legacy/app` 源树纳入 Core sdist；direct wheel 与 sdist→wheel 均只发现该源树。自动化同步测试逐字节比较 monorepo source，roundtrip 测试复制 clean source、构建 sdist、解压重建 wheel，并断言 sdist vendor 与 wheel RECORD 都严格等于四文件白名单，无 tests/utils/voice 等漂移。
 - **R6 runtime：** direct wheel 和 sdist 重建 wheel 分别安装到全新 venv；仓库外 cwd、无 `PYTHONPATH` 下均实跑 media probe、Fake HTTP/SRT FunASR、AtomicTaskHandler analysis Artifact，以及 invalid→exactly-one repair→valid script，未发布模块保持 `ModuleNotFoundError`，两次输出 `R6_RELEASE_RUNTIME_SMOKE_OK` 且 `pip check` 无 broken requirements。
 - **R6 GREEN：** Task 8 指定 `64 passed, 1 warning`；Core 全量（含 2 个发布 roundtrip 测试）`279 passed, 12 warnings`；根项目相关回归 `53 passed, 1 warning`；direct/sdist build、RECORD 白名单、ruff、compileall 与 diff-check 均通过。
+
+### Task 8 独立审查 R7
+
+- **结论：** Commit `de9b075` 的需求符合性与代码质量均 PASS；Critical 0、Important 0。Task 8 指定 `64 passed`、Core `279 passed`、根项目 `53 passed`，direct wheel 与 sdist→wheel 的仓库外 runtime 均通过；selective legacy runtime 保持严格四文件白名单。
+
+## Task 9：实现 TTS、字幕、渲染、产物和剪映 Manifest
+
+- **状态：** 实现完成，待独立审查。
+- **Commit：** `feat: expose render and jianying manifest capabilities`（本 Task 独立提交；精确哈希由后续 Gate 回填，避免提交自引用改变哈希）。
+- **TDD RED：** 首次执行 Task 9 指定四文件测试时，真实在收集阶段分别失败于 `core_api.adapters.narrato.tts`、`render`、`jianying` 不存在，共 `4 errors`；最小模块加入后继续观察到 SRT 按源时间生成导致 cue 重叠，以及 `AtomicTaskHandler` 尚未接受 `render_adapter` 的 `2 failed, 8 passed` 行为 RED。
+- **最小实现：** 新增请求级 `TtsProvider`、无网络确定性 `FakeTtsProvider` 与冻结 endpoint/secret 的 `HttpTtsProvider`；稳定 `voice_id` 通过 capability catalog 校验并冻结 provider/voice/catalog/secret_ref/公开配置，未知或配置缺失不得回退 Fake。新增纯 UTF-8 SRT 路径、Fake render 和受治理 `FfmpegRenderBackend`，只消费不可变 `snapshot_id`、显式 source 数组/order、时间线与 attempt workspace；FFmpeg 使用参数数组、独立进程组、超时、有界输出和 heartbeat 回收。
+- **路由与可靠执行：** 新增固定 Bearer/幂等/extra-forbid 的 `tts`、`subtitle`、`video-render` 异步创建接口，以及同步无状态 `jianying/manifests/build`；全部接入统一 router、持久 dispatch、claim/lease/heartbeat/fencing/recovery 与终态事务 Artifact 登记。重复 wake 不重复执行；渲染成功登记 `video/subtitle/voice/timeline` 四类 HTTPS Artifact。多对象上传在 guard/上传失败时反向补偿删除，上传后终态前 lease 丢失也由 handler 清理未登记对象。
+- **Jianying：** Core-local Builder 仅在内存组合模板版本、`.zip` 包名、基础文件和公开 HTTPS 资源映射；拒绝 traversal、绝对路径、反斜杠、重复 zip path、IP/非 HTTPS URL，以及缺失 size/checksum/content-type。现有 Builder 新增 `JianyingBuildRequest`、`ManifestResource`、`build_jianying_base_files`、`build_jianying_resource_manifest` 稳定纯接口；不下载、复制、上传、写数据库或创建 ZIP。
+- **GREEN 验证：** Task 9 指定四文件 `16 passed, 1 warning`（含真实 FFmpeg + Fake TTS 小视频渲染、生产 HTTP TTS 冻结请求和生产 FFmpeg argv/heartbeat 契约），新增路由集成测试 `2 passed`；Core 全量 unit/integration/e2e（含 direct/sdist selective packaging roundtrip）`297 passed, 12 warnings`；原项目指定字幕/合并/剪映回归 `28 passed, 1 warning`；Alembic upgrade/check、`pip check`、`compileall`、修改文件 ruff format/check 与 `git diff --check` 均 PASS。direct wheel 与 sdist→wheel 分别在仓库外 cwd、空 `PYTHONPATH` 下实跑 Fake TTS、四产物 render 与 Jianying Builder，两次输出 `TASK9_RELEASE_RUNTIME_SMOKE_OK`；构建产物 `build/dist` 已删除，未进入提交。
+- **关键决策与计划偏差：** 设计要求生产 Worker 不依赖 UI/global provider，因此没有把 legacy `voice`、`generate_video`、Jianying 或整个 `app` 纳入 wheel；生产 TTS 使用 request-local HTTP Provider，生产视频用 Core-local FFmpeg 编排，selective legacy wheel 仍严格只有 Task 7/8 的四个文件。Implementation Plan 要求“复用或等价封装”，本实现选择等价 Core-local 封装以满足并发隔离、发布闭合和无共享目录约束。
+- **剩余风险：** 真实 TTS endpoint/OSS 凭据和供应商音频契约当前环境未提供，因此真实供应商 Smoke 按 Goal 作为可选外部验证；Fake Provider、HTTP 错误分类、FFmpeg 受治理调用、Artifact/恢复主链和发布闭合均由本地自动化覆盖。剪映模板内容完整性仍需 Task 15/18 使用真实完成项目与桌面 Chrome/Edge 样例验证。
+
+### Task 9 独立审查 R1 修复
+
+- **审查 RED：** 独立审查发现 1 Critical + 5 Important。新增 checksum 与 FFmpeg 分类测试首次为 `4 failed, 1 passed`，真实复现短/大写/非 hex SHA-256 被接受及所有 FFmpeg 非零均误报 retryable；审查的真实媒体探针同时复现两段共 4 秒最终仅 0.3 秒、异构分辨率无法 concat。
+- **C1 关闭：** 生产渲染先用 ffprobe 验证每个显式 source 及裁剪范围，越界稳定 non-retryable；每个 timeline segment 独立调用冻结 TTS，并以 `aresample + apad + atrim + asetpts` 精确对齐目标片段时长后合并 voice。视频逐段裁剪，以固定画布 scale/pad、30fps、SAR、timebase、PTS 归零后 concat；最终按 timeline 总时长 mux，不再用 `-shortest`。两个各 2 秒、160x90@10fps 与 320x180@24fps 的真实 FFmpeg E2E 输出 video/voice 均约 4 秒。
+- **I1 关闭：** Jianying route 不再接受 caller 的 `template_version/base_files/package_name`；服务端固定模板版本，从不可变 `snapshot_id`、严格 timeline 和 video/subtitle/voice/timeline 四类已登记资源生成受保护 `draft_content.json`、`draft_info.json` 与包名。legacy 两个稳定接口同步改为结构化快照生成和资源投影，并有根项目回归。
+- **I2 关闭：** complete_attempt 的租约、Artifact 唯一约束、Outbox、Integrity/DB 或其他终态异常统一检查提交事实；未提交时反向补偿全部当前 attempt 上传对象，已成功提交但调用方收到迟到异常时不误删。专项覆盖四对象全删、数据库无 Artifact，以及 commit succeeded 后零删除。
+- **I3/I4/I5 关闭：** ArtifactStore 必须从 OSS 明示 public base 或注入策略构建严格 `CdnUrlPolicy(prefix=/narrato/coreApi/)`，并要求 URL path 与实际 object_key 完全一致、无 query；拒绝 IP/loopback、userinfo、错误 host/prefix、query/fragment。Manifest checksum 仅接受 `sha256:` + 64 位小写 hex，并校验正 size、kind 集合和合理 content-type。FFmpeg 超时/进程不可用为 retryable，非零的输入/codec/format/filter/越界为稳定 non-retryable，stderr、路径和供应商正文不进入公开错误或日志。
+- **R1 GREEN：** Core 全量 `310 passed, 12 warnings`；根项目指定回归 `29 passed, 1 warning`；direct wheel 与 sdist→wheel 仓库外 Fake TTS/render/Jianying runtime 两次 `TASK9_RELEASE_RUNTIME_SMOKE_OK`。Alembic、pip check、compileall、ruff、diff-check 与构建产物清理均通过。
+- **剩余风险：** 真实供应商 TTS/OSS Smoke 仍需外部凭据；Jianying 桌面导入兼容样例按设计在 Task 15/18 验收，但 Core 已维护固定模板版本和结构化基础文件事实，不再把格式责任透传调用方。
+
+### Task 9 独立审查 R2 修复
+
+- **R2 RED：** 独立复审确认长 TTS 被每段 `atrim` 静默截断、固定剪映文件只是 Narrato 摘要 JSON、COMMIT 结果未知时误删已登记对象，以及 Manifest 未完整限制非有限/重叠/超大时间线；新增 2 秒语音对 1 秒 slot、真实草稿 schema/文件集合、提交成功后确认读取失败、NaN/Infinity/重叠/600 段上限测试覆盖上述边界。
+- **长语音完整性：** 生产 FFmpeg 逐段验证 WAV 并读取真实时长，以 `max(source duration, voice duration)` 重算连续输出 timeline；语音较长时用 `tpad=stop_mode=clone` 延长源片段尾帧，合并 voice 不再截掉内容，SRT、timeline、video 与 voice 同步延长。两段各 2 秒语音、原 slot 各 1 秒的真实 FFmpeg E2E 得到连续 `0-2/2-4` timeline、4 秒 SRT/voice/video。
+- **真实剪映基础结构：** 从 legacy plaintext Builder 的模板语义抽取 Core-local 纯内存生成器，固定生成 `draft_info.json`、`template-2.tmp`、`template.tmp`、`draft_meta_info.json`、`draft_settings`、cover、attachments、virtual store、layout 等基础文件；`draft_info` 含 54 类 materials、video/audio tracks/segments 和 draft path placeholder 资源引用。legacy 稳定接口复用其现有 `_create_draft_template/material/segment/meta/settings/attachment` 纯构建函数生成同类结构；两侧都不下载、不复制、不创建 ZIP、不写 DB/网络。
+- **补偿与输入上限：** 终态异常后二次读取成功且明确未提交才反向删除；COMMIT 是否成功无法确认时保留对象供任务/Artifact 对账恢复，避免数据库成功而 CDN 对象被删。Jianying Builder 拒绝非有限、倒序/重叠 cue，timeline 上限 500，使用 `allow_nan=False`，并按实际 HTTP 内联字段序列化字节执行 5 MiB 上限。
+- **R2 GREEN：** Task 9 定向 unit/integration/Fake+真实 FFmpeg E2E `56 passed`；Core 全量在 `coreApi` cwd 使用 Python 3.12 venv 为 `317 passed, 12 warnings`；legacy 剪映回归 `18 passed, 1 warning`。direct wheel 与 sdist 均成功构建并包含 Core-local template 模块，仓库外 runtime 两次输出 `TASK9_RELEASE_RUNTIME_SMOKE_OK`；ruff、compileall、diff-check 和构建产物清理通过。
+- **剩余风险：** 真实供应商 TTS/OSS Smoke 仍为外部可选条件；桌面剪映不同版本的实际导入 UI 验证按设计在 Task 15/18 完成，当前固定 10.6.0 基础结构已与仓库 plaintext Builder 的必需文件、materials/tracks/segments/schema 对齐。
+
+### Task 9 独立审查 R3 修复
+
+- **R3 RED：** 独立复审发现 Core 缩减剪映 schema、空 material index、无 text track、subtitle/timeline 未引用、画布硬编码，以及资源可覆盖基础文件和明确 rollback 在确认读取失败时不补偿。新增真实 legacy schema 深比较、字节同步、资源 path/MIME/metadata、text track/index/reference、明确 rollback 与 ambiguous commit 持久恢复测试，初次剪映专项为 `9 failed, 13 passed`。
+- **精确模板抽取：** 以 legacy 正式 `_create_draft_template/_create_draft_info/_normalize_materials/_normalize_tracks/_create_meta_info` 输出为基线，抽取无文件/DB/网络副作用的纯模板生成源；Core 与 legacy 各保留一份逐字节同步白名单并有 byte-sync 测试，selective wheel 只发布 Core 副本，不打包整个 app。深比较验证完整顶层字段集合、video/audio material 和 segment 字段集合与 legacy 正式 helper 一致；输出含非空 video/audio material index、真实 subtitle text materials/track、subtitle/timeline attachment 引用及 placeholder→zip_path 闭环。
+- **媒体与 Manifest 契约：** canvas、video material、segment 和 meta index 的 width/height/duration 全部来自最终 video resource metadata，不再硬编码 1920x1080。四类资源固定 `assets/video/*.mp4`、`assets/voice/*.wav`、`assets/subtitle/*.srt`、`assets/timeline/*.json` 及精确 MIME；资源间与全部 base files 最终全局唯一，拒绝目录/扩展/MIME 伪装和受保护文件冲突。
+- **终态补偿闭环：** `OutboxEventConflictError` 是 TaskService 明确 rollback，确认读取失败也立即反向补偿；真正 COMMIT acknowledgement unknown 时原子写入 `work_root/.artifact_reconciliation` 的 0600 journal。Handler 每次执行前扫描该持久事实，数据库恢复后 succeeded 删除 journal 并保留对象，其他状态幂等删除对象后清理 journal；生产 Worker 显式注入 reconciliation ArtifactStore。
+- **R3 GREEN：** 剪映/补偿/路由专项 `31 passed, 1 warning`；Core 全量 `326 passed, 12 warnings`；legacy 剪映 `19 passed, 1 warning`。direct wheel 与 sdist→wheel 均包含纯 Core 模板并通过仓库外 runtime smoke；ruff、compileall、diff-check、byte-sync 和构建产物清理通过。
+- **剩余风险：** 不同桌面剪映版本的真实 UI 导入仍按 design 在 Task 15/18 样例验收；Task 9 已提供与当前 legacy 10.6.0 正式结构可自动深比较的固定模板，不依赖整个 legacy app 运行时。
+
+### Task 9 独立审查 R4 修复
+
+- **R4 RED：** 独立复审确认旧 journal 只按 task status 会删除 running/retry 对象或保留新 retry 成功前的旧 orphan，且固定 PID temp、可跟随 symlink、无 fsync/claim、无周期任务、非 render/TTS rollback 无通用 store。新增 reconciliation 专项首次 collection 失败于模块不存在；随后覆盖 50 线程写入、symlink、running/retry、逐 Artifact DB 匹配、旧 attempt、新 retry、两 scanner claim、DB/OSS 失败、周期 Beat 和四类 Adapter store。
+- **逐 Artifact 数据库事实：** journal 固定持久化 `task_id/attempt_no` 及每个 `artifact_id/object_key` 和完整安全 ArtifactRef。scanner 查询对应 attempt 与 `core_artifacts(task_id, attempt_no)`，只保留 exact `(artifact_id, object_key)` 登记；queued/running/retry_wait/DB 不可用保持 pending；终态未登记或已 failed/expired 且不再 current 的旧 attempt 删除 orphan。新 retry 成功时旧 attempt 未登记对象会被删除，SUCCEEDED 不再无条件保留。
+- **崩溃与并发安全：** reconciliation 目录使用受控 root dirfd、`O_DIRECTORY|O_NOFOLLOW`，拒绝 symlink/非 owner，权限收紧 0700；每条 journal 使用 192-bit 随机 temp/target、`O_EXCL|O_NOFOLLOW`、0600、file fsync、dirfd 原子 replace 与 directory fsync。scanner 先原子 rename 为唯一 claim，两进程只有一个领取；异常恢复原名并 fsync，超时 claim 可恢复。50 线程同 task 写入零异常且 50 条事实完整。
+- **通用补偿与周期扫描：** Handler 统一从显式 reconciliation store 或 ASR/short-drama/TTS/render Adapter 取得 ArtifactStore，analysis/script/ASR/subtitle/TTS/render 的明确 rollback 与 unknown 均走同一逻辑；store 缺失或 OSS 删除失败绝不丢 journal。明确 rollback 失败 journal 标记 `known_orphan` 可立即周期重试；ambiguous journal 等待 DB 精确事实。新增 `core.tasks.reconcile_artifacts` 独立 Celery Beat 每 15 秒执行，不依赖后续业务任务。
+- **R4 GREEN：** reconciliation/handler/Beat 专项 `21 passed, 1 warning`；Core 全量 `339 passed, 12 warnings`；legacy 剪映 `19 passed, 1 warning`。direct wheel 与 sdist→wheel 仓库外 runtime 两次 PASS；ruff、compileall、diff-check、byte-sync 和构建产物清理通过。
+- **剩余风险：** 真实 OSS delete 的供应商 Smoke 仍需外部凭据；scanner 对 OSS/DB 异常保持持久事实并由 Beat 重试，Fake OSS 已覆盖失败恢复和幂等删除路径。
+
+### Task 9 独立审查 R5 修复
+
+- **R5 RED/审查结论：** 独立复审确认 reconciliation 尚有 1 Critical + 2 Important：OSS PUT 前没有持久 write-ahead intent，进程在 PUT 前后或多 Artifact 中途崩溃会留下不可发现对象；旧 pending 被 claim 后沿用旧 mtime，慢 resolver 可被第二 scanner 抢占；journal 文件未限制 hardlink/owner/size，payload schema 与 `known_orphan` 可被畸形数据驱动删除。
+- **C1 Write-ahead 闭环：** `ArtifactStore.upload` 现在完成文件 fstat/摘要、生成 `artifact_id/object_key` 后，必须先以 file fsync + atomic replace + directory fsync 写入包含 task/attempt/artifact/key/checksum/size/content-type 的 intent，成功后才允许 OSS PUT；journal 落盘失败时 PUT 不会发生。PUT 成功后以同样的持久写入替换为完整 bucket/url ArtifactRef；进程在 PUT 前、PUT 后、引用更新前或多对象中途退出时，每个对象都有独立 exact identity 可由 scanner 对照 DB 清理或确认。Handler 在 ambiguous commit 时把同 attempt 的 write-ahead facts 安全聚合，明确 rollback 且 OSS 反向删除成功时同步清理 exact intents。
+- **I1 claim lease：** pending 原子 rename 为 claim 后立即刷新 mtime 并 fsync；resolver 活跃期间独立 heartbeat 按 lease 的三分之一持续刷新 claim。专项把 60 秒旧 pending 交给慢 scanner，并在超过 stale 阈值后启动第二 scanner，仍只执行一次 resolve/delete。
+- **I2 安全 schema/quarantine：** claim 打开后以 `O_NOFOLLOW + fstat` 拒绝非 regular、非当前 owner、`st_nlink != 1`、group/other 权限、空文件和超过 1 MiB；读取有界。payload 只接受精确 version/top-level/artifact key 集，严格校验 `ctask_`/`art_` ID、attempt、最多 16 artifacts、Core object-key prefix/path、kind/MIME/size、完整小写 SHA-256 及 bucket/url 长度；非法 `known_orphan`、hardlink、畸形或超大事实只原子移入随机 quarantine 并 fsync，绝不触发 OSS delete，也不形成热循环。
+- **故障注入与 GREEN：** 新增 PUT 前可观察 intent、journal 磁盘失败零 PUT、PUT 已写后 `SystemExit` 仍保留 exact key、完整引用更新、hardlink/非法 `known_orphan` quarantine、旧 pending + 慢 resolver + 第二 scanner 等测试。reconciliation + render failure 专项 `25 passed, 1 warning`；Core Python 3.12 全量 `344 passed, 12 warnings`；legacy Jianying `19 passed, 1 warning`；direct/sdist packaging roundtrip `2 passed, 1 warning`。ruff format/check、compileall、`git diff --check` 全部 PASS。
+- **剩余风险：** 真实 OSS 在硬进程终止边界的供应商级 Smoke 仍需外部凭据；本地 Fake OSS 已覆盖 PUT 前/后故障与多事实恢复协议，scanner 对 DB/OSS 异常保持 journal 并由 Beat 重试。
+
+### Task 9 独立审查 R6 修复
+
+- **R6 RED/审查结论：** 独立复审以跨进程晚提交探针复现 `scanner 首次 DELETE 并退休 fact -> 在途 PUT 晚到 -> Worker 退出` 后远端对象永久存在；同时复现 resolver/store 抛 `ValueError` 被误 quarantine，以及 FIFO 在 `open()` 阻塞、symlink 每 15 秒恢复形成热循环。结论为 1 Critical + 2 Important。
+- **安全 phase protocol：** journal schema 新增严格的 `uploading / uploaded / cleanup_tombstone` phase、`upload_protected_until`、`cleanup_settle_after` 和连续 delete confirmation。ArtifactStore 在 PUT 前写 `uploading`，保护期强制大于配置化 PUT 等待/transport 上界 30 秒裕量；保护期内 scanner 即使发现旧 attempt 也绝不 delete。PUT 返回后只允许把仍处于 uploading/uploaded 的 exact fact 持久转为 uploaded；若 scanner 已进入 tombstone，上传方不得返回成功并再次 delete。
+- **晚提交恢复：** 过保护期且确认需清理的 fact 原子转 `cleanup_tombstone`，首次 DELETE 后不退休；默认 settlement 60 秒且至少连续 3 次幂等 DELETE，达到 deadline/confirmation 前每个 15 秒 Beat 周期继续删除。可控时钟故障测试覆盖保护期零删、首次删除、远端 PUT 随后晚提交、上传方观察 tombstone 拒绝成功、后续 scanner 再删，最终对象不存在且 fact 仅在安全 settlement 后退休。该协议提供 at-least-once cleanup，不宣称不可证明的立即 exactly-once。
+- **有限 PUT 上界：** ArtifactStore caller 等待上限强制为 `(0,60]` 秒；生产 Oss2 connect/read 各限制 `<=30s`，总 transport 上界不得超过 60 秒；超时返回稳定 retryable `OSS_UPLOAD_TIMEOUT`，durable uploading/tombstone 继续覆盖可能的远端迟到提交。
+- **错误分层：** 新增专用 `InvalidJournalError`。只有 lstat/open/fstat/有界读取/JSON/schema 的明确不可信输入进入 quarantine；payload 解析成功后，DB、OSS、`ArtifactSecurityError`/`ValueError` 或其他 resolver 运行错误统一 rollback、持久保存已发生的 phase 转换并恢复 pending，下一周期继续重试。
+- **特殊文件与队列活性：** 打开前 `lstat` 仅接受 owner、0600、单 hardlink、regular、1 MiB 内文件；再以 `O_NONBLOCK|O_NOFOLLOW|O_CLOEXEC` 打开并复核 dev/inode/size，循环有界读取处理 short read 和增长。FIFO、socket/device、symlink、hardlink 均不阻塞且原子 quarantine；坏条目后 scanner 继续处理同轮合法 fact，不产生 15 秒热循环。
+- **GREEN：** 新增 phase/晚提交、resolver ValueError retry、FIFO/symlink/socket 安全与坏条目不阻塞测试。reconciliation/OSS/render failure 定向 `92 passed, 1 warning`；Core Python 3.12 全量 `347 passed, 12 warnings`；legacy Jianying `19 passed, 1 warning`；direct/sdist packaging roundtrip `2 passed, 1 warning`。ruff format/check、compileall、`git diff --check` 全部 PASS。
+- **剩余风险：** 真实 OSS 供应商端对客户端超时后的最终一致时间需在部署 Smoke 中按供应商 SLA 校准 settlement deadline；当前默认在 bounded PUT 保护后跨多个 Beat 周期重复幂等删除，Fake remote-set 已覆盖 reviewer 指定的 DELETE-before-late-commit 顺序。
+
+### Task 9 独立审查 R7 修复
+
+- **R7 RED/审查结论：** 独立复审确认 R6 的 caller wait timeout 只让调用方抛错，detached daemon PUT 仍可继续并在 tombstone 退休后晚提交；500ms 固定轮询会把正常 scanner claim 误判为 fact 消失并删除健康对象；固定 30 秒总等待会系统性误伤持续有进展的大视频，并积累不可管理后台线程。另复现 missing intent 后 direct delete 失败导致 `pending=0`，以及 replace 失败残留 `.tmp-*`。
+- **同步 PUT ownership：** 完全移除 `_bounded_upload`、固定 30/60 秒 caller 总时限和 detached daemon PUT。ArtifactStore 在当前 Worker 调用栈同步等待 provider `upload_stream`；底层 `connect_timeout/read_timeout` 继续由 Oss2 Settings 配置并只表达 socket idle timeout，不再伪称 wall-clock 总上界。调用返回或抛错时不存在仍运行的 PUT 线程；健康大文件只要持续有网络进展即可继续。
+- **受管理 intent heartbeat：** 同步 PUT 期间启动唯一受管理 heartbeat，周期原子延长 `upload_protected_until`；PUT 的所有退出路径均 `stop + join` 后才继续，handler 原有 task lease heartbeat 同时保持。上传保护租约独立配置为 30～3600 秒（默认 300 秒），不是上传总时限。测试覆盖阻塞 PUT 期间 caller 必须存活、释放后 PUT 与 heartbeat 都已 join、线程集合恢复基线；向后 wall-clock 不缩短既有 protection，向前跳变由下一 heartbeat 立即扩展。
+- **跨进程 claim 协调：** journal 增加受控 0600 advisory operation lock；scanner claim/resolve/restore 与 uploader heartbeat/update_reference 串行协调。update_reference 按 exact `intent_name` 定位 pending/claim/transition，不再固定轮询 500ms；0.8 秒慢 scanner 后 uploader 阻塞等待并成功转 uploaded，不删除健康对象。
+- **tombstone 安全退休：** 默认 cleanup retention 提升到 24 小时并保留至少三次跨周期 delete；只有 provider HEAD 明确持续确认对象不存在且达到 retention/confirmations 才退休。Oss2 增加安全 `object_exists` HEAD；无 HEAD 能力的 store 永不退休 tombstone，以小 journal 换取不产生永久 orphan。scanner 仍在每个 15 秒周期重复幂等 DELETE，覆盖客户端断开后的供应商迟到提交。
+- **上传方恢复责任：** 若 update 观察到 tombstone 或 durable fact 缺失，先重新持久写入 exact cleanup tombstone，再 direct DELETE；DELETE 临时失败原异常向上抛但 tombstone 保留，后续 Beat 可继续，禁止 `pending=0`。replace/fsync 失败路径 finally 清理随机 `.tmp-*`，避免磁盘错误累积死文件。
+- **GREEN：** 新增同步 PUT 无 detached thread、慢 claim 等待、无 HEAD 永不退休、missing fact + delete failure durable tombstone、wall-clock jump heartbeat、replace failure tmp cleanup 测试。reconciliation/render failure 专项 `34 passed, 1 warning`；Core Python 3.12 全量 `353 passed, 12 warnings`；legacy Jianying `19 passed, 1 warning`；direct/sdist packaging roundtrip `2 passed, 1 warning`。ruff format/check、compileall、`git diff --check` 全部 PASS。
+- **剩余风险：** 生产 24 小时 retention 应在真实 OSS Smoke 后按供应商“客户端终止后最终提交/HEAD 一致性”SLA 调高而不能调低到 SLA 以下；无 HEAD provider 当前选择永久保留 tombstone，不以不可靠固定时间换取清理事实丢失。
+
+### Task 9 独立审查 R8 修复
+
+- **R8 RED/审查结论：** 独立复审复现三个永久/24h tombstone 在 `limit=2` 时固定排序头部连续四轮占满配额、第三 fact 永远未清；DELETE 成功次数被误当 HEAD absent confirmations，单次 false-negative 即可退休；全局 operation lock 接受 0666/hardlink，且跨 DB/DELETE/HEAD 网络导致一个慢 fact 阻塞所有上传 heartbeat/update 和 scanner。
+- **持久 due/fairness 调度：** journal schema 增加 `next_check_at/last_checked_at/delete_attempts/absent_streak/last_absent_at`。scanner 先隔离全部坏 entry（不占 limit），只 claim `next_check_at <= now` 的合法 fact 并按 due 排序；每次未完成处理都持久推进 due，因此前 `limit` 项立即移出下一轮候选。`limit=2 + 3 tombstones` 测试第二轮必处理第三项，不再按文件名头部饥饿。
+- **有界退避与容量：** tombstone DELETE/HEAD 采用 15 秒起始、指数增长、1 小时封顶；无 HEAD 永久 tombstone 低频但持续清理，不再每 15 秒产生约 5760 次/日调用。active journal 强制最多 10,000 entries/64 MiB；容量判断发生在 write-ahead intent fsync/OSS PUT 之前，达到阈值 fail closed 且既有事实不丢，scanner 继续按 due 公平消化。
+- **连续独立 HEAD 确认：** `delete_attempts` 与 `absent_streak` 完全拆分。仅 HEAD 明确 absent 且距离上次 absent 至少 15 秒才增加连续 streak；HEAD exists 或 HEAD 异常立即把 streak/last_absent 清零并保留 tombstone，异常 phase/result 仍持久后恢复。retention 到期也必须达到至少 N 次连续、分时 absent；eventual-consistency 序列中一次 false-negative 后紧接 exists 不会退休，只有最后连续三次 absent 才退休。
+- **per-fact 并发锁：** scanner 不再持全局锁跨 DB/OSS；每个 fact 使用由 immutable pending basename 派生的稳定 0600 sidecar advisory lock，claim/replace 不改变 lock inode。scanner、upload heartbeat、update_reference 只串行同一 fact；一个慢网络 fact 处理中，另一 scanner 在 500ms 内完成不同 fact。全局 lock helper 同步加固为受控 dirfd、`O_NOFOLLOW|O_CLOEXEC`、fstat regular/euid/nlink=1/mode0600/inode 一致，0666 与 hardlink 均拒绝。
+- **GREEN：** 新增 due rotation、容量 fail-closed、连续 spaced HEAD、weak/hardlink lock、慢 fact 不阻塞另一 scanner 探针。reconciliation 专项 `33 passed, 1 warning`；Core Python 3.12 全量 `359 passed, 12 warnings`；legacy Jianying `19 passed, 1 warning`；direct/sdist packaging roundtrip `2 passed, 1 warning`。ruff format/check、compileall、`git diff --check` 全部 PASS。
+- **剩余风险：** active capacity 达阈值时新上传按设计 fail closed，需要部署监控 pending count/bytes 与 quarantine 数量；默认 1 小时 backoff 上界和 24 小时 remote settlement retention 应结合真实 OSS 限流及 HEAD 一致性 SLA 调优，但不得削弱连续 absent 退休条件。
+
+### Task 9 独立审查 R9 修复
+
+- **R9 RED/审查结论：** R8 无 Critical，独立复审发现 3 Important：DELETE 异常发生在 attempts/backoff 更新前导致每次扫描立即重打；capacity 统计与提交无跨 writer reservation，limit=1 可被两个线程同时穿透；每个随机 fact 的 `.fact-lock-*` 在完成后永久遗留且未计入容量，20 个完成 fact 稳定留下 20 个 inode。
+- **异常前置退避：** 每轮 cleanup 在任何 DELETE/HEAD side effect 前先递增 `delete_attempts` 并计算/写入 `next_check_at`；provider 任意运行异常后 outer recovery 持久保存该状态再 restore pending。持续 DELETE failure 测试首轮得到 attempt=1/next=+15s，同一时刻重复 scan 不再调用 provider，到 due 后才第二次调用。若 phase 持久化本身失败，claim 保持且最新 mtime/stale lease 提供安全退避，不形成 15 秒热循环。
+- **原子 capacity reservation：** hardened 0600 operation lock 现在只覆盖 `active/aux count+bytes -> temp write/fsync -> pending rename/dir fsync` 短临界区，绝不跨 DB/OSS。进程内 creation race 由本地 mutex 收口，跨进程由 flock 收口；entry limit=1 的两并发 writers 严格 1 success + 1 `ReconciliationCapacityError`，最终 pending=1。
+- **sidecar 生命周期与辅助容量：** per-fact lock name 可稳定推导；fact 成功退休、quarantine 或 exact discard 后，仅在无对应 pending/claim/transition 且能 nonblocking 独占 flock 时安全 unlink，绝不删除正在使用的 lock inode。scanner 启动清理无对应 fact 且无人持有的 stale sidecar、超过 stale lease 的 `.tmp-*`，并把 quarantine 保留上限设为 1000。容量同时对 active 设 10,000/64MiB、auxiliary temp/lock/quarantine 设 20,000/64MiB 上界；20 个 fact 完成后 pending/sidecar/tmp 均为 0。
+- **GREEN：** reconciliation 专项 `36 passed, 1 warning`；Core Python 3.12 全量 `362 passed, 12 warnings`；legacy Jianying `19 passed, 1 warning`；direct/sdist packaging roundtrip `2 passed, 1 warning`。ruff format/check、compileall、`git diff --check` 全部 PASS。
+- **剩余风险：** quarantine 超过 1000 时按最旧优先清理，需要生产监控保留安全事件计数/摘要而不能依赖文件永久审计；capacity 达阈值继续按设计在 PUT 前 fail closed。
+
+### Task 9 独立审查 R10 修复
+
+- **R10 RED/审查结论：** Task 9 整体无 Critical，仅剩 2 Important：空 root 上 6 个 prefork Worker 同时首次创建 `.operation.lock` 会间歇 ENOENT；quarantine 只按 1000 条数量裁剪，约 65 个近 1 MiB 坏 fact 即可超过 64 MiB auxiliary byte 上限并永久阻止新 write-ahead。
+- **冷启动 lock 初始化协议：** operation lock 不再使用 check-then-create；在受控 dirfd 下先 `O_CREAT|O_EXCL|O_NOFOLLOW|O_CLOEXEC` 原子创建，`EEXIST` 后重开既有固定 inode，冷创建 ENOENT 窗口重新打开安全 directory fd 并以 5ms 有界重试 40 次。最终仍强制 regular/euid/nlink=1/mode0600 并 flock；lock 文件固定存在且不进入 GC。空 root 6 个 fork Worker × 3 rounds 自动测试零失败，并额外连续执行该测试 5 次（共 90 个冷启动 child writes）全部 PASS。
+- **quarantine count+bytes 双水位：** quarantine GC 同时按 mtime 最旧优先删除，直到 `count <= 1000` 且 `bytes <= 32 MiB`；32 MiB 清理水位低于 64 MiB auxiliary fail-closed 上限，为 tmp/sidecar 留出余量。scanner 在本轮将坏 pending 移入 quarantine 后再次执行 GC，因此不需等待下一 Beat。缩小常量探针以 3×6-byte quarantine/10-byte budget 验证自动降至预算内，随后在 12-byte auxiliary 上限下成功新建 write-ahead fact；active/pending/claim/locks 均不参与 quarantine 删除。
+- **GREEN：** reconciliation 专项 `38 passed, 1 warning`；Core Python 3.12 全量 `364 passed, 12 warnings`；legacy Jianying `19 passed, 1 warning`；direct/sdist packaging roundtrip `2 passed, 1 warning`。ruff format/check、compileall、`git diff --check` 全部 PASS。
+- **剩余风险：** quarantine 文件是安全诊断样本而非业务事实，超过 count/byte 水位会删除最旧样本；生产应把 quarantine 计数和错误摘要接入监控，durable pending/claim/tombstone 不受该 GC 影响。

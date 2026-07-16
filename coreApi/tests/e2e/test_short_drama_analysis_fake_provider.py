@@ -45,6 +45,8 @@ class MemoryDownloader:
 class MemoryOss:
     """记录确定性 JSON 产物内容。"""
 
+    public_base_url = "https://cdn.example.test"
+
     def __init__(self, downloader: MemoryDownloader) -> None:
         self.downloader = downloader
         self.uploads: dict[str, bytes] = {}
