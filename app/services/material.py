@@ -5,6 +5,7 @@ import traceback
 from urllib.parse import urlencode
 from datetime import datetime
 import json
+from pathlib import Path
 
 import requests
 from typing import List, Optional
@@ -13,13 +14,14 @@ from moviepy.video.io.VideoFileClip import VideoFileClip
 
 from app.config import config
 from app.models.schema import VideoAspect, VideoConcatMode, MaterialInfo
+from app.runtime.task_workspace import TaskWorkspace
 from app.utils import utils
 from app.utils import ffmpeg_utils
 
-requested_count = 0
 
+def get_api_key(cfg_key: str, request_index: int = 0):
+    """按调用方显式序号选择 API Key，不保存进程级轮询状态。"""
 
-def get_api_key(cfg_key: str):
     api_keys = config.app.get(cfg_key)
     if not api_keys:
         raise ValueError(
@@ -31,20 +33,19 @@ def get_api_key(cfg_key: str):
     if isinstance(api_keys, str):
         return api_keys
 
-    global requested_count
-    requested_count += 1
-    return api_keys[requested_count % len(api_keys)]
+    return api_keys[request_index % len(api_keys)]
 
 
 def search_videos_pexels(
     search_term: str,
     minimum_duration: int,
     video_aspect: VideoAspect = VideoAspect.portrait,
+    request_index: int = 0,
 ) -> List[MaterialInfo]:
     aspect = VideoAspect(video_aspect)
     video_orientation = aspect.name
     video_width, video_height = aspect.to_resolution()
-    api_key = get_api_key("pexels_api_keys")
+    api_key = get_api_key("pexels_api_keys", request_index=request_index)
     headers = {"Authorization": api_key}
     # Build URL
     params = {"query": search_term, "per_page": 20, "orientation": video_orientation}
@@ -94,12 +95,13 @@ def search_videos_pixabay(
     search_term: str,
     minimum_duration: int,
     video_aspect: VideoAspect = VideoAspect.portrait,
+    request_index: int = 0,
 ) -> List[MaterialInfo]:
     aspect = VideoAspect(video_aspect)
 
     video_width, video_height = aspect.to_resolution()
 
-    api_key = get_api_key("pixabay_api_keys")
+    api_key = get_api_key("pixabay_api_keys", request_index=request_index)
     # Build URL
     params = {
         "q": search_term,
@@ -187,6 +189,33 @@ def save_video(video_url: str, save_dir: str = "") -> str:
     return ""
 
 
+def _resolve_material_directory(
+    task_id: str,
+    workspace: TaskWorkspace | None,
+    workspace_subdir: str,
+) -> str:
+    """解析任务独占目录，Core attempt 优先使用显式工作区。"""
+
+    if workspace is not None:
+        material_directory = workspace.temp_dir / workspace_subdir
+        material_directory.mkdir(parents=True, exist_ok=True)
+        return str(material_directory)
+
+    configured_directory = config.app.get("material_directory", "").strip()
+    if not configured_directory or configured_directory == "task":
+        return utils.task_dir(task_id)
+
+    configured_path = Path(configured_directory)
+    if not configured_path.is_dir():
+        logger.warning(f"素材目录不存在，改用任务独立目录: {configured_directory}")
+        return utils.task_dir(task_id)
+
+    # 即使管理员配置了全局素材根目录，任务产物也必须落入独立子目录。
+    task_directory = configured_path / task_id
+    task_directory.mkdir(parents=True, exist_ok=True)
+    return str(task_directory)
+
+
 def download_videos(
     task_id: str,
     search_terms: List[str],
@@ -195,7 +224,10 @@ def download_videos(
     video_contact_mode: VideoConcatMode = VideoConcatMode.random,
     audio_duration: float = 0.0,
     max_clip_duration: int = 5,
+    workspace: TaskWorkspace | None = None,
 ) -> List[str]:
+    """下载素材到显式 attempt 工作区或旧 WebUI 的任务独立目录。"""
+
     valid_video_items = []
     valid_video_urls = []
     found_duration = 0.0
@@ -203,11 +235,12 @@ def download_videos(
     if source == "pixabay":
         search_videos = search_videos_pixabay
 
-    for search_term in search_terms:
+    for request_index, search_term in enumerate(search_terms):
         video_items = search_videos(
             search_term=search_term,
             minimum_duration=max_clip_duration,
             video_aspect=video_aspect,
+            request_index=request_index,
         )
         logger.info(f"found {len(video_items)} videos for '{search_term}'")
 
@@ -222,11 +255,11 @@ def download_videos(
     )
     video_paths = []
 
-    material_directory = config.app.get("material_directory", "").strip()
-    if material_directory == "task":
-        material_directory = utils.task_dir(task_id)
-    elif material_directory and not os.path.isdir(material_directory):
-        material_directory = ""
+    material_directory = _resolve_material_directory(
+        task_id=task_id,
+        workspace=workspace,
+        workspace_subdir="downloads",
+    )
 
     if video_contact_mode.value == VideoConcatMode.random.value:
         random.shuffle(valid_video_items)
@@ -333,11 +366,8 @@ def save_clip_video(timestamp: str, origin_video: str, save_dir: str = "") -> st
     Returns:
         dict: 裁剪后的视频路径,格式为 {timestamp: video_path}
     """
-    # 使用新的路径结构
     if not save_dir:
-        base_dir = os.path.join(utils.temp_dir(), "clip_video")
-        video_hash = utils.md5(origin_video)
-        save_dir = os.path.join(base_dir, video_hash)
+        raise ValueError("裁剪视频必须显式提供任务独立的保存目录")
 
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
@@ -489,7 +519,13 @@ def save_clip_video(timestamp: str, origin_video: str, save_dir: str = "") -> st
         return ''
 
 
-def clip_videos(task_id: str, timestamp_terms: List[str], origin_video: str, progress_callback=None) -> dict:
+def clip_videos(
+    task_id: str,
+    timestamp_terms: List[str],
+    origin_video: str,
+    progress_callback=None,
+    workspace: TaskWorkspace | None = None,
+) -> dict:
     """
     剪辑视频
     Args:
@@ -497,14 +533,19 @@ def clip_videos(task_id: str, timestamp_terms: List[str], origin_video: str, pro
         timestamp_terms: 需要剪辑的时间戳列表，如:['00:00:00,000-00:00:20,100', '00:00:43,039-00:00:46,959']
         origin_video: 原视频路径
         progress_callback: 进度回调函数
+        workspace: Core attempt 显式工作区；旧 WebUI 可不传
 
     Returns:
         剪辑后的视频路径
     """
     video_paths = {}
     total_items = len(timestamp_terms)
+    material_directory = _resolve_material_directory(
+        task_id=task_id,
+        workspace=workspace,
+        workspace_subdir="clips",
+    )
     for index, item in enumerate(timestamp_terms):
-        material_directory = config.app.get("material_directory", "").strip()
         try:
             saved_video_path = save_clip_video(timestamp=item, origin_video=origin_video, save_dir=material_directory)
             if saved_video_path:

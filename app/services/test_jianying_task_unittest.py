@@ -305,7 +305,7 @@ class JianyingTaskTests(unittest.TestCase):
             self.assertEqual(1.25, draft_script[0]["duration"])
             self.assertTrue(draft_script[0]["use_source_timerange"])
 
-    def test_get_original_subtitle_paths_falls_back_to_matching_video_name(self):
+    def test_get_original_subtitle_paths_does_not_guess_from_video_name(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             temp_path = Path(temp_dir)
             video_path = temp_path / "episode_20260608010240.mp4"
@@ -320,7 +320,7 @@ class JianyingTaskTests(unittest.TestCase):
             with patch.object(jianying_task.utils, "subtitle_dir", return_value=str(temp_path)):
                 subtitle_paths = jianying_task._get_original_subtitle_paths(params)
 
-            self.assertEqual([str(newer_subtitle)], subtitle_paths)
+            self.assertEqual([], subtitle_paths)
 
     def test_create_jianying_subtitle_file_includes_original_audio_subtitles(self):
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -335,7 +335,11 @@ class JianyingTaskTests(unittest.TestCase):
                 encoding="utf-8",
             )
 
-            params = VideoClipParams(video_origin_path=str(video_path), subtitle_enabled=True)
+            params = VideoClipParams(
+                video_origin_path=str(video_path),
+                original_subtitle_path=str(subtitle_path),
+                subtitle_enabled=True,
+            )
             draft_script = jianying_task._build_jianying_draft_script(
                 [
                     {
@@ -349,10 +353,7 @@ class JianyingTaskTests(unittest.TestCase):
                 [],
             )
 
-            with (
-                patch.object(jianying_task.utils, "subtitle_dir", return_value=str(temp_path)),
-                patch.object(jianying_task.utils, "task_dir", return_value=str(task_dir)),
-            ):
+            with patch.object(jianying_task.utils, "task_dir", return_value=str(task_dir)):
                 output_path = jianying_task._create_jianying_subtitle_file(
                     "task-id",
                     draft_script,
