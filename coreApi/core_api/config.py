@@ -26,6 +26,10 @@ class Settings(BaseSettings):
     celery_queue_prefix: str = "narrato.core"
     service_token: str = Field(default="", repr=False)
     callback_token: str = Field(default="", repr=False)
+    callback_url: str = ""
+    callback_connect_timeout_seconds: float = Field(default=3.0, gt=0, le=30)
+    callback_read_timeout_seconds: float = Field(default=10.0, gt=0, le=60)
+    callback_total_timeout_seconds: float = Field(default=15.0, gt=0, le=120)
     provider_secrets: dict[str, str] = Field(default_factory=dict, repr=False)
     oss_endpoint: str = ""
     oss_bucket: str = ""

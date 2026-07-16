@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from core_api.type_coercion import as_float, as_int
+
 import json
 import math
 import wave
@@ -68,18 +70,18 @@ class FakeRenderBackend:
         for index, item in enumerate(timeline, 1):
 
             def stamp(value):
-                milliseconds = int(float(value) * 1000)
+                milliseconds = as_int(as_float(value) * 1000)
                 hours, remainder = divmod(milliseconds, 3_600_000)
                 minutes, remainder = divmod(remainder, 60_000)
                 seconds, millis = divmod(remainder, 1000)
                 return f"{hours:02}:{minutes:02}:{seconds:02},{millis:03}"
 
-            duration = float(item["end"]) - float(item["start"])
+            duration = as_float(item["end"]) - as_float(item["start"])
             adjusted.append(
                 {
                     **item,
-                    "source_start": float(item["start"]),
-                    "source_end": float(item["end"]),
+                    "source_start": as_float(item["start"]),
+                    "source_end": as_float(item["end"]),
                     "start": cursor,
                     "end": cursor + duration,
                 }
@@ -141,14 +143,14 @@ class FfmpegRenderBackend:
                 raise RenderTemporaryError("RENDER_PROCESS_UNAVAILABLE") from exc
             self._require_process_success(probe)
             try:
-                duration = float(probe.stdout.strip())
+                duration = as_float(probe.stdout.strip())
             except ValueError as exc:
                 raise RenderInputError("RENDER_MEDIA_INVALID") from exc
             if not math.isfinite(duration) or duration <= 0:
                 raise RenderInputError("RENDER_MEDIA_INVALID")
             if any(
                 str(item["source_asset_id"]) == source_id
-                and float(item["end"]) > duration + 0.02
+                and as_float(item["end"]) > duration + 0.02
                 for item in timeline
             ):
                 raise RenderInputError("RENDER_SOURCE_RANGE_INVALID")
@@ -158,7 +160,7 @@ class FfmpegRenderBackend:
         adjusted_timeline: list[dict[str, object]] = []
         cursor = 0.0
         for index, item in enumerate(timeline):
-            source_duration = float(item["end"]) - float(item["start"])
+            source_duration = as_float(item["end"]) - as_float(item["start"])
             target = output_dir / f"voice_segment_{index:04}.wav"
             self.provider.synthesize(
                 str(item["narration"]), target, voice_snapshot=self.voice_snapshot
@@ -172,8 +174,8 @@ class FfmpegRenderBackend:
             adjusted_timeline.append(
                 {
                     **item,
-                    "source_start": float(item["start"]),
-                    "source_end": float(item["end"]),
+                    "source_start": as_float(item["start"]),
+                    "source_end": as_float(item["end"]),
                     "start": cursor,
                     "end": cursor + duration,
                 }
@@ -183,7 +185,7 @@ class FfmpegRenderBackend:
         subtitle = output_dir / "subtitle.srt"
 
         def stamp(value: float) -> str:
-            total = int(round(value * 1000))
+            total = as_int(round(value * 1000))
             hours, rem = divmod(total, 3_600_000)
             minutes, rem = divmod(rem, 60_000)
             seconds, millis = divmod(rem, 1_000)
@@ -191,8 +193,8 @@ class FfmpegRenderBackend:
 
         subtitle.write_text(
             "\n".join(
-                f"{index}\n{stamp(float(item['start']))} --> "
-                f"{stamp(float(item['end']))}\n{item['narration']}\n"
+                f"{index}\n{stamp(as_float(item['start']))} --> "
+                f"{stamp(as_float(item['end']))}\n{item['narration']}\n"
                 for index, item in enumerate(adjusted_timeline, 1)
             ),
             encoding="utf-8",
@@ -206,14 +208,14 @@ class FfmpegRenderBackend:
                     "-ss",
                     str(item["start"]),
                     "-t",
-                    str(float(item["end"]) - float(item["start"])),
+                    str(as_float(item["end"]) - as_float(item["start"])),
                     "-i",
                     str(source_by_id[str(item["source_asset_id"])]),
                 ]
             )
         filters = []
         for index, (item, duration) in enumerate(zip(timeline, durations, strict=True)):
-            source_duration = float(item["end"]) - float(item["start"])
+            source_duration = as_float(item["end"]) - as_float(item["start"])
             extension = max(0.0, duration - source_duration)
             filters.append(
                 f"[{index}:v:0]scale=640:360:force_original_aspect_ratio=decrease,"
@@ -334,25 +336,25 @@ class RenderAdapter:
             if (
                 type(start) not in (int, float)
                 or type(end) not in (int, float)
-                or not math.isfinite(float(start))
-                or not math.isfinite(float(end))
-                or float(start) < previous
-                or float(end) <= float(start)
+                or not math.isfinite(as_float(start))
+                or not math.isfinite(as_float(end))
+                or as_float(start) < previous
+                or as_float(end) <= as_float(start)
                 or not isinstance(text, str)
                 or not text.strip()
             ):
                 raise RenderInputError("RENDER_TIMELINE_INVALID")
-            previous = float(end)
+            previous = as_float(end)
 
             def stamp(value: float) -> str:
-                total = int(value * 1000)
+                total = as_int(value * 1000)
                 hours, rem = divmod(total, 3_600_000)
                 minutes, rem = divmod(rem, 60_000)
                 seconds, millis = divmod(rem, 1_000)
                 return f"{hours:02}:{minutes:02}:{seconds:02},{millis:03}"
 
             cues.append(
-                f"{index}\n{stamp(float(start))} --> {stamp(float(end))}\n{text.strip()}\n"
+                f"{index}\n{stamp(as_float(start))} --> {stamp(as_float(end))}\n{text.strip()}\n"
             )
         target = workspace.controlled_path("output", "subtitle", "srt")
         target.write_text("\n".join(cues), encoding="utf-8")
@@ -413,10 +415,10 @@ class RenderAdapter:
                 source_id not in source_set
                 or type(start) not in (int, float)
                 or type(end) not in (int, float)
-                or not math.isfinite(float(start))
-                or not math.isfinite(float(end))
-                or float(start) < 0
-                or float(end) <= float(start)
+                or not math.isfinite(as_float(start))
+                or not math.isfinite(as_float(end))
+                or as_float(start) < 0
+                or as_float(end) <= as_float(start)
                 or not isinstance(narration, str)
                 or not narration.strip()
             ):
@@ -426,8 +428,8 @@ class RenderAdapter:
             validated.append(
                 {
                     "source_asset_id": source_id,
-                    "start": float(start),
-                    "end": float(end),
+                    "start": as_float(start),
+                    "end": as_float(end),
                     "narration": narration.strip(),
                 }
             )
@@ -475,11 +477,11 @@ class RenderAdapter:
         try:
             if timeline_path.stat().st_size > JSON_MAX_BYTES:
                 raise RenderInputError("RENDER_TIMELINE_TOO_LARGE")
-            subtitle = Path(produced["subtitle"])
+            subtitle = Path(str(produced["subtitle"]))
             if subtitle.stat().st_size > SRT_MAX_BYTES:
                 raise RenderInputError("RENDER_SUBTITLE_INVALID")
             parse_srt(subtitle.read_bytes())
-            video, voice = Path(produced["video"]), Path(produced["voice"])
+            video, voice = Path(str(produced["video"])), Path(str(produced["voice"]))
             for path in (video, subtitle, voice):
                 if (
                     path.parent.resolve() != workspace.output_dir.resolve()

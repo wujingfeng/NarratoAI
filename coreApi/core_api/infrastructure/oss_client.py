@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import ipaddress
+import os
 import posixpath
 import re
 import time
@@ -264,7 +265,11 @@ class HttpCdnDownloader:
             raise ValueError("max_bytes 必须大于零")
         current = self.policy.validate(url)
         destination = Path(destination)
-        destination.parent.mkdir(parents=True, exist_ok=True)
+        if not destination.is_absolute() or destination.name in {"", ".", ".."}:
+            raise DownloadTemporaryError("SOURCE_DOWNLOAD_FAILED")
+        parent_fd = self._open_parent_dirfd(destination)
+        filename = destination.name
+        created = False
         started = time.monotonic()
         try:
             with httpx.Client(
@@ -297,7 +302,16 @@ class HttpCdnDownloader:
                                     "SOURCE_LENGTH_INVALID"
                                 ) from exc
                         size = 0
-                        with destination.open("xb") as handle:
+                        flags = (
+                            os.O_WRONLY
+                            | os.O_CREAT
+                            | os.O_EXCL
+                            | getattr(os, "O_NOFOLLOW", 0)
+                            | getattr(os, "O_CLOEXEC", 0)
+                        )
+                        descriptor = os.open(filename, flags, 0o600, dir_fd=parent_fd)
+                        created = True
+                        with os.fdopen(descriptor, "wb") as handle:
                             for chunk in response.iter_bytes(64 * 1024):
                                 if time.monotonic() - started > self.total_timeout:
                                     raise DownloadTemporaryError(
@@ -307,6 +321,8 @@ class HttpCdnDownloader:
                                 if size > max_bytes:
                                     raise DownloadTooLargeError("SOURCE_TOO_LARGE")
                                 handle.write(chunk)
+                            handle.flush()
+                            os.fsync(handle.fileno())
                         return DownloadReceipt(
                             url=current,
                             size=size,
@@ -314,11 +330,45 @@ class HttpCdnDownloader:
                         )
             raise InputSecurityError("SOURCE_REDIRECT_REJECTED")
         except InfrastructureError:
-            destination.unlink(missing_ok=True)
+            if created:
+                self._unlink_at(parent_fd, filename)
             raise
         except (httpx.HTTPError, OSError) as exc:
-            destination.unlink(missing_ok=True)
+            if created:
+                self._unlink_at(parent_fd, filename)
             raise DownloadTemporaryError("SOURCE_DOWNLOAD_FAILED") from exc
+        finally:
+            os.close(parent_fd)
+
+    @staticmethod
+    def _open_parent_dirfd(destination: Path) -> int:
+        """从根逐层 O_NOFOLLOW 打开父目录，消除祖先替换竞态。"""
+
+        flags = (
+            os.O_RDONLY
+            | getattr(os, "O_DIRECTORY", 0)
+            | getattr(os, "O_NOFOLLOW", 0)
+            | getattr(os, "O_CLOEXEC", 0)
+        )
+        descriptor = os.open("/", flags)
+        try:
+            for part in destination.parent.parts[1:]:
+                next_descriptor = os.open(part, flags, dir_fd=descriptor)
+                os.close(descriptor)
+                descriptor = next_descriptor
+            return descriptor
+        except OSError as exc:
+            os.close(descriptor)
+            raise DownloadTemporaryError("SOURCE_DOWNLOAD_FAILED") from exc
+
+    @staticmethod
+    def _unlink_at(parent_fd: int, filename: str) -> None:
+        """仅从已验证 dirfd 删除本次受控临时文件。"""
+
+        try:
+            os.unlink(filename, dir_fd=parent_fd)
+        except FileNotFoundError:
+            return
 
 
 class Oss2Client:

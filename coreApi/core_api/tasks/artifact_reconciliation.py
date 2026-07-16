@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from core_api.type_coercion import as_float, as_int, as_mapping, as_sequence
+
 import json
 import fcntl
 import hashlib
@@ -51,6 +53,7 @@ _LOCAL_OPERATION_LOCK = threading.Lock()
 
 @dataclass(frozen=True, slots=True)
 class ReconciliationArtifact:
+    """持久化补偿日志中的单个 OSS Artifact 安全事实。"""
     artifact_id: str
     kind: str
     object_key: str
@@ -324,7 +327,7 @@ class ArtifactReconciliationJournal:
             identity = (artifact.artifact_id, artifact.object_key)
             recorded = {
                 (str(item["artifact_id"]), str(item["object_key"]))
-                for item in payload["artifacts"]
+                for item in as_sequence(payload["artifacts"])
             }
             if (
                 payload["task_id"] != task_id
@@ -374,7 +377,7 @@ class ArtifactReconciliationJournal:
             if payload["phase"] != "uploading":
                 return False
             payload["upload_protected_until"] = max(
-                float(payload["upload_protected_until"]),
+                as_float(payload["upload_protected_until"]),
                 self.clock() + protection_seconds,
             )
             self._replace_claim_payload(directory_fd, name, payload)
@@ -433,7 +436,7 @@ class ArtifactReconciliationJournal:
                     continue
                 recorded = {
                     (str(item["artifact_id"]), str(item["object_key"]))
-                    for item in payload["artifacts"]
+                    for item in as_sequence(payload["artifacts"])
                 }
                 if (
                     payload["task_id"] == task_id
@@ -884,15 +887,18 @@ class ArtifactReconciliationScanner:
 
     def _resolve(self, payload: dict[str, object]) -> bool:
         task_id = str(payload["task_id"])
-        attempt_no = int(payload["attempt_no"])
-        artifacts = [ReconciliationArtifact(**item) for item in payload["artifacts"]]
+        attempt_no = as_int(payload["attempt_no"])
+        artifacts = [
+            ReconciliationArtifact(**as_mapping(item))
+            for item in as_sequence(payload["artifacts"])
+        ]
         now = self.clock()
         payload["last_checked_at"] = now
-        if payload["phase"] == "uploading" and now < float(
+        if payload["phase"] == "uploading" and now < as_float(
             payload["upload_protected_until"]
         ):
             payload["next_check_at"] = min(
-                float(payload["upload_protected_until"]), now + 60.0
+                as_float(payload["upload_protected_until"]), now + 60.0
             )
             return False
         task = self.session.get(CoreTask, task_id, populate_existing=True)
@@ -947,14 +953,25 @@ class ArtifactReconciliationScanner:
             payload["cleanup_confirmations"] = 0
             payload["absent_streak"] = 0
             payload["last_absent_at"] = None
-        payload["delete_attempts"] = int(payload["delete_attempts"]) + 1
+        payload["delete_attempts"] = as_int(payload["delete_attempts"]) + 1
         backoff = min(
             _MAX_RECONCILE_BACKOFF,
-            15.0 * (2 ** min(int(payload["delete_attempts"]) - 1, 8)),
+            15.0 * (2 ** min(as_int(payload["delete_attempts"]) - 1, 8)),
         )
         payload["next_check_at"] = now + backoff
         for artifact in unmatched:
-            self.artifact_store.delete_reconciled_artifact(artifact)
+            self.artifact_store.delete_reconciled_artifact(
+                ArtifactRef(
+                    artifact_id=artifact.artifact_id,
+                    kind=artifact.kind,
+                    bucket=artifact.bucket or "",
+                    object_key=artifact.object_key,
+                    url=artifact.url or "",
+                    content_type=artifact.content_type,
+                    size=artifact.size,
+                    checksum=artifact.checksum,
+                )
+            )
         confirm_absent = getattr(
             self.artifact_store, "is_reconciled_artifact_absent", None
         )
@@ -975,14 +992,14 @@ class ArtifactReconciliationScanner:
         last_absent = payload["last_absent_at"]
         if (
             last_absent is None
-            or now - float(last_absent) >= _MIN_ABSENCE_CONFIRM_INTERVAL
+            or now - as_float(last_absent) >= _MIN_ABSENCE_CONFIRM_INTERVAL
         ):
-            payload["absent_streak"] = int(payload["absent_streak"]) + 1
-            payload["cleanup_confirmations"] = int(payload["absent_streak"])
+            payload["absent_streak"] = as_int(payload["absent_streak"]) + 1
+            payload["cleanup_confirmations"] = as_int(payload["absent_streak"])
             payload["last_absent_at"] = now
         return (
-            now >= float(payload["cleanup_settle_after"])
-            and int(payload["absent_streak"]) >= self.settlement_confirmations
+            now >= as_float(payload["cleanup_settle_after"])
+            and as_int(payload["absent_streak"]) >= self.settlement_confirmations
         )
 
     def scan(self, *, limit: int = 100) -> int:
@@ -1014,7 +1031,7 @@ class ArtifactReconciliationScanner:
                     except FileNotFoundError:
                         pass
                     continue
-                due = float(preview["next_check_at"])
+                due = as_float(preview["next_check_at"])
                 if due <= self.clock():
                     candidates.append((due, name))
             self._cleanup_auxiliary(directory_fd)

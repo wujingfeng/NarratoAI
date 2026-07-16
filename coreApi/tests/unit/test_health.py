@@ -90,6 +90,18 @@ def test_required_configuration_rejects_invalid_task7_security_semantics(setting
     assert required_configuration_is_present(
         base.model_copy(update={"work_root": "relative/work"})
     ) is False
+    assert required_configuration_is_present(
+        base.model_copy(update={"callback_url": ""})
+    ) is False
+    assert required_configuration_is_present(
+        base.model_copy(update={"callback_url": "http://narrato.example.test/callback"})
+    ) is False
+    assert required_configuration_is_present(
+        base.model_copy(update={"callback_url": "https://example.test:bad/callback"})
+    ) is False
+    assert required_configuration_is_present(
+        base.model_copy(update={"callback_url": "https://127.0.0.1/callback"})
+    ) is False
 
 
 def test_ready_probes_oss_with_timeout_and_safe_error(settings, monkeypatch):

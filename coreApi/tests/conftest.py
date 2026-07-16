@@ -46,6 +46,7 @@ def settings(tmp_path) -> Settings:
         celery_broker_url="redis://127.0.0.1:6379/14",
         service_token="test-service-token",
         callback_token="test-callback-token",
+        callback_url="https://narrato.example.test/api/v1/internal/core/callbacks",
         oss_public_base_url="https://cdn.example.test",
         cdn_allowed_hosts=["cdn.example.test"],
         work_root=tmp_path / "work",
@@ -73,8 +74,8 @@ def client(app) -> Iterator[TestClient]:
 
 
 @pytest.fixture
-def session():
-    """提供带完整 Core 元数据的内存数据库会话。"""
+def session(tmp_path):
+    """提供带完整 Core 元数据且支持独立心跳 Session 的数据库会话。"""
 
     from sqlalchemy import create_engine, event
     from sqlalchemy.orm import Session
@@ -83,7 +84,7 @@ def session():
     from core_api.tasks import models as task_models  # noqa: F401
 
     engine = create_engine(
-        "sqlite+pysqlite:///:memory:",
+        f"sqlite+pysqlite:///{tmp_path / 'unit.db'}",
         connect_args={"check_same_thread": False},
     )
 

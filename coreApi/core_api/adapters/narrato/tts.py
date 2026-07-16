@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from core_api.type_coercion import as_float, as_int
+
 import math
 import struct
 import wave
@@ -74,7 +76,7 @@ class FakeTtsProvider:
             output.writeframes(
                 b"".join(
                     struct.pack(
-                        "<h", int(800 * math.sin(2 * math.pi * 220 * i / sample_rate))
+                        "<h", as_int(800 * math.sin(2 * math.pi * 220 * i / sample_rate))
                     )
                     for i in range(frames)
                 )
@@ -169,13 +171,13 @@ class TtsAdapter:
                 or not text.strip()
                 or type(start) not in (int, float)
                 or type(end) not in (int, float)
-                or not math.isfinite(float(start))
-                or not math.isfinite(float(end))
-                or float(start) < previous_end
-                or float(end) <= float(start)
+                or not math.isfinite(as_float(start))
+                or not math.isfinite(as_float(end))
+                or as_float(start) < previous_end
+                or as_float(end) <= as_float(start)
             ):
                 raise TtsInputError("TTS_SEGMENT_INVALID")
-            previous_end = float(end)
+            previous_end = as_float(end)
             texts.append(text.strip())
         if len("\n".join(texts).encode("utf-8")) > 5 * 1024 * 1024:
             raise TtsInputError("TTS_TEXT_TOO_LARGE")

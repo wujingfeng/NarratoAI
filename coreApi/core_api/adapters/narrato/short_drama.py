@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from core_api.type_coercion import as_float, as_int, as_mapping
+
 import json
 import hashlib
 import logging
@@ -7,7 +9,7 @@ import math
 import re
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
-from typing import Protocol
+from typing import Any, NoReturn, Protocol, cast
 
 import httpx
 import requests
@@ -263,7 +265,7 @@ def validate_timeline(
             float,
         ):
             raise _validation_error("SCRIPT_TIME_INVALID")
-        start, end = float(raw["start"]), float(raw["end"])
+        start, end = as_float(raw["start"]), as_float(raw["end"])
         if not math.isfinite(start) or not math.isfinite(end):
             raise _validation_error("SCRIPT_TIME_INVALID")
         if start < 0 or end <= start:
@@ -295,7 +297,7 @@ def _source_from_snapshot(raw: Mapping[str, object]) -> ShortDramaSource:
         source_asset_id=str(raw.get("source_asset_id") or ""),
         video_url=str(raw.get("video_url") or ""),
         subtitle_url=str(raw.get("subtitle_url") or artifact_url or "") or None,
-        duration_seconds=float(raw["duration_seconds"])
+        duration_seconds=as_float(raw["duration_seconds"])
         if raw.get("duration_seconds") is not None
         else None,
         subtitle_text=str(raw.get("subtitle_text") or "") or None,
@@ -319,7 +321,7 @@ def _public_source_map(
         if raw.get("subtitle_url") is not None:
             item["subtitle_url"] = raw.get("subtitle_url")
         elif isinstance(raw.get("subtitle_artifact"), Mapping):
-            artifact = raw["subtitle_artifact"]
+            artifact = as_mapping(raw["subtitle_artifact"])
             item["subtitle_artifact"] = {
                 "artifact_id": artifact.get("artifact_id"),
                 "url": artifact.get("url"),
@@ -789,7 +791,7 @@ class UnavailableShortDramaProvider:
     """把供应商 Adapter 缺失转成 attempt 内的确定性失败。"""
 
     @staticmethod
-    def _raise() -> None:
+    def _raise() -> NoReturn:
         raise ProviderAdapterUnavailableError("PROVIDER_ADAPTER_UNAVAILABLE")
 
     def analyze_story(
@@ -917,7 +919,8 @@ class NarratoShortDramaProvider:
         if json_output:
             kwargs["response_format"] = {"type": "json_object"}
         assert self.client is not None
-        response = self._call(self.client.chat.completions.create, **kwargs)
+        client = cast(Any, self.client)
+        response = cast(Any, self._call(client.chat.completions.create, **kwargs))
         try:
             content = response.choices[0].message.content
         except (AttributeError, IndexError, TypeError) as exc:
@@ -942,7 +945,7 @@ class NarratoShortDramaProvider:
         return raw if type(raw) is int else None
 
     @classmethod
-    def _raise_failure(cls, failure: object) -> None:
+    def _raise_failure(cls, failure: object) -> NoReturn:
         current = failure
         messages: list[str] = []
         seen: set[int] = set()
@@ -1062,14 +1065,14 @@ class NarratoShortDramaProvider:
             raise ShortDramaInputError("SHORT_DRAMA_INPUT_INVALID")
         if self.analyzer is not None:
             raw = self._result(
-                self._call(self.analyzer.analyze_subtitle, subtitle_content),
+                self._call(cast(Any, self.analyzer).analyze_subtitle, subtitle_content),
                 "analysis",
             )
         else:
             raw = self._completion(
                 "analysis",
                 f"剧情分析\n语言：{language}\n提示类别：{self.prompt_category}\n字幕：\n{subtitle_content}",
-                temperature=float(config.get("temperature", 0.7)),
+                temperature=as_float(config.get("temperature", 0.7)),
                 max_tokens=self._max_tokens(config),
             )
         summary = raw if isinstance(raw, str) else json.dumps(raw, ensure_ascii=False)
@@ -1108,7 +1111,7 @@ class NarratoShortDramaProvider:
             "short_name": str(config.get("short_name") or "短剧"),
             "plot_analysis": plot_analysis,
             "subtitle_content": subtitle_content,
-            "temperature": float(config.get("temperature", 0.7)),
+            "temperature": as_float(config.get("temperature", 0.7)),
             "max_tokens": self._max_tokens(config),
             "narration_language": language,
             "drama_genre": drama_genre,
@@ -1116,7 +1119,7 @@ class NarratoShortDramaProvider:
         }
         if self.analyzer is not None:
             narration_copy = self._result(
-                self._call(self.analyzer.generate_narration_copy, **kwargs),
+                self._call(cast(Any, self.analyzer).generate_narration_copy, **kwargs),
                 "narration_copy",
             )
         else:
@@ -1125,7 +1128,7 @@ class NarratoShortDramaProvider:
                 "生成解说正文\n"
                 f"语言：{language}\n类型：{drama_genre}\n"
                 f"剧情：{plot_analysis}\n字幕：\n{subtitle_content}",
-                temperature=float(config.get("temperature", 0.7)),
+                temperature=as_float(config.get("temperature", 0.7)),
                 max_tokens=self._max_tokens(config),
             )
         self._context.update(
@@ -1133,7 +1136,7 @@ class NarratoShortDramaProvider:
             | {
                 "narration_copy": narration_copy,
                 "sources": sources,
-                "original_sound_ratio": int(config.get("original_sound_ratio", 30)),
+                "original_sound_ratio": as_int(config.get("original_sound_ratio", 30)),
             }
         )
         return narration_copy
@@ -1143,12 +1146,12 @@ class NarratoShortDramaProvider:
         if self.analyzer is not None:
             raw = self._result(
                 self._call(
-                    self.analyzer.match_narration_copy_to_script,
+                    cast(Any, self.analyzer).match_narration_copy_to_script,
                     short_name=context["short_name"],
                     plot_analysis=context["plot_analysis"],
                     subtitle_content=context["subtitle_content"],
                     narration_copy=str(script),
-                    temperature=min(float(context["temperature"]), 0.3),
+                    temperature=min(as_float(context["temperature"]), 0.3),
                     narration_language=context["narration_language"],
                     drama_genre=context["drama_genre"],
                     original_sound_ratio=context["original_sound_ratio"],
@@ -1161,8 +1164,8 @@ class NarratoShortDramaProvider:
                 f"匹配画面。{self._timeline_contract(sources)}\n"
                 f"原声比例：{context['original_sound_ratio']}\n"
                 f"字幕：{context['subtitle_content']}\n文案：{script}",
-                temperature=float(context["temperature"]),
-                max_tokens=int(context["max_tokens"]),
+                temperature=as_float(context["temperature"]),
+                max_tokens=as_int(context["max_tokens"]),
                 json_output=True,
             )
         return self._bounded_timeline(raw, sources)
@@ -1172,7 +1175,7 @@ class NarratoShortDramaProvider:
         if self.analyzer is not None:
             raw = self._result(
                 self._call(
-                    self.analyzer.repair_narration_script,
+                    cast(Any, self.analyzer).repair_narration_script,
                     short_name=context["short_name"],
                     plot_analysis=context["plot_analysis"],
                     subtitle_content=context["subtitle_content"],
@@ -1180,7 +1183,7 @@ class NarratoShortDramaProvider:
                         invalid_script, ensure_ascii=False, allow_nan=False
                     ),
                     validation_errors=",".join(validation_errors),
-                    temperature=min(float(context["temperature"]), 0.3),
+                    temperature=min(as_float(context["temperature"]), 0.3),
                     narration_language=context["narration_language"],
                     drama_genre=context["drama_genre"],
                 ),
@@ -1193,8 +1196,8 @@ class NarratoShortDramaProvider:
                 f"错误：{','.join(validation_errors)}\n"
                 f"字幕：{context['subtitle_content']}\n"
                 f"无效结果：{json.dumps(invalid_script, ensure_ascii=False, allow_nan=False)}",
-                temperature=float(context["temperature"]),
-                max_tokens=int(context["max_tokens"]),
+                temperature=as_float(context["temperature"]),
+                max_tokens=as_int(context["max_tokens"]),
                 json_output=True,
             )
         return self._bounded_timeline(raw, sources)
@@ -1216,7 +1219,7 @@ def _timestamp_seconds(value: str) -> tuple[float, float]:
     )
     if match is None:
         raise ProviderResponseError("PROVIDER_RESPONSE_INVALID")
-    values = [int(value) for value in match.groups()]
+    values = [as_int(value) for value in match.groups()]
     return (
         values[0] * 3600 + values[1] * 60 + values[2] + values[3] / 1000,
         values[4] * 3600 + values[5] * 60 + values[6] + values[7] / 1000,
@@ -1244,6 +1247,8 @@ def _legacy_script_to_timeline(
             if type(video_id) is not int or video_id < 1 or video_id > len(sources):
                 raise ProviderResponseError("PROVIDER_RESPONSE_INVALID")
             source_id = sources[video_id - 1].source_asset_id
+        start: object
+        end: object
         if "timestamp" in item:
             start, end = _timestamp_seconds(str(item["timestamp"]))
         else:

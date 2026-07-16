@@ -494,3 +494,52 @@
 - **quarantine count+bytes 双水位：** quarantine GC 同时按 mtime 最旧优先删除，直到 `count <= 1000` 且 `bytes <= 32 MiB`；32 MiB 清理水位低于 64 MiB auxiliary fail-closed 上限，为 tmp/sidecar 留出余量。scanner 在本轮将坏 pending 移入 quarantine 后再次执行 GC，因此不需等待下一 Beat。缩小常量探针以 3×6-byte quarantine/10-byte budget 验证自动降至预算内，随后在 12-byte auxiliary 上限下成功新建 write-ahead fact；active/pending/claim/locks 均不参与 quarantine 删除。
 - **GREEN：** reconciliation 专项 `38 passed, 1 warning`；Core Python 3.12 全量 `364 passed, 12 warnings`；legacy Jianying `19 passed, 1 warning`；direct/sdist packaging roundtrip `2 passed, 1 warning`。ruff format/check、compileall、`git diff --check` 全部 PASS。
 - **剩余风险：** quarantine 文件是安全诊断样本而非业务事实，超过 count/byte 水位会删除最旧样本；生产应把 quarantine 计数和错误摘要接入监控，durable pending/claim/tombstone 不受该 GC 影响。
+
+### Task 9 独立审查 R11
+
+- **Commit：** `de28121 feat: expose render and jianying manifest capabilities`。
+- **结论：** 需求符合性与代码质量均 PASS；Critical 0、Important 0。Task 9 指定测试、Core 全量、legacy 字幕/合并/剪映、direct wheel 与 sdist→wheel 仓库外 runtime 均通过；最终固定剪映模板、Artifact reconciliation 和 selective packaging 闭合。
+
+## Gate A：Core 可独立运行
+
+- **状态：** 完成（最终需求复核 PASS，最终代码质量审查 PASS；Critical 0、Important 0）。
+- **Gate RED：** 独立需求复核为 Important 2，代码审查为 Critical 1 + Important 3。真实复现 callback Outbox 只有入库无投递器、`GET /api/v1/tasks/{core_task_id}/events` 为 404、工作区校验后祖先目录替换可向外部写入 `owned`；`ruff` 有 3 个 F401，原配置下 `mypy core_api` 有 112 个错误。加入不降低检查强度的可复现 mypy 配置后 RED 为 119 errors/16 files。`python3.11 -m pytest app/services -q` 另复现 TwelveLabs Fake client 因可选 SDK 导入失败和剪映纯模板字节不同步，共 `2 failed, 128 passed, 1 skipped`。
+- **Callback 闭环：** 新增配置化 HTTPS callback URL、独立 Bearer、connect/read/total timeout 与 readiness 必要配置验证；新增请求级 `HttpCallbackClient` 和持久 `CallbackOutboxPublisher`。HTTP 使用可取消的 Async transport，并由硬 total deadline 主动取消慢请求，不是请求结束后才检查耗时。publisher 在网络前以条件 UPDATE 原子 claim，先提交 attempt count 与指数 backoff，再发送统一 payload；成功或确定性 4xx 按 event/state identity 结束，408/429/5xx/timeout 保持 pending。并发双 Session、limit 公平、网络失败、硬总时限、Worker `SystemExit` 后到期重放和敏感异常不外泄均有自动化；Celery Beat 每 5 秒运行生产 publisher。发送成功后进程退出允许至少一次重复，由后续 narratoApi 按 event/version 幂等。
+- **Events 合同：** 新增固定 Core Bearer 的只读 `GET /api/v1/tasks/{core_task_id}/events`，事实来自 `callback_outbox`，按 state version/created/id 稳定排序；DTO 返回 event identity、sequence、事件类型、时间、状态、phase、progress、attempt、稳定错误码和公开 HTTPS Artifact 摘要，不公开 bucket/object key/本地路径/堆栈/secret。未知任务为统一 404，OpenAPI 已包含路径，POST 为 405。
+- **TOCTOU：** `HttpCdnDownloader` 不再对已校验 `Path` 普通 reopen；从 `/` 开始逐祖先以 `O_DIRECTORY|O_NOFOLLOW|O_CLOEXEC` 打开 dirfd，最终以 `O_CREAT|O_EXCL|O_NOFOLLOW` 在同一 dirfd 创建，流式写完 flush/fsync，失败仅 unlinkat 本次确实创建的文件。祖先替换 symlink 探针不产生外部文件，预存同名文件也不会被失败清理删除。
+- **静态质量与回归：** `ruff` 3 个 F401 和公开 `ReconciliationArtifact` 中文 Docstring 已修；`ruff>=0.8,<1`、`mypy>=1.15,<2` 纳入 test extra，仅对无 stubs 的 `app/celery/oss2` 精确 `ignore_missing_imports`。通过 JSON 边界类型收窄、SQLAlchemy result typing、能力模型 union 收窄、provider 变量隔离和 DTO 构造修复全部 119 个 mypy 错误；`.venv/bin/mypy core_api` 为 `Success: no issues found in 59 source files`。TwelveLabs 可选 SDK 仅在真实 client 构建时必需，注入 Fake client 不再要求 SDK；Core/legacy 剪映模板继续逐字节同步。
+- **GREEN 命令与结果：** `alembic upgrade head && alembic check` PASS；fresh SQLite 0001-0004 upgrade/check PASS；PostgreSQL offline DDL 生成 206 行；Core 最终全量 `377 passed, 12 warnings`，新增 Gate 定向/发布/恢复/Fake E2E `44 passed, 1 warning`；`.venv/bin/ruff check .`、`.venv/bin/mypy core_api`、`.venv/bin/pip check`、`compileall` 均 PASS；direct wheel 与 sdist→wheel 由 packaging roundtrip 在仓库外 runtime 验证。根项目实际完整 `python3.11 -m pytest app/services -q` 为 `130 passed, 1 skipped, 4 warnings`，唯一 skip 是未提供真实 TwelveLabs 凭据的可选 live test；`git diff --check` PASS。
+- **计划差异：** 原 Gate brief 中两个不存在的根测试路径已弃用，正式矩阵改为实际存在的 `app/services` 全目录测试；不记录不存在命令为 PASS。回调使用可验证的条件 UPDATE 原子 claim，而非依赖 SQLite 不支持的 `SKIP LOCKED`；生产 PostgreSQL 同样由 status/due 条件保证单轮唯一领取。
+- **剩余风险：** 真实 callback 接收端属于 Task 14，当前以 Mock HTTP 验证发送协议；真实 OSS/TTS/SMTP/供应商 Smoke 和生产部署按 Goal 非强制。真实 PostgreSQL 运行条件未提供，本 Gate 已完成 PostgreSQL offline DDL，数据库并发语义由条件 UPDATE 与文件 SQLite 双 Session 自动化覆盖；后续 Gate B/D 在可用 PostgreSQL 环境继续集成验证。
+
+### Gate A 独立复审 R2 修复
+
+- **R2 RED：** 独立复审发现 1 Critical + 2 Important。新增 receiver 强制幂等 Header、全非 2xx、危险 callback URL 与 OpenAPI 生成契约测试，首次为 `6 failed, 26 passed`：缺少 `X-Idempotency-Key`、422/3xx/4xx 被分类 terminal 并伪装 sent、非法端口被 readiness 接受、Task/Event 200 schema 为 `additionalProperties: true`。
+- **Callback 合同与恢复：** 每次 POST 强制 `X-Idempotency-Key: <event_id>`，测试逐请求验证 Header、body event identity/task/attempt/version 一致。只有 2xx 返回 `SUCCESS` 并原子标 `SENT`；3xx、400/401/403/404/409/422、408/429、5xx、网络错误与 timeout 全部保持 durable `PENDING`，使用已持久的有界指数 backoff 重试。自动化覆盖 token/receiver 修复后由拒绝转 2xx 的恢复，不新增伪 sent/dead-letter 路径，响应 body 不写日志或数据库。
+- **Callback URL 安全基线：** client 与 readiness 共用 `validate_callback_url`，显式访问并捕获 `urlsplit.port` 的 `ValueError`；只接受 HTTPS、规范 DNS label、无 userinfo/query/fragment、端口省略或 443、无控制符/反斜杠的路径。拒绝 IP literal（含 loopback/private）、localhost/local/internal、非法 DNS label、非法/非 443 端口；返回 IDNA/host 规范化 endpoint。
+- **版本化查询 DTO：** Task GET 与 Events GET 均声明 `ApiResponse[具体 DTO]` response model；新增 extra-forbid 的 `CoreTaskErrorDTO/CoreTaskArtifactDTO/CoreTaskDTO/CoreTaskEventDTO/CoreTaskEventsDTO`。OpenAPI 200 schema 使用 `$ref`，明确 envelope `code/message/data/request_id` 和 Task/Event 全字段，DTO `additionalProperties=false`；运行时 Task/Event error 仅公开稳定 code/retryable，Artifact 不再公开 bucket/object key/本地路径。
+- **R2 GREEN：** 定向 `32 passed, 1 warning`；Core 最终全量 `379 passed, 12 warnings`；legacy `130 passed, 1 skipped, 4 warnings`；Alembic upgrade/check、Ruff、Mypy 59 files、pip check、compileall、`git diff --check` 全部 PASS。迁移保持无变化。
+- **剩余风险：** receiver 实现仍属于 Task 14；Gate A 已以强制幂等 Mock receiver 验证发送方协议和拒绝后恢复。所有非 2xx 当前选择持续有界退避，后续运维应监控长期 pending 数量和 attempt count，但不得把未确认事件伪装 sent。
+
+### Gate A 独立复审 R3 修复
+
+- **R3 RED：** 独立复审发现 1 Important。取消抵抗型 AsyncTransport 吞掉 `CancelledError` 后在 0.14 秒迟到返回 204，原 `asyncio.wait_for` 会把已超过 0.02 秒 total timeout 的请求错误分类为 `SUCCESS`；同时固定 claim 只按初始 timeout+5 秒保护，真实网络调用异常超时后会重新变为 due。新增迟到 204、持久 pending、慢投递跨 claim、心跳数据库失败和线程回收测试，首次为 `3 failed`，稳定复现上述边界。
+- **单调 deadline：** `HttpCallbackClient` 从调用前记录 monotonic 起点，`wait_for` 返回后再次核对真实 elapsed；即使下层忽略取消并迟到返回 2xx，只要超过 total timeout 就固定 `RETRY`。生产 HTTP 改用 `AsyncClient.stream`，只等待响应头并立即关闭，不读取或保留响应正文；connect/read idle timeout 仍独立有界。
+- **受管理 claim heartbeat：** Publisher 在真实 `deliver` 全程启动唯一非 daemon 心跳线程，使用从 Engine 创建的独立 SQLAlchemy Session，按 claim 时长三分之一周期条件更新同一 `id/event_id/state_version/PENDING` 的 `next_attempt_at`；所有正常、异常及 `SystemExit` 路径均 `stop + join`，不跨线程共享主 Session。心跳 UPDATE 未命中或数据库异常时强制把本轮结果降为 `RETRY`，即使 HTTP 2xx 也保持 durable pending。
+- **R3 GREEN：** callback delivery/outbox 定向 `20 passed, 1 warning`；Core 全量 `383 passed, 12 warnings`；legacy `130 passed, 1 skipped, 4 warnings`。Alembic upgrade/check、Ruff、Mypy 59 files、pip check、compileall、`git diff --check` 全部 PASS。线程基线探针确认慢投递完成后无 `core-callback-claim-*` 遗留。
+- **剩余风险：** 真实 callback receiver 与公网网络抖动 Smoke 仍属于后续 Task 14/部署验证；本 Gate 已用取消抵抗 transport 和文件 SQLite 双 Publisher 验证迟到成功不会伪 SENT、慢请求期间不会重复认领、心跳失败可安全重试。
+
+### Gate A 独立复审 R4 修复
+
+- **R4 RED：** 独立复审发现 1 Important：claim heartbeat 无条件把 `next_attempt_at` 写成 `now + minimum_claim`，会把高 attempt 已持久化的一小时指数退避缩短为数百毫秒。新增 `attempt_count=10/base=5/max=3600/minimum_claim=0.3` 回归测试，首次稳定失败并显示 due 仅剩约 0.3 秒。
+- **单调 claim 延长：** heartbeat 条件 UPDATE 改用跨 SQLite/PostgreSQL 的 SQL `CASE` 语义，仅当当前 `next_attempt_at < now + minimum_claim` 时才向后延长；否则保留数据库中的既有 due。心跳因此只承担并发 claim 保护，不覆盖或缩短 publisher 在网络前已持久化的指数 backoff；首次短 claim 的慢投递仍由既有双 Publisher 测试验证会持续延长并阻止重复认领。
+- **R4 GREEN：** 新增长退避与慢 claim 定向 `2 passed, 1 warning`；Core 全量 `384 passed, 12 warnings`；legacy `130 passed, 1 skipped, 4 warnings`。Alembic upgrade/check、Ruff、Mypy 59 files、pip check、compileall、`git diff --check` 全部 PASS。
+- **剩余风险：** PostgreSQL 真实运行条件仍未提供；该表达式使用 SQLAlchemy 标准 searched CASE，并已由 SQLite 集成测试覆盖数据库端原子 max 语义，生产 PostgreSQL 将生成同等 `CASE WHEN ... THEN ... ELSE ... END` 更新。
+
+### Gate A 独立复审 R5（最终）
+
+- **需求复核：** PASS。逐项对照 design 文档、Gate A 验收范围及 R1-R4 修复证据，Core 独立运行、持久 callback 投递、Events 查询合同、TOCTOU 防护、迁移与发布边界均符合要求；无范围外扩张，Critical 0、Important 0。
+- **代码质量审查：** PASS。最终独立审查确认 callback monotonic deadline、独立 Session claim heartbeat、单调 `next_attempt_at`、失败保持 pending、线程 stop/join 及数据库条件更新实现闭合；无遗留 Critical/Important，未要求继续修改生产代码或测试。
+- **Commit：** Gate 独立提交 `test: pass core api gate a`（本 R5 结论与本日志随同该提交 amend，最终 hash 以分支 HEAD 为准）。
+- **最终验证证据：** Core Python 3.12 全量 `384 passed, 12 warnings`；legacy `python3.11 -m pytest app/services -q` 为 `130 passed, 1 skipped, 4 warnings`，唯一 skip 为无真实 TwelveLabs 凭据的可选 live test。`alembic upgrade head && alembic check`、`.venv/bin/ruff check .`、`.venv/bin/mypy core_api`（59 files）、`.venv/bin/pip check`、`compileall`、`git diff --check` 全部 PASS。
+- **Gate 结论：** Gate A 正式关闭并自动进入下一 Gate。真实 callback receiver、真实 PostgreSQL/OSS/TTS/SMTP/供应商 Smoke 继续按 design 在后续 Gate 或部署条件具备时验证，不构成本 Gate 未完成项。

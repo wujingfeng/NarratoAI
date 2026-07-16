@@ -114,12 +114,12 @@ class CapabilityService:
         capability_types_by_provider: dict[str, set[str]] = {
             provider.code: set() for provider in callable_providers
         }
-        for item in model_items:
-            capability_types_by_provider[item.provider_code].update(
-                item.capability_types
+        for model_item in model_items:
+            capability_types_by_provider[model_item.provider_code].update(
+                model_item.capability_types
             )
-        for item in voice_items:
-            capability_types_by_provider[item.provider_code].add("tts")
+        for voice_item in voice_items:
+            capability_types_by_provider[voice_item.provider_code].add("tts")
         provider_items = [
             ProviderDTO(
                 provider_code=provider.code,
@@ -138,7 +138,12 @@ class CapabilityService:
             visible, ensure_ascii=False, sort_keys=True, separators=(",", ":")
         ).encode("utf-8")
         version = f"catalog_{hashlib.sha256(canonical).hexdigest()}"
-        return CapabilityCatalogDTO(version=version, **visible)
+        return CapabilityCatalogDTO(
+            version=version,
+            providers=provider_items,
+            models=model_items,
+            voices=voice_items,
+        )
 
     def require_model(
         self,

@@ -3,6 +3,7 @@ from __future__ import annotations
 from sqlalchemy.orm import Session
 from fastapi import Header
 from typing import Annotated
+from collections.abc import Mapping
 
 from core_api.api.errors import ApiError
 from core_api.api.responses import envelope
@@ -32,9 +33,9 @@ def create_atomic_task(
     route: str,
     task_type: str,
     idempotency_key: str,
-    input_snapshot: dict[str, object],
+    input_snapshot: Mapping[str, object],
     caller_task_id: str | None,
-    idempotency_payload: dict[str, object] | None = None,
+    idempotency_payload: Mapping[str, object] | None = None,
 ) -> dict[str, object]:
     """提交幂等数据库事实后仅为首次创建发送一次唤醒。"""
 
@@ -44,9 +45,9 @@ def create_atomic_task(
             route=route,
             task_type=task_type,
             idempotency_key=idempotency_key,
-            input_snapshot=input_snapshot,
+            input_snapshot=dict(input_snapshot),
             caller_task_id=caller_task_id,
-            idempotency_payload=idempotency_payload,
+            idempotency_payload=(dict(idempotency_payload) if idempotency_payload else None),
         )
     except IdempotencyConflictError as exc:
         raise ApiError("IDEMPOTENCY_CONFLICT", "幂等键对应的请求体不同", 409) from exc
@@ -70,7 +71,7 @@ def replay_atomic_task(
     request_id: str,
     route: str,
     idempotency_key: str,
-    idempotency_payload: dict[str, object],
+    idempotency_payload: Mapping[str, object],
 ) -> dict[str, object] | None:
     """在可变能力校验前重放同一公开请求的首次 202 快照。"""
 
@@ -79,7 +80,7 @@ def replay_atomic_task(
             caller="narrato-api",
             route=route,
             idempotency_key=idempotency_key,
-            idempotency_payload=idempotency_payload,
+            idempotency_payload=dict(idempotency_payload),
         )
     except IdempotencyConflictError as exc:
         raise ApiError("IDEMPOTENCY_CONFLICT", "幂等键对应的请求体不同", 409) from exc

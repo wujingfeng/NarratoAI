@@ -33,6 +33,10 @@ def create_celery_app(settings: Settings | None = None) -> Celery:
                 "task": "core.tasks.reconcile_artifacts",
                 "schedule": 15.0,
             },
+            "publish-core-callback-outbox": {
+                "task": "core.tasks.publish_callback_outbox",
+                "schedule": 5.0,
+            },
         },
     )
     return app

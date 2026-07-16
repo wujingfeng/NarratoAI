@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, cast
 
 from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert as postgresql_insert
@@ -64,7 +64,7 @@ def _insert_or_read_winner(
 
     dialect_name = session.get_bind().dialect.name
     if dialect_name == "sqlite":
-        statement = sqlite_insert(model).values(**values)
+        statement: Any = sqlite_insert(model).values(**values)
     elif dialect_name == "postgresql":
         statement = postgresql_insert(model).values(**values)
     else:
@@ -75,7 +75,7 @@ def _insert_or_read_winner(
     winner = session.scalar(winner_query)
     if winner is None:
         raise RuntimeError("CAPABILITY_SEED_WINNER_NOT_FOUND")
-    return winner, result.rowcount > 0
+    return winner, getattr(result, "rowcount", 0) > 0
 
 
 def seed_capabilities(
@@ -88,7 +88,7 @@ def seed_capabilities(
 
     for item in providers:
         provider_query = select(CoreProvider).where(CoreProvider.code == item.code)
-        provider, provider_created = _insert_or_read_winner(
+        provider_row, provider_created = _insert_or_read_winner(
             session,
             CoreProvider,
             {
@@ -103,6 +103,7 @@ def seed_capabilities(
             [CoreProvider.code],
             provider_query,
         )
+        provider = cast(CoreProvider, provider_row)
         provider.name = item.name
         provider.secret_ref = item.secret_ref
         provider.settings = item.settings
@@ -115,7 +116,7 @@ def seed_capabilities(
                 CoreModel.provider_id == provider.id,
                 CoreModel.provider_model_code == model_item.provider_model_code,
             )
-            model, model_created = _insert_or_read_winner(
+            model_row, model_created = _insert_or_read_winner(
                 session,
                 CoreModel,
                 {
@@ -131,6 +132,7 @@ def seed_capabilities(
                 [CoreModel.provider_id, CoreModel.provider_model_code],
                 model_query,
             )
+            model = cast(CoreModel, model_row)
             model.name = model_item.name
             model.capability_types = list(model_item.capability_types)
             model.languages = list(model_item.languages)
@@ -143,7 +145,7 @@ def seed_capabilities(
                 CoreVoice.provider_id == provider.id,
                 CoreVoice.provider_voice_code == voice_item.provider_voice_code,
             )
-            voice, voice_created = _insert_or_read_winner(
+            voice_row, voice_created = _insert_or_read_winner(
                 session,
                 CoreVoice,
                 {
@@ -164,6 +166,7 @@ def seed_capabilities(
                 [CoreVoice.provider_id, CoreVoice.provider_voice_code],
                 voice_query,
             )
+            voice = cast(CoreVoice, voice_row)
             voice.name = voice_item.name
             voice.languages = list(voice_item.languages)
             voice.gender = voice_item.gender

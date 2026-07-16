@@ -256,7 +256,7 @@ class TaskService:
             )
             .execution_options(synchronize_session=False)
         )
-        if result.rowcount != 1:
+        if getattr(result, "rowcount", 0) != 1:
             self.session.commit()
             self.session.expire_all()
             return None
@@ -525,12 +525,13 @@ class TaskService:
             raise StaleLeaseError("STALE_LEASE")
         attempt.error = {**error, "retryable": retryable}
         if retryable:
-            return self._schedule_retry_locked(
+            self._schedule_retry_locked(
                 attempt,
                 task,
                 now=utc_now(),
                 retry_delay_seconds=retry_delay_seconds,
             )
+            return None
         now = utc_now()
         attempt.status = AttemptStatus.FAILED
         attempt.finished_at = now

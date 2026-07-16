@@ -2,13 +2,15 @@ from __future__ import annotations
 
 from typing import Generic, TypeVar
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 T = TypeVar("T")
 
 
 class ApiResponse(BaseModel, Generic[T]):
     """Core API 成功与失败共用的响应信封。"""
+
+    model_config = ConfigDict(extra="forbid")
 
     code: str
     message: str

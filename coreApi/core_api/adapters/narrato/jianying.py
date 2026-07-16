@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from core_api.type_coercion import as_float, as_int
+
 import base64
 import json
 import math
@@ -124,21 +126,21 @@ class JianyingBuilder:
                 not isinstance(source_id, str)
                 or type(start) not in (int, float)
                 or type(end) not in (int, float)
-                or not math.isfinite(float(start))
-                or not math.isfinite(float(end))
-                or float(start) < 0
-                or float(start) < previous_end
-                or float(end) <= float(start)
+                or not math.isfinite(as_float(start))
+                or not math.isfinite(as_float(end))
+                or as_float(start) < 0
+                or as_float(start) < previous_end
+                or as_float(end) <= as_float(start)
                 or not isinstance(narration, str)
                 or not narration.strip()
             ):
                 raise JianyingInputError("JIANYING_TIMELINE_INVALID")
-            previous_end = float(end)
+            previous_end = as_float(end)
             normalized_timeline.append(
                 {
                     "source_asset_id": source_id,
-                    "start": float(start),
-                    "end": float(end),
+                    "start": as_float(start),
+                    "end": as_float(end),
                     "narration": narration.strip(),
                 }
             )
@@ -151,7 +153,7 @@ class JianyingBuilder:
             if (
                 path in seen
                 or type(item.get("size")) is not int
-                or int(item["size"]) <= 0
+                or as_int(item["size"]) <= 0
                 or kind not in {"video", "subtitle", "voice", "timeline"}
             ):
                 raise JianyingInputError("JIANYING_MANIFEST_INVALID")
@@ -181,16 +183,16 @@ class JianyingBuilder:
                 if (
                     type(width) is not int
                     or type(height) is not int
-                    or not 1 <= int(width) <= 16_384
-                    or not 1 <= int(height) <= 16_384
+                    or not 1 <= as_int(width) <= 16_384
+                    or not 1 <= as_int(height) <= 16_384
                     or type(duration) not in (int, float)
-                    or not math.isfinite(float(duration))
-                    or float(duration) <= 0
-                    or float(duration) + 0.02 < previous_end
+                    or not math.isfinite(as_float(duration))
+                    or as_float(duration) <= 0
+                    or as_float(duration) + 0.02 < previous_end
                 ):
                     raise JianyingInputError("JIANYING_VIDEO_METADATA_INVALID")
                 resource_entry.update(
-                    width=int(width), height=int(height), duration=float(duration)
+                    width=as_int(width), height=as_int(height), duration=as_float(duration)
                 )
             elif any(
                 item.get(key) is not None for key in ("width", "height", "duration")
@@ -201,7 +203,7 @@ class JianyingBuilder:
                 ManifestFile(
                     path,
                     url=_public_https(str(item.get("url", ""))),
-                    size=int(item["size"]),
+                    size=as_int(item["size"]),
                     checksum=checksum,
                     content_type=content_type,
                 )

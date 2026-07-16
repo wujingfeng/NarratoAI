@@ -20,6 +20,7 @@ from core_api.api.errors import ServiceUnavailableError, UnauthorizedError
 from core_api.config import Settings, get_cached_settings
 from core_api.database import get_engine, get_session
 from core_api.infrastructure.oss_client import CdnUrlPolicy, Oss2Client
+from core_api.tasks.callbacks import validate_callback_url
 
 _bearer = HTTPBearer(auto_error=False)
 
@@ -168,6 +169,7 @@ def required_configuration_is_present(settings: Settings) -> bool:
         (
             settings.service_token,
             settings.callback_token,
+            settings.callback_url,
             settings.oss_endpoint,
             settings.oss_bucket,
             settings.oss_access_key_id,
@@ -178,6 +180,7 @@ def required_configuration_is_present(settings: Settings) -> bool:
     ):
         return False
     try:
+        validate_callback_url(settings.callback_url)
         CdnUrlPolicy(set(settings.cdn_allowed_hosts))
         Oss2Client(
             endpoint=settings.oss_endpoint,

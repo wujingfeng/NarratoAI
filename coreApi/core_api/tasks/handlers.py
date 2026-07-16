@@ -157,7 +157,7 @@ class AtomicTaskHandler:
 
     @staticmethod
     def _artifact_references(result: object) -> list[ArtifactRef]:
-        references = []
+        references: list[ArtifactRef] = []
         if not isinstance(result, dict):
             return references
         for item in result.get("artifacts", []):

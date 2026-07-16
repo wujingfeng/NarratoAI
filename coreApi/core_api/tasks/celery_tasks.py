@@ -28,6 +28,7 @@ from core_api.infrastructure.oss_client import (
 from core_api.runtime.artifact_store import ArtifactStore
 from core_api.tasks.handlers import AtomicTaskHandler
 from core_api.tasks.dispatch import DispatchOutboxPublisher
+from core_api.tasks.callbacks import CallbackOutboxPublisher, HttpCallbackClient
 from core_api.tasks.service import TaskService
 from core_api.tasks.recovery import TaskRecoveryScanner
 from core_api.tasks.artifact_reconciliation import (
@@ -190,7 +191,7 @@ def _run_atomic_task(
                 if isinstance(voice_snapshot, dict)
                 else ""
             )
-            provider = create_tts_provider(
+            tts_provider = create_tts_provider(
                 str(provider_code or ""),
                 voice_snapshot=voice_snapshot
                 if isinstance(voice_snapshot, dict)
@@ -198,13 +199,13 @@ def _run_atomic_task(
                 api_key=str(settings.provider_secrets.get(str(secret_ref or ""), "")),
             )
             tts_adapter = TtsAdapter(
-                provider=provider, artifact_store=ArtifactStore(oss_client)
+                provider=tts_provider, artifact_store=ArtifactStore(oss_client)
             )
             if task.task_type == "video_render":
                 render_adapter = RenderAdapter(
                     downloader=downloader,
                     backend=FfmpegRenderBackend(
-                        provider=provider,
+                        provider=tts_provider,
                         voice_snapshot=voice_snapshot,
                         runner=ProcessRunner(heartbeat_interval_seconds=5),
                     ),
@@ -267,6 +268,27 @@ def replay_dispatch_outbox() -> None:
 
     with Session(get_engine(settings), expire_on_commit=False) as session:
         DispatchOutboxPublisher(session).publish_pending(CeleryWakeDispatcher())
+
+
+@celery_app.task(name="core.tasks.publish_callback_outbox", ignore_result=True)
+def publish_callback_outbox() -> None:
+    """周期投递 Core 状态回调，网络故障由数据库退避重放。"""
+
+    settings = get_cached_settings()
+    if not settings.callback_url or not settings.callback_token:
+        return
+    client = HttpCallbackClient(
+        settings.callback_url,
+        settings.callback_token,
+        connect_timeout=settings.callback_connect_timeout_seconds,
+        read_timeout=settings.callback_read_timeout_seconds,
+        total_timeout=settings.callback_total_timeout_seconds,
+    )
+    with Session(get_engine(settings), expire_on_commit=False) as session:
+        CallbackOutboxPublisher(
+            session,
+            minimum_claim_seconds=settings.callback_total_timeout_seconds + 5.0,
+        ).publish_pending(client)
 
 
 @celery_app.task(name="core.tasks.recover_stalled", ignore_result=True)
