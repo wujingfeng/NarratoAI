@@ -118,7 +118,7 @@
 ## Task 4：创建 coreApi FastAPI 骨架
 
 - **状态：** 完成
-- **Commit：** `feat: scaffold core api service`（本 Task 独立提交，哈希见提交记录与 Task 报告）。
+- **Commit：** `557e96c feat: scaffold core api service`。
 - **TDD RED：**
   - 先创建 health、统一 envelope、OpenAPI 方法集合、request ID、ready 503/200 和 Bearer 401 测试，并创建 `coreApi/.venv` Python 3.12 隔离环境。
   - 普通 `pip install -e '.[test]'` 首次受沙箱 DNS 限制失败；按授权流程重试后，依赖从 `coreApi/pyproject.toml` 完整安装成功。
@@ -155,3 +155,46 @@
   - structured extra 别名 RED：对 `api_key`、`api-key`、`APIKey`、`access_key_id`、`ACCESS-KEY-ID`、`secret_access_key`、`credential(s)`、`passwd`、`pwd` 的大小写与嵌套 dict/list 参数化验证，原实现得到 `10 failed, 7 passed`，证明 substring 判定覆盖不足。
   - 现统一把 camelCase、大小写、下划线和连字符规范化为词元/紧凑键名，通过凭据词元、敏感后缀和 key namespace 做保守判定；structured extra 与 message `key=value` 共用同一判定，不会误伤 `request_id/project_id`。
   - R2 完整 Task 4 GREEN：`43 passed, 1 warning`；敏感别名探针 `19 passed`，Alembic、compileall、diff-check、OpenAPI/边界扫描继续通过。
+- **最终独立复审 R3：** PASS；Commit 固定为 `557e96c`，需求符合性与代码质量均通过，无遗留 Critical/Important 问题。
+
+## Task 5：实现 Core Task、Attempt、租约与 Callback Outbox
+
+- **状态：** 完成
+- **Commit：** `feat: add durable core task runtime`（本 Task 独立提交；精确哈希由 Task 6 回填，避免提交自引用改变哈希）。
+- **TDD RED：**
+  - 先新增状态机、租约、Outbox 和 ProcessRunner 四组测试；生产模块尚不存在时，`.venv/bin/python -c 'import core_api.tasks.models'` 真实失败于 `ModuleNotFoundError: No module named 'core_api.tasks'`，确认目标能力缺失而非断言误写。
+  - 首次启动指定 pytest RED 命令时，macOS 本机对新 Python 进程的标准库/pytest 动态模块导入异常缓慢；`-X importtime` 证据显示 `_csv`、`random` 等单次导入耗时数十秒。中断堆栈仅位于 pytest 导入阶段，因此不把该次环境启动失败计作行为 RED；模块缓存热身后同一 venv 的测试稳定运行。
+  - 增量行为 RED：retryable 失败错误被 `LEASE_EXPIRED` 覆盖（`1 failed`）；运行中状态未写 Outbox且 heartbeat 回调异常未回收子进程（`2 failed`）；重启接受零租约时长且 Runner 会拆分命令字符串（`2 failed`）。各项均先观察期望失败，再做最小修复。
+- **最小实现：**
+  - 新增 `core_tasks`、`core_task_attempts`、`callback_outbox` SQLAlchemy 模型及 `0002_core_tasks` 迁移；任务使用 `ctask_` 时间有序 ULID 风格 ID，attempt/Outbox 均使用带前缀 ID，输入快照和请求摘要持久化，幂等作用域固定为“调用方 + 路径 + Key”。
+  - `TaskService` 使用显式事务和 PostgreSQL `FOR UPDATE` 领取：仅 `queued/retry_wait` 可创建 current attempt；高熵 token、单调 lease version、heartbeat 到期时间、current attempt、token/version/status 六重守卫共同阻止重复领取与迟到覆盖。
+  - 迟到结果只保存摘要和 digest 后提交审计，再抛 `STALE_LEASE`；旧 attempt 不改变新 attempt、任务结果或终态。状态迁移单调增加 `state_version`，`succeeded/failed` 不可逆且不存在 cancel。
+  - 默认 `max_retries=3` 明确定义为“初次执行 + 最多 3 次自动重试”，总计最多 4 个 attempt；临时错误保留规范化错误并重启，确定性错误直接终止，耗尽后进入 `failed`。
+  - 每个 running/retry_wait/终态状态版本写入事务 Outbox；数据库同时以 `event_id` 和 `(core_task_id, state_version)` 唯一约束去重，Celery 任务只负责唤醒且禁用 Result Backend 事实语义。
+  - `ProcessRunner` 仅执行参数列表，使用 `subprocess.Popen(..., shell=False, start_new_session=True)`；周期 heartbeat，超时先 TERM 进程组再 KILL，heartbeat 异常同样回收；stdout/stderr 分别按字节上限持续 drain 并返回截断标记。
+- **GREEN 验证：**
+  - `.venv/bin/alembic upgrade head && .venv/bin/alembic check`：PASS，升级至 `0002_core_tasks` 且 `No new upgrade operations detected.`。
+  - `.venv/bin/pytest tests/unit/test_task_state_machine.py tests/unit/test_leases.py tests/unit/test_callback_outbox.py tests/unit/test_process_runner.py -q`：`22 passed, 1 warning in 0.63s`。
+  - `.venv/bin/pytest tests/unit/test_health.py tests/unit/test_http_contract.py -q`：`43 passed, 1 warning in 0.54s`。
+  - `.venv/bin/python -m compileall core_api migrations`：PASS。
+  - Fresh SQLite `/private/tmp/narrato_core_api_task5_fresh_20260716.db` 从空库执行 upgrade/check，核验 `alembic_version/core_tasks/core_task_attempts/callback_outbox` 四表、三组唯一约束和全部指定索引：PASS。
+  - PostgreSQL offline migration SQL：成功生成三表、外键、唯一约束和索引，证明迁移可由 PostgreSQL 方言编译。
+- **关键决策：**
+  - 统一采用“初次 + 3 次自动重试”语义，与设计文档“最多重试 3 次”一致；`current_attempt_no` 从 1 开始，`lease_version` 随新 attempt 单调增加，heartbeat 不改变版本。
+  - `expire_and_restart()` 是调度器确认旧 attempt 已失效后的原子操作；本 Task 不实现 Task 6+ 的原子能力路由、供应商适配或实际 Worker 执行。
+  - Callback Outbox 是 PostgreSQL 事实记录；Celery 只携带 task ID 作为唤醒信号，未读取或保存最终结果。
+- **计划偏差：**
+  - Implementation Plan 只明确终态 Outbox 示例，设计基线要求“状态变化和终态”回调；按设计基线扩展为 running、retry_wait 和终态均按状态版本写 Outbox，并记录双唯一约束。
+  - 本机没有可直接使用的真实 PostgreSQL 凭据；按 Task brief 使用 SQLite 做迁移/模型验证，并额外生成 PostgreSQL offline SQL，不把生产数据库连接作为本 Task 强制条件。
+- **自审结论：** 状态迁移表、current/version/token/expiry 守卫、迟到审计事务、Outbox 双去重、无 cancel、中文 Docstring、PostgreSQL 方言迁移、`git diff --check` 均通过。
+- **剩余风险：**
+  - 当前并发领取单元测试在 SQLite 验证重复调用，生产原子性依赖 PostgreSQL 行锁与 `(core_task_id, attempt_no)` 唯一约束；真实 PostgreSQL 竞争集成测试留待 Gate A/Task 20 环境验证。
+  - 唯一告警仍为 Task 4 已记录的 FastAPI/Starlette TestClient 上游弃用告警；不影响 Task 运行时行为。
+- **独立审查 R1 修复（amend）：**
+  - 租约恢复 RED：有效 3600 秒租约可被立即替换；现 `expire_and_restart()` 在同一行锁事务中验证 `lease_expires_at` 或 heartbeat 阈值，未超时稳定抛 `LEASE_STILL_ACTIVE` 且状态/版本/attempt 不变，租约到期和 heartbeat 边界均有测试。
+  - 结果版本 RED：`complete_attempt()` / `fail_attempt()` 省略 `lease_version` 仍成功；现调用方必须显式提供 version，缺失产生签名错误，错误 version 统一拒绝。Implementation Plan 示例省略 version 且立即重启有效租约，与设计“所有结果必须带租约版本、确认超时后恢复”冲突；按 design 唯一需求基线修正测试和接口，不沿用示例的宽松行为。
+  - Outbox 碰撞 RED：两个 task 复用 `event_id` 会提交第二个终态但无事件；现只有同一 task/state 逻辑事件幂等，跨 task 或同 task 不同 state 稳定抛 `OUTBOX_EVENT_CONFLICT`，并回滚第二个 task/attempt 的终态与 `state_version`。
+  - ProcessRunner RED：0.1 秒超时、0.05 秒宽限时，leader 收到 TERM 退出但忽略 TERM 的后代持 pipe 使调用阻塞约 3.095 秒；现宽限检查整个进程组，期限后无条件 KILL group，并对 reader 做有界收尾。黑盒复测耗时 `0.164s`；stdout/stderr 各 10 MiB 探针 `0.048s` 完成，各仅保留 1024 bytes 且标记截断。
+  - 并发幂等 RED：两个独立 Session/WAL 强制同时读到空作用域时，同体和异体 loser 均泄漏 `IntegrityError`（`2 failed`）；现以 savepoint 捕获唯一约束竞争并回读 winner，同 digest 两调用返回同 ID，不同 digest 稳定抛 `IDEMPOTENCY_CONFLICT`，重复执行五轮稳定通过。
+  - 事实源约束 RED：task/attempt/outbox 三个状态列均无数据库 CHECK（`2 failed` 中的约束断言）；现模型和 `0002` migration 统一生成命名 CHECK。Fresh SQLite 反射和非法状态写入、PostgreSQL offline DDL 三条 `CONSTRAINT ... CHECK` 断言均通过，Alembic check 无差异。
+  - R1 最终 GREEN：Task 5 指定四文件 `31 passed, 1 warning in 0.94s`；并发幂等 `2 passed, 1 warning in 0.06s`；Task 4 回归 `43 passed, 1 warning in 0.41s`；默认/fresh SQLite upgrade/check、PostgreSQL offline DDL、compileall、diff-check 全部通过。
