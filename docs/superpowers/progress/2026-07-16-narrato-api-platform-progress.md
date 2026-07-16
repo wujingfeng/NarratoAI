@@ -84,7 +84,7 @@
 ## Task 3：消除共享状态、隐式字幕匹配与共享工作目录
 
 - **状态：** 完成
-- **Commit：** 本 Task 独立提交 `fix: isolate media task workspaces`（哈希见提交记录与 Task 报告）。
+- **Commit：** `05c81e2 fix: isolate media task workspaces`。
 - **TDD RED：**
   - 指定 RED 命令：`/private/tmp/narrato-api-platform-py312/bin/python -m pytest tests/test_task_workspace_isolation.py tests/test_task_no_cross_task_globals.py -q`。
   - 结果：`5 failed, 2 warnings`；真实失败分别来自 `app.runtime`/`TaskWorkspace` 尚不存在、`start_subclip` 与 `start_subclip_unified` 仍声明 `global merged_audio_path, merged_subtitle_path`、Task/剪映字幕解析仍会扫描共享字幕目录并按 stem/时间选择文件。环境和测试收集正常。
@@ -113,3 +113,45 @@
   - 审查同时发现 `material.py` 的模块级 `requested_count` 会在并发请求间串写；静态与并发 RED 分别确认全局仍存在、`request_index` 接口缺失。现由调用方显式传递请求序号，`download_videos()` 使用本次调用的局部枚举选择 Key，不再保存进程级轮询状态。
   - 针对性并发/静态 GREEN：`tests/test_task_no_cross_task_globals.py`，结果 `9 passed, 2 warnings in 1.13s`。
   - 最终 Task 3 GREEN：指定四文件命令结果 `30 passed, 2 warnings in 1.12s`；Task 1 九文件旧回归结果 `87 passed, 4 warnings, 4 subtests passed in 25.58s`。
+- **最终独立复审：** PASS；需求符合性与代码质量均通过，无遗留 Critical/Important 问题。
+
+## Task 4：创建 coreApi FastAPI 骨架
+
+- **状态：** 完成
+- **Commit：** `feat: scaffold core api service`（本 Task 独立提交，哈希见提交记录与 Task 报告）。
+- **TDD RED：**
+  - 先创建 health、统一 envelope、OpenAPI 方法集合、request ID、ready 503/200 和 Bearer 401 测试，并创建 `coreApi/.venv` Python 3.12 隔离环境。
+  - 普通 `pip install -e '.[test]'` 首次受沙箱 DNS 限制失败；按授权流程重试后，依赖从 `coreApi/pyproject.toml` 完整安装成功。
+  - 隔离环境中的真实 RED 命令：`.venv/bin/pytest tests/unit/test_health.py tests/unit/test_http_contract.py -q`；结果因 `ModuleNotFoundError: No module named 'core_api'` 失败（退出码 `4`），确认测试运行环境正常且应用骨架尚不存在。
+  - 自审补充 OSS 必要配置与日志脱敏测试；观察到 `required_configuration_is_present` 尚不存在的导入失败（退出码 `2`），再补最小实现。
+- **最小实现：**
+  - 新建独立 FastAPI 项目，`create_app()` 注册 `/api/v1`、请求 ID middleware、统一异常处理和 GET-only health 路由；成功与错误均返回 `code/message/data/request_id`，响应 Header 与 body 使用同一请求 ID。
+  - `live` 仅检查进程；`ready` 通过可覆盖 Dependency 检查独立 Core 数据库、Redis，以及服务 Token、回调 Token、OSS 必要配置，失败只返回稳定 `SERVICE_UNAVAILABLE`。
+  - 配置基于 Pydantic v2、环境变量和显式 TOML；生产默认/示例使用 PostgreSQL，真实配置不提交；SQLAlchemy 2、Alembic 和 Celery 均采用 Core 独立连接、Redis key 与 queue 前缀。
+  - JSON 日志支持 `request_id/core_task_id/attempt_no`，自动屏蔽配置密钥和 Bearer Token；首次迁移仅建立 Alembic 基线，不包含 Task 5+ 业务表。
+- **GREEN 验证：**
+  - `.venv/bin/alembic upgrade head`：PASS，从空 SQLite 测试库升级至 `0001_core_base`。
+  - `.venv/bin/alembic check`：PASS，`No new upgrade operations detected.`。
+  - `.venv/bin/pytest tests/unit/test_health.py tests/unit/test_http_contract.py -q`：`10 passed, 1 warning`，退出码 `0`。
+  - `.venv/bin/python -m compileall core_api migrations`：PASS。
+- **关键决策：**
+  - health 路由免鉴权以满足最小运维可用性；固定服务 Bearer Token 仍集中在可复用 FastAPI Dependency，未创建测试专用生产路由。
+  - Alembic 配置中的 SQLite URL 只用于本地静态迁移验证并写入 `/private/tmp`；部署必须用 `CORE_API_DATABASE_URL` 覆盖为 PostgreSQL，项目依赖已包含 psycopg 驱动。
+  - OSS 在本骨架阶段校验必要配置，具体签名与供应商连接由后续 OSS Adapter 任务实现；ready checker 接口允许集成环境替换为真实检查器。
+- **计划偏差：**
+  - 实现计划未列出 Alembic 模板和包初始化文件，但 Alembic 运行及测试包导入确实需要，按 Task brief 允许的最小范围补充。
+  - 系统 Python 3.12 初始无本 Task 依赖；已按 Goal 要求创建 `coreApi/.venv` 并从独立依赖声明安装，无根环境偶然依赖。
+- **剩余风险：**
+  - 测试存在 1 条来自当前 FastAPI/Starlette TestClient 组合的上游弃用告警，不影响行为与验收。
+  - 真实 PostgreSQL、Redis 和 OSS 连接不属于本 Task 单元验证；本 Task 使用 SQLite 与 Fake readiness，后续数据库/适配器集成 Gate 必须覆盖真实服务。
+- **独立审查修复（amend）：**
+  - 日志安全 RED：默认 formatter 对 PostgreSQL/Redis URI userinfo、`password/token/secret` 命名值和 nested extra 的测试得到 `2 failed`，明文凭据可稳定复现；现统一按 URI、Bearer、敏感键名、已配置密钥递归脱敏，并保留非敏感结构化 extra。
+  - 配置 Dependency RED：应用已持有显式 Settings 时，把 `CORE_API_CONFIG` 指向不存在文件，受保护路由仍因 eager fallback 返回 `500`；现仅在 `app.state.settings` 确实不存在时读取缓存配置，回归返回 `200`。
+  - 异步 readiness RED：同步 DB probe 阻塞 `0.2s` 时，事件循环调度与 timeout 断言失败；现用 `asyncio.to_thread()` offload SQLAlchemy 探针，以可配置 `readiness_timeout_seconds` 包裹 DB/Redis，并设置 Redis socket timeout。事件循环探针证明慢 DB 不再阻塞 live 调度，超时统一转换为安全 `503`。
+  - Minor 修复：新增 Bearer 缺失/Basic/畸形/正确值、非法 Request ID、405、422、500、默认配置缺失 503 的负向回归；`import core_api` 不再导入 `main` 或初始化 FastAPI/日志配置。
+  - 修复后完整 Task 4 测试：`.venv/bin/pytest tests/unit/test_health.py tests/unit/test_http_contract.py -q`，结果 `26 passed, 1 warning`；fresh SQLite `alembic upgrade head`/`alembic check`、compileall、diff-check、OpenAPI/边界/敏感信息扫描均通过。
+  - Task 4 继续保持单一 amended commit；精确最终 hash 由下一 Task 在 amend 完成后回填，避免提交自引用导致 hash 再次变化。
+- **独立复审 R2 修复（amend）：**
+  - structured extra 别名 RED：对 `api_key`、`api-key`、`APIKey`、`access_key_id`、`ACCESS-KEY-ID`、`secret_access_key`、`credential(s)`、`passwd`、`pwd` 的大小写与嵌套 dict/list 参数化验证，原实现得到 `10 failed, 7 passed`，证明 substring 判定覆盖不足。
+  - 现统一把 camelCase、大小写、下划线和连字符规范化为词元/紧凑键名，通过凭据词元、敏感后缀和 key namespace 做保守判定；structured extra 与 message `key=value` 共用同一判定，不会误伤 `request_id/project_id`。
+  - R2 完整 Task 4 GREEN：`43 passed, 1 warning`；敏感别名探针 `19 passed`，Alembic、compileall、diff-check、OpenAPI/边界扫描继续通过。

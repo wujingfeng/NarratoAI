@@ -1,0 +1,15 @@
+# 复制为部署机上的私有配置文件，并将文件权限设为 0600。
+database_url = "postgresql+psycopg://narrato_core:replace-me@127.0.0.1:5432/narrato_core"
+redis_url = "redis://127.0.0.1:6379/2"
+redis_key_prefix = "narrato:core:"
+celery_broker_url = "redis://127.0.0.1:6379/3"
+celery_queue_prefix = "narrato.core"
+service_token = "replace-with-core-service-token"
+callback_token = "replace-with-core-callback-token"
+oss_endpoint = "https://oss-cn-example.aliyuncs.com"
+oss_bucket = "replace-with-core-bucket"
+oss_access_key_id = "replace-with-oss-access-key-id"
+oss_access_key_secret = "replace-with-oss-access-key-secret"
+readiness_timeout_seconds = 3.0
+log_level = "INFO"
+work_root = "/var/lib/narrato/core"
