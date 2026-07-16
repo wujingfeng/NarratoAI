@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import re
 import secrets
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
@@ -9,6 +10,7 @@ from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from core_api.api.errors import ApiError
+from core_api.api.dependencies import BoundedReadinessExecutor
 from core_api.api.responses import envelope
 from core_api.api.router import api_router
 from core_api.config import Settings, load_settings
@@ -51,8 +53,20 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     current = settings or load_settings()
     configure_logging(current)
-    app = FastAPI(title="Narrato Core API", version="1.0.0")
+    readiness_executor = BoundedReadinessExecutor(max_workers=2)
+
+    @asynccontextmanager
+    async def lifespan(_app: FastAPI):
+        """在应用关闭时释放私有 readiness 线程资源。"""
+
+        try:
+            yield
+        finally:
+            readiness_executor.close()
+
+    app = FastAPI(title="Narrato Core API", version="1.0.0", lifespan=lifespan)
     app.state.settings = current
+    app.state.oss_readiness_executor = readiness_executor
 
     @app.middleware("http")
     async def attach_request_id(request: Request, call_next):

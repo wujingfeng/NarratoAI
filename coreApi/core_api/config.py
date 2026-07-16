@@ -31,6 +31,12 @@ class Settings(BaseSettings):
     oss_bucket: str = ""
     oss_access_key_id: str = Field(default="", repr=False)
     oss_access_key_secret: str = Field(default="", repr=False)
+    oss_public_base_url: str = ""
+    cdn_allowed_hosts: list[str] = Field(default_factory=list)
+    asr_local_api_url: str = "http://127.0.0.1:7860"
+    download_connect_timeout_seconds: float = Field(default=5.0, gt=0, le=30)
+    download_read_timeout_seconds: float = Field(default=30.0, gt=0, le=300)
+    download_total_timeout_seconds: float = Field(default=120.0, gt=0, le=1800)
     readiness_timeout_seconds: float = Field(default=3.0, gt=0, le=30)
     log_level: str = "INFO"
     work_root: Path = Path("/var/lib/narrato/core")

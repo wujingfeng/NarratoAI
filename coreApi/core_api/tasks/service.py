@@ -3,20 +3,23 @@ from __future__ import annotations
 import hashlib
 import json
 import secrets
+from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import func, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from core_api.ids import new_time_ordered_id
 from core_api.tasks.callbacks import OutboxEventConflictError, enqueue_state_callback
+from core_api.tasks.dispatch import enqueue_task_dispatch
 from core_api.tasks.models import (
     AttemptStatus,
     CoreTask,
     CoreTaskAttempt,
     CoreTaskStatus,
+    CoreArtifact,
     utc_now,
 )
 from core_api.tasks.state_machine import can_transition
@@ -44,6 +47,14 @@ class StaleLeaseError(TaskRuntimeError):
 
 class LeaseStillActiveError(TaskRuntimeError):
     """调度器试图提前替换仍有效的租约。"""
+
+
+@dataclass(frozen=True, slots=True)
+class TaskCreation:
+    """幂等创建返回的任务及本调用是否赢得创建。"""
+
+    task: CoreTask
+    created: bool
 
 
 def _utc(value: datetime) -> datetime:
@@ -88,17 +99,43 @@ class TaskService:
     ) -> CoreTask:
         """按调用方、路径和 Key 幂等创建不可变 Core Task。"""
 
+        return self.create_core_task_result(
+            caller=caller,
+            route=route,
+            task_type=task_type,
+            idempotency_key=idempotency_key,
+            input_snapshot=input_snapshot,
+            caller_task_id=caller_task_id,
+            max_retries=max_retries,
+        ).task
+
+    def create_core_task_result(
+        self,
+        *,
+        caller: str,
+        route: str,
+        task_type: str,
+        idempotency_key: str,
+        input_snapshot: dict[str, Any],
+        caller_task_id: str | None = None,
+        max_retries: int = 3,
+    ) -> TaskCreation:
+        """幂等创建任务，并告诉路由是否需要进行首次 Celery 唤醒。"""
+
         if max_retries < 0:
             raise ValueError("max_retries 不能小于零")
         scope = f"{caller}\x1f{route}\x1f{idempotency_key}"
-        digest = _digest_payload(input_snapshot)
+        # caller_task_id 来自同一公开请求体，也必须参与“同 Key + 同请求”判定。
+        digest = _digest_payload(
+            {"input_snapshot": input_snapshot, "caller_task_id": caller_task_id}
+        )
         existing = self.session.scalar(
             select(CoreTask).where(CoreTask.idempotency_scope == scope)
         )
         if existing is not None:
             if existing.request_digest != digest:
                 raise IdempotencyConflictError("IDEMPOTENCY_CONFLICT")
-            return existing
+            return TaskCreation(existing, False)
         task = CoreTask(
             id=new_time_ordered_id("ctask_"),
             task_type=task_type,
@@ -109,13 +146,17 @@ class TaskService:
             request_digest=digest,
             # JSON round-trip 防止调用方随后修改原 dict 影响不可变快照。
             input_snapshot=json.loads(json.dumps(input_snapshot)),
+            initial_response={},
             max_retries=max_retries,
         )
+        task.initial_response = {"core_task_id": task.id, "status": "queued"}
         # 唯一约束是并发幂等的最终裁决；savepoint 让 loser 可恢复并回读 winner。
         self.session.commit()
         try:
             with self.session.begin_nested():
                 self.session.add(task)
+                self.session.flush()
+                enqueue_task_dispatch(self.session, task)
                 self.session.flush()
         except IntegrityError as exc:
             self.session.expire_all()
@@ -128,9 +169,9 @@ class TaskService:
             self.session.commit()
             if winner.request_digest != digest:
                 raise IdempotencyConflictError("IDEMPOTENCY_CONFLICT") from exc
-            return winner
+            return TaskCreation(winner, False)
         self.session.commit()
-        return task
+        return TaskCreation(task, True)
 
     def start_attempt(
         self, task_id: str, *, lease_seconds: float = 60
@@ -146,17 +187,66 @@ class TaskService:
 
         if lease_seconds <= 0:
             raise ValueError("lease_seconds 必须大于零")
-        task = self.session.scalar(
-            select(CoreTask).where(CoreTask.id == task_id).with_for_update()
-        )
+        task = self.session.scalar(select(CoreTask).where(CoreTask.id == task_id))
         if task is None:
             raise TaskNotFoundError("CORE_TASK_NOT_FOUND")
-        if task.status not in {CoreTaskStatus.QUEUED, CoreTaskStatus.RETRY_WAIT}:
+        attempt = self.claim_dispatched_task(
+            task_id,
+            expected_state_version=task.state_version,
+            not_before=utc_now(),
+            lease_seconds=lease_seconds,
+        )
+        if attempt is None:
             raise InvalidTaskTransitionError("CORE_TASK_NOT_CLAIMABLE")
-        now = utc_now()
-        task.current_attempt_no += 1
-        self._transition(task, CoreTaskStatus.RUNNING)
-        task.started_at = task.started_at or now
+        return attempt
+
+    def claim_dispatched_task(
+        self,
+        task_id: str,
+        *,
+        expected_state_version: int,
+        not_before: datetime,
+        now: datetime | None = None,
+        lease_seconds: float = 60,
+    ) -> CoreTaskAttempt | None:
+        """按 wake 版本与到期时间原子领取；迟到、重复和并发 loser 均忽略。"""
+
+        if lease_seconds <= 0:
+            raise ValueError("lease_seconds 必须大于零")
+        observed_at = _utc(now) if now is not None else utc_now()
+        if _utc(not_before) > observed_at:
+            return None
+        result = self.session.execute(
+            update(CoreTask)
+            .where(
+                CoreTask.id == task_id,
+                CoreTask.state_version == expected_state_version,
+                CoreTask.status.in_(
+                    (CoreTaskStatus.QUEUED, CoreTaskStatus.RETRY_WAIT)
+                ),
+            )
+            .values(
+                status=CoreTaskStatus.RUNNING,
+                state_version=CoreTask.state_version + 1,
+                current_attempt_no=CoreTask.current_attempt_no + 1,
+                started_at=func.coalesce(CoreTask.started_at, observed_at),
+                updated_at=observed_at,
+            )
+            .execution_options(synchronize_session=False)
+        )
+        if result.rowcount != 1:
+            self.session.commit()
+            self.session.expire_all()
+            return None
+        self.session.expire_all()
+        task = self.session.scalar(
+            select(CoreTask)
+            .where(CoreTask.id == task_id)
+            .execution_options(populate_existing=True)
+        )
+        if task is None:
+            self.session.rollback()
+            raise TaskNotFoundError("CORE_TASK_NOT_FOUND")
         attempt = CoreTaskAttempt(
             id=new_time_ordered_id("attempt_"),
             core_task_id=task.id,
@@ -164,17 +254,23 @@ class TaskService:
             status=AttemptStatus.RUNNING,
             lease_token=secrets.token_urlsafe(32),
             lease_version=task.current_attempt_no,
-            heartbeat_at=now,
-            lease_expires_at=now + timedelta(seconds=lease_seconds),
-            started_at=now,
+            heartbeat_at=observed_at,
+            lease_expires_at=observed_at + timedelta(seconds=lease_seconds),
+            started_at=observed_at,
         )
-        self.session.add(attempt)
-        enqueue_state_callback(
-            self.session,
-            task,
-            event_id=f"evt_{task.id}_{task.state_version}",
-        )
-        self.session.commit()
+        try:
+            self.session.add(attempt)
+            enqueue_state_callback(
+                self.session,
+                task,
+                event_id=f"evt_{task.id}_{task.state_version}",
+            )
+            self.session.commit()
+        except IntegrityError:
+            # PostgreSQL/SQLite 唯一约束是并发领取的最后防线。
+            self.session.rollback()
+            self.session.expire_all()
+            return None
         return attempt
 
     def heartbeat(
@@ -207,6 +303,7 @@ class TaskService:
         lease_seconds: float = 60,
         heartbeat_timeout_seconds: float = 60,
         now: datetime | None = None,
+        retry_delay_seconds: float | None = None,
     ) -> CoreTaskAttempt | None:
         """确认租约或心跳超时后，使 current attempt 失效并恢复。"""
 
@@ -229,7 +326,10 @@ class TaskService:
         if not lease_expired and not heartbeat_expired:
             raise LeaseStillActiveError("LEASE_STILL_ACTIVE")
         return self._restart_locked_attempt(
-            attempt, task, lease_seconds=lease_seconds, now=observed_at
+            attempt,
+            task,
+            now=observed_at,
+            retry_delay_seconds=retry_delay_seconds,
         )
 
     def _restart_locked_attempt(
@@ -237,8 +337,8 @@ class TaskService:
         attempt: CoreTaskAttempt,
         task: CoreTask,
         *,
-        lease_seconds: float,
         now: datetime,
+        retry_delay_seconds: float | None,
     ) -> CoreTaskAttempt | None:
         """在调用方已持有 current task/attempt 行锁时执行原子恢复。"""
 
@@ -267,27 +367,16 @@ class TaskService:
             task,
             event_id=f"evt_{task.id}_{task.state_version}",
         )
-        task.current_attempt_no += 1
-        self._transition(task, CoreTaskStatus.RUNNING)
-        replacement = CoreTaskAttempt(
-            id=new_time_ordered_id("attempt_"),
-            core_task_id=task.id,
-            attempt_no=task.current_attempt_no,
-            status=AttemptStatus.RUNNING,
-            lease_token=secrets.token_urlsafe(32),
-            lease_version=task.current_attempt_no,
-            heartbeat_at=now,
-            lease_expires_at=now + timedelta(seconds=lease_seconds),
-            started_at=now,
-        )
-        self.session.add(replacement)
-        enqueue_state_callback(
+        retries_used = attempt.attempt_no - 1
+        if retry_delay_seconds is None:
+            retry_delay_seconds = min(300.0, 5.0 * (2 ** retries_used))
+        enqueue_task_dispatch(
             self.session,
             task,
-            event_id=f"evt_{task.id}_{task.state_version}",
+            available_at=now + timedelta(seconds=retry_delay_seconds),
         )
         self.session.commit()
-        return replacement
+        return None
 
     def complete_attempt(
         self,
@@ -318,6 +407,7 @@ class TaskService:
         attempt.status = AttemptStatus.SUCCEEDED
         attempt.finished_at = now
         task.result = result
+        self._register_result_artifacts(task, attempt, result)
         task.error = None
         task.progress = 100
         task.finished_at = now
@@ -339,6 +429,37 @@ class TaskService:
         self.session.commit()
         return task
 
+    def _register_result_artifacts(
+        self,
+        task: CoreTask,
+        attempt: CoreTaskAttempt,
+        result: list[dict[str, Any]] | dict[str, Any],
+    ) -> None:
+        """在合法租约终态事务中登记统一 Artifact DTO。"""
+
+        if not isinstance(result, dict):
+            return
+        raw_artifacts = result.get("artifacts", [])
+        if not isinstance(raw_artifacts, list):
+            raise ValueError("artifacts 必须是数组")
+        for item in raw_artifacts:
+            if not isinstance(item, dict):
+                raise ValueError("artifact 必须是对象")
+            self.session.add(
+                CoreArtifact(
+                    id=str(item["artifact_id"]),
+                    core_task_id=task.id,
+                    attempt_no=attempt.attempt_no,
+                    kind=str(item["kind"]),
+                    bucket=str(item["bucket"]),
+                    object_key=str(item["object_key"]),
+                    url=str(item["url"]),
+                    content_type=str(item["content_type"]),
+                    size=int(item["size"]),
+                    checksum=str(item["checksum"]) if item.get("checksum") else None,
+                )
+            )
+
     def fail_attempt(
         self,
         attempt_id: str,
@@ -347,6 +468,7 @@ class TaskService:
         *,
         retryable: bool,
         lease_version: int,
+        retry_delay_seconds: float | None = None,
     ) -> CoreTaskAttempt | None:
         """记录失败；确定性错误终止，临时错误按预算自动重试。"""
 
@@ -357,8 +479,11 @@ class TaskService:
             raise StaleLeaseError("STALE_LEASE")
         attempt.error = {**error, "retryable": retryable}
         if retryable:
-            return self._restart_locked_attempt(
-                attempt, task, lease_seconds=60, now=utc_now()
+            return self._schedule_retry_locked(
+                attempt,
+                task,
+                now=utc_now(),
+                retry_delay_seconds=retry_delay_seconds,
             )
         now = utc_now()
         attempt.status = AttemptStatus.FAILED
@@ -368,6 +493,47 @@ class TaskService:
         self._transition(task, CoreTaskStatus.FAILED)
         enqueue_state_callback(
             self.session, task, event_id=f"evt_{task.id}_{task.state_version}"
+        )
+        self.session.commit()
+        return None
+
+    def _schedule_retry_locked(
+        self,
+        attempt: CoreTaskAttempt,
+        task: CoreTask,
+        *,
+        now: datetime,
+        retry_delay_seconds: float | None,
+    ) -> None:
+        """结束旧 attempt，并在 backoff 到期后可靠唤醒 retry_wait 任务。"""
+
+        attempt.status = AttemptStatus.FAILED
+        attempt.finished_at = now
+        retries_used = attempt.attempt_no - 1
+        if retries_used >= task.max_retries:
+            task.error = {"code": "RETRY_EXHAUSTED", "retryable": False}
+            task.finished_at = now
+            self._transition(task, CoreTaskStatus.FAILED)
+            enqueue_state_callback(
+                self.session, task, event_id=f"evt_{task.id}_{task.state_version}"
+            )
+            self.session.commit()
+            return None
+
+        task.error = attempt.error
+        self._transition(task, CoreTaskStatus.RETRY_WAIT)
+        enqueue_state_callback(
+            self.session, task, event_id=f"evt_{task.id}_{task.state_version}"
+        )
+        if retry_delay_seconds is None:
+            exponential = min(300.0, 5.0 * (2 ** retries_used))
+            retry_delay_seconds = exponential + secrets.randbelow(1000) / 1000
+        if retry_delay_seconds < 0:
+            raise ValueError("retry_delay_seconds 不能小于零")
+        enqueue_task_dispatch(
+            self.session,
+            task,
+            available_at=now + timedelta(seconds=retry_delay_seconds),
         )
         self.session.commit()
         return None
@@ -406,6 +572,7 @@ class TaskService:
             select(CoreTaskAttempt)
             .where(CoreTaskAttempt.id == attempt_id)
             .with_for_update()
+            .execution_options(populate_existing=True)
         )
         if attempt is None:
             raise TaskNotFoundError("CORE_ATTEMPT_NOT_FOUND")
@@ -413,6 +580,7 @@ class TaskService:
             select(CoreTask)
             .where(CoreTask.id == attempt.core_task_id)
             .with_for_update()
+            .execution_options(populate_existing=True)
         )
         if task is None:
             raise TaskNotFoundError("CORE_TASK_NOT_FOUND")

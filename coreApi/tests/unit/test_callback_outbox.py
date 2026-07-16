@@ -52,7 +52,7 @@ def test_outbox_records_attempt_and_state_version(session, task_service, task):
 
 
 def test_retry_transitions_each_write_one_state_event(session, task_service, task):
-    """租约过期的 retry_wait 与新 running 状态均可靠入 Outbox。"""
+    """租约过期只写 retry_wait；新 running 必须由到期 wake 领取。"""
 
     first = task_service.start_attempt(task.id)
     first.lease_expires_at = utc_now() - timedelta(seconds=1)
@@ -64,7 +64,6 @@ def test_retry_transitions_each_write_one_state_event(session, task_service, tas
     assert [(row.state_version, row.payload["status"]) for row in rows] == [
         (1, "running"),
         (2, "retry_wait"),
-        (3, "running"),
     ]
 
 

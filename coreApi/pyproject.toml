@@ -11,6 +11,8 @@ dependencies = [
   "alembic>=1.14,<2",
   "celery>=5.4,<6",
   "fastapi>=0.115,<1",
+  "httpx>=0.28,<1",
+  "oss2>=2.19,<3",
   "pydantic-settings>=2.7,<3",
   "psycopg[binary]>=3.2,<4",
   "redis>=5.2,<6",
@@ -26,6 +28,7 @@ test = [
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+pythonpath = [".."]
 
 [tool.setuptools.packages.find]
 include = ["core_api*"]

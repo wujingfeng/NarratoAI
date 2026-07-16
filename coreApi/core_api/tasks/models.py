@@ -5,10 +5,12 @@ from enum import StrEnum
 from typing import Any
 
 from sqlalchemy import (
+    CheckConstraint,
     JSON,
     DateTime,
     Enum,
     ForeignKey,
+    ForeignKeyConstraint,
     Index,
     Integer,
     String,
@@ -51,6 +53,13 @@ class CallbackStatus(StrEnum):
     SENT = "sent"
 
 
+class DispatchStatus(StrEnum):
+    """可靠任务唤醒 Outbox 的投递状态。"""
+
+    PENDING = "pending"
+    SENT = "sent"
+
+
 def _string_enum(enum_type: type[StrEnum], name: str) -> Enum:
     return Enum(
         enum_type,
@@ -78,6 +87,7 @@ class CoreTask(Base):
     idempotency_key: Mapped[str] = mapped_column(String(255), nullable=False)
     request_digest: Mapped[str] = mapped_column(String(64), nullable=False)
     input_snapshot: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
+    initial_response: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
     status: Mapped[CoreTaskStatus] = mapped_column(
         _string_enum(CoreTaskStatus, "core_task_status"),
         nullable=False,
@@ -100,6 +110,12 @@ class CoreTask(Base):
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     attempts: Mapped[list[CoreTaskAttempt]] = relationship(
+        back_populates="core_task", cascade="all, delete-orphan"
+    )
+    artifacts: Mapped[list[CoreArtifact]] = relationship(
+        back_populates="core_task", cascade="all, delete-orphan"
+    )
+    dispatches: Mapped[list[CoreDispatchOutbox]] = relationship(
         back_populates="core_task", cascade="all, delete-orphan"
     )
 
@@ -175,3 +191,76 @@ class CallbackOutbox(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=utc_now, onupdate=utc_now
     )
+
+
+class CoreArtifact(Base):
+    """Core 任务上传到 OSS 后的统一产物登记。"""
+
+    __tablename__ = "core_artifacts"
+    __table_args__ = (
+        UniqueConstraint("object_key", name="uq_core_artifacts_object_key"),
+        ForeignKeyConstraint(
+            ["core_task_id", "attempt_no"],
+            ["core_task_attempts.core_task_id", "core_task_attempts.attempt_no"],
+            name="fk_core_artifacts_task_attempt",
+            ondelete="CASCADE",
+        ),
+        CheckConstraint("attempt_no > 0", name="ck_core_artifacts_attempt_positive"),
+        CheckConstraint("size > 0", name="ck_core_artifacts_size_positive"),
+        Index("ix_core_artifacts_task_attempt", "core_task_id", "attempt_no"),
+    )
+
+    id: Mapped[str] = mapped_column(String(40), primary_key=True)
+    core_task_id: Mapped[str] = mapped_column(
+        ForeignKey("core_tasks.id", ondelete="CASCADE"), nullable=False
+    )
+    attempt_no: Mapped[int] = mapped_column(Integer, nullable=False)
+    kind: Mapped[str] = mapped_column(String(80), nullable=False)
+    bucket: Mapped[str] = mapped_column(String(255), nullable=False)
+    object_key: Mapped[str] = mapped_column(String(1024), nullable=False)
+    url: Mapped[str] = mapped_column(String(2048), nullable=False)
+    content_type: Mapped[str] = mapped_column(String(255), nullable=False)
+    size: Mapped[int] = mapped_column(Integer, nullable=False)
+    checksum: Mapped[str | None] = mapped_column(String(80))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=utc_now
+    )
+
+    core_task: Mapped[CoreTask] = relationship(back_populates="artifacts")
+
+
+class CoreDispatchOutbox(Base):
+    """数据库事实源中的可靠 Core Task 唤醒事件。"""
+
+    __tablename__ = "core_dispatch_outbox"
+    __table_args__ = (
+        UniqueConstraint(
+            "core_task_id", "state_version", name="uq_core_dispatch_task_state"
+        ),
+        Index("ix_core_dispatch_pending", "status", "available_at"),
+        Index("ix_core_dispatch_recovery", "status", "recover_after"),
+    )
+
+    id: Mapped[str] = mapped_column(String(40), primary_key=True)
+    core_task_id: Mapped[str] = mapped_column(
+        ForeignKey("core_tasks.id", ondelete="CASCADE"), nullable=False
+    )
+    state_version: Mapped[int] = mapped_column(Integer, nullable=False)
+    status: Mapped[DispatchStatus] = mapped_column(
+        _string_enum(DispatchStatus, "core_dispatch_status"),
+        nullable=False,
+        default=DispatchStatus.PENDING,
+    )
+    available_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    attempt_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    last_error: Mapped[str | None] = mapped_column(String(80))
+    sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    recover_after: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=utc_now
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=utc_now, onupdate=utc_now
+    )
+
+    core_task: Mapped[CoreTask] = relationship(back_populates="dispatches")

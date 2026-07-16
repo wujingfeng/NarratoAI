@@ -17,6 +17,19 @@ def create_celery_app(settings: Settings | None = None) -> Celery:
             "global_keyprefix": f"{current.redis_key_prefix}celery:"
         },
         result_backend=None,
+        task_acks_late=True,
+        task_reject_on_worker_lost=True,
+        worker_prefetch_multiplier=1,
+        beat_schedule={
+            "replay-core-dispatch-outbox": {
+                "task": "core.tasks.replay_dispatch_outbox",
+                "schedule": 5.0,
+            },
+            "recover-stalled-core-tasks": {
+                "task": "core.tasks.recover_stalled",
+                "schedule": 15.0,
+            },
+        },
     )
     return app
 

@@ -103,5 +103,6 @@ def test_stale_heartbeat_at_threshold_allows_restart(task_service, task, session
         heartbeat_timeout_seconds=60,
         now=observed_at,
     )
-    assert replacement is not None
-    assert replacement.attempt_no == 2
+    assert replacement is None
+    assert task_service.get_task(task.id).status == CoreTaskStatus.RETRY_WAIT
+    assert task_service.get_task(task.id).current_attempt_no == 1

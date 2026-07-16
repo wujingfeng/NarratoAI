@@ -33,6 +33,8 @@ def settings(tmp_path) -> Settings:
         celery_broker_url="redis://127.0.0.1:6379/14",
         service_token="test-service-token",
         callback_token="test-callback-token",
+        oss_public_base_url="https://cdn.example.test",
+        cdn_allowed_hosts=["cdn.example.test"],
         work_root=tmp_path / "work",
     )
 
@@ -61,7 +63,7 @@ def client(app) -> Iterator[TestClient]:
 def session():
     """提供带完整 Core 元数据的内存数据库会话。"""
 
-    from sqlalchemy import create_engine
+    from sqlalchemy import create_engine, event
     from sqlalchemy.orm import Session
 
     from core_api.database import Base
@@ -71,6 +73,12 @@ def session():
         "sqlite+pysqlite:///:memory:",
         connect_args={"check_same_thread": False},
     )
+
+    @event.listens_for(engine, "connect")
+    def enable_foreign_keys(dbapi_connection, _record):
+        cursor = dbapi_connection.cursor()
+        cursor.execute("PRAGMA foreign_keys=ON")
+        cursor.close()
     Base.metadata.create_all(engine)
     with Session(engine, expire_on_commit=False) as database_session:
         yield database_session
