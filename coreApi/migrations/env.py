@@ -7,6 +7,7 @@ from alembic import context
 from sqlalchemy import engine_from_config, pool
 
 from core_api.database import Base
+from core_api.capabilities import models as capability_models  # noqa: F401
 from core_api.tasks import models as task_models  # noqa: F401
 
 config = context.config

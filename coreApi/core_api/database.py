@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Iterator
 from functools import lru_cache
 
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, event
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
@@ -18,7 +18,24 @@ class Base(DeclarativeBase):
 def create_database_engine(database_url: str) -> Engine:
     """为 Core 独立数据库创建 SQLAlchemy 2 引擎。"""
 
-    return create_engine(database_url, pool_pre_ping=True)
+    engine = create_engine(database_url, pool_pre_ping=True)
+    if engine.dialect.name == "sqlite":
+
+        @event.listens_for(engine, "connect")
+        def enable_sqlite_foreign_keys(dbapi_connection, _connection_record) -> None:
+            """为每个 SQLite 连接实际启用外键约束。"""
+
+            autocommit = getattr(dbapi_connection, "autocommit", None)
+            if autocommit is not None:
+                dbapi_connection.autocommit = True
+            cursor = dbapi_connection.cursor()
+            try:
+                cursor.execute("PRAGMA foreign_keys=ON")
+            finally:
+                cursor.close()
+                if autocommit is not None:
+                    dbapi_connection.autocommit = autocommit
+    return engine
 
 
 def get_engine(settings: Settings | None = None) -> Engine:

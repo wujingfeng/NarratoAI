@@ -13,3 +13,8 @@ oss_access_key_secret = "replace-with-oss-access-key-secret"
 readiness_timeout_seconds = 3.0
 log_level = "INFO"
 work_root = "/var/lib/narrato/core"
+
+# 数据库仅保存下列键名引用，真实值只存在权限为 0600 的私有 TOML 中。
+[provider_secrets]
+volcengine = "replace-with-volcengine-secret"
+aliyun = "replace-with-aliyun-secret"

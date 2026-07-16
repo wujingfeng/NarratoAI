@@ -26,6 +26,7 @@ class Settings(BaseSettings):
     celery_queue_prefix: str = "narrato.core"
     service_token: str = Field(default="", repr=False)
     callback_token: str = Field(default="", repr=False)
+    provider_secrets: dict[str, str] = Field(default_factory=dict, repr=False)
     oss_endpoint: str = ""
     oss_bucket: str = ""
     oss_access_key_id: str = Field(default="", repr=False)

@@ -25,3 +25,10 @@ class UnauthorizedError(ApiError):
 
     def __init__(self, message: str = "服务凭据无效") -> None:
         super().__init__("UNAUTHORIZED", message, 401)
+
+
+class CapabilityUnavailableError(ApiError):
+    """表示稳定能力 ID 当前不存在或不可调用。"""
+
+    def __init__(self, message: str = "能力当前不可用") -> None:
+        super().__init__("CAPABILITY_UNAVAILABLE", message, 409)

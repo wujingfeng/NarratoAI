@@ -2,16 +2,18 @@ from __future__ import annotations
 
 import asyncio
 import hmac
+from collections.abc import Iterator
 from typing import Annotated, Protocol
 
 from fastapi import Depends, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from redis.asyncio import Redis
 from sqlalchemy import text
+from sqlalchemy.orm import Session
 
 from core_api.api.errors import ServiceUnavailableError, UnauthorizedError
 from core_api.config import Settings, get_cached_settings
-from core_api.database import get_engine
+from core_api.database import get_engine, get_session
 
 _bearer = HTTPBearer(auto_error=False)
 
@@ -85,6 +87,14 @@ def get_settings(request: Request) -> Settings:
     if hasattr(request.app.state, "settings"):
         return request.app.state.settings
     return get_cached_settings()
+
+
+def get_database_session(
+    settings: Annotated[Settings, Depends(get_settings)],
+) -> Iterator[Session]:
+    """提供绑定当前应用配置的请求作用域数据库会话。"""
+
+    yield from get_session(settings)
 
 
 def get_readiness_checker(

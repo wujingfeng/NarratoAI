@@ -136,6 +136,7 @@ def configure_logging(settings: Settings) -> None:
                 settings.callback_token,
                 settings.oss_access_key_id,
                 settings.oss_access_key_secret,
+                *settings.provider_secrets.values(),
             )
         )
     )

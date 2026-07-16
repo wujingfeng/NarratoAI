@@ -160,7 +160,7 @@
 ## Task 5：实现 Core Task、Attempt、租约与 Callback Outbox
 
 - **状态：** 完成
-- **Commit：** `feat: add durable core task runtime`（本 Task 独立提交；精确哈希由 Task 6 回填，避免提交自引用改变哈希）。
+- **Commit：** `6990308 feat: add durable core task runtime`。
 - **TDD RED：**
   - 先新增状态机、租约、Outbox 和 ProcessRunner 四组测试；生产模块尚不存在时，`.venv/bin/python -c 'import core_api.tasks.models'` 真实失败于 `ModuleNotFoundError: No module named 'core_api.tasks'`，确认目标能力缺失而非断言误写。
   - 首次启动指定 pytest RED 命令时，macOS 本机对新 Python 进程的标准库/pytest 动态模块导入异常缓慢；`-X importtime` 证据显示 `_csv`、`random` 等单次导入耗时数十秒。中断堆栈仅位于 pytest 导入阶段，因此不把该次环境启动失败计作行为 RED；模块缓存热身后同一 venv 的测试稳定运行。
@@ -198,3 +198,48 @@
   - 并发幂等 RED：两个独立 Session/WAL 强制同时读到空作用域时，同体和异体 loser 均泄漏 `IntegrityError`（`2 failed`）；现以 savepoint 捕获唯一约束竞争并回读 winner，同 digest 两调用返回同 ID，不同 digest 稳定抛 `IDEMPOTENCY_CONFLICT`，重复执行五轮稳定通过。
   - 事实源约束 RED：task/attempt/outbox 三个状态列均无数据库 CHECK（`2 failed` 中的约束断言）；现模型和 `0002` migration 统一生成命名 CHECK。Fresh SQLite 反射和非法状态写入、PostgreSQL offline DDL 三条 `CONSTRAINT ... CHECK` 断言均通过，Alembic check 无差异。
   - R1 最终 GREEN：Task 5 指定四文件 `31 passed, 1 warning in 0.94s`；并发幂等 `2 passed, 1 warning in 0.06s`；Task 4 回归 `43 passed, 1 warning in 0.41s`；默认/fresh SQLite upgrade/check、PostgreSQL offline DDL、compileall、diff-check 全部通过。
+- **独立复审 R2：** PASS；Commit 固定为 `6990308`，需求符合性与代码质量均通过，无遗留 Critical/Important 问题。
+
+## Task 6：实现统一能力目录
+
+- **状态：** 完成
+- **Commit：** `feat: add normalized capability catalog`（本 Task 独立提交；精确哈希由 Task 7 回填，避免提交自引用改变哈希）。
+- **TDD RED：**
+  - 先创建 10 组目录契约、过滤、ID 校验、幂等种子和版本测试；指定命令 `.venv/bin/pytest tests/unit/test_capability_catalog.py -q` 在收集阶段真实失败于 `ModuleNotFoundError: No module named 'core_api.capabilities'`（退出码 `2`），确认能力域尚不存在而非环境或断言错误。
+  - 自审发现新增供应商密钥注册表的真实值尚未进入日志 formatter 的已配置密钥集合；先补日志 RED，目标测试得到 `1 failed`，测试密钥明文可在普通日志参数中稳定复现，再做最小脱敏修复。
+- **最小实现：**
+  - 新增 `core_providers/core_models/core_voices` 模型及 `0003_core_capabilities` 迁移；provider code 全局唯一，模型/音色原始 code 仅在同一 provider 内唯一，公开 `model_`/`voice_` ID 使用时间有序 ULID 风格稳定标识，UTC timestamps 与 JSON 约束字段完整落库。
+  - `Settings.provider_secrets` 从私有 TOML `[provider_secrets]` 加载；数据库只保存 `secret_ref`。目录仅纳入 provider 与能力自身均启用、且引用解析为非空字符串的记录；真实密钥值同时加入 JSON 日志 formatter 的脱敏集合。
+  - `GET /api/v1/capabilities` 复用固定 Core Bearer dependency 和统一 envelope；Provider/Model/Voice 均经过显式 DTO 映射，业务层看不到 `secret_ref`、settings、原始 provider model/voice code 或真实密钥。
+  - 目录按稳定键排序，对完整公开内容做 canonical JSON SHA-256 得到 `catalog_...` 版本；相同可见内容版本稳定、可见内容变化版本变化，密钥值轮换但可调用性不变时版本保持不变。
+  - `require_model()` / `require_voice()` 对未知 ID、能力停用、provider 不可调用和语言/格式/采样率/能力类型不匹配统一抛 `CAPABILITY_UNAVAILABLE`，不提供默认供应商回退。
+  - `seed_capabilities()` 按 provider code 与 provider 内原始能力 code 幂等 upsert；允许更新所有非密钥配置和 `secret_ref`，默认保留运维当前 `enabled` 状态，仅 `override_enabled=True` 时显式覆盖。
+- **GREEN 验证：**
+  - `.venv/bin/alembic upgrade head && .venv/bin/alembic check`：PASS，升级至 `0003_core_capabilities` 且 `No new upgrade operations detected.`。
+  - `.venv/bin/pytest tests/unit/test_capability_catalog.py -q`：`11 passed, 1 warning in 0.36s`。
+  - `.venv/bin/pytest tests/unit/test_task_state_machine.py tests/unit/test_leases.py tests/unit/test_callback_outbox.py tests/unit/test_process_runner.py tests/unit/test_health.py tests/unit/test_http_contract.py -q`：`74 passed, 1 warning in 1.43s`。
+  - `.venv/bin/python -m compileall core_api migrations`：PASS。
+  - Fresh SQLite 从空库完整执行 `0001 -> 0002 -> 0003` 与 `alembic check`，反射核验 7 张表、模型/音色到 provider 的 FK 及三组 code 唯一约束：PASS。
+  - PostgreSQL offline DDL 成功生成三张能力表、两个 FK、三组唯一约束和索引，方言静态验证：PASS。
+  - 私有 TOML `[provider_secrets]` 实际解析及 `Settings` repr 不含真实值：PASS。
+- **关键决策：**
+  - 目录 `version` 只由公开 DTO 内容计算，不使用 timestamps、`secret_ref` 或 secret 值；密钥从有值变为缺失会因可见 provider/能力集合变化而自然改变版本。
+  - 供应商公开摘要固定为 `provider_code/name/capability_types`；模型和音色分别使用设计规定的统一字段集合，不暴露任何适配器私有字段。
+  - Core ORM 实体仍保存后续 adapter 所需原始 code，但仅 `CapabilityService` 内部验证返回实体；HTTP 边界只能序列化统一 DTO，本 Task 不实现 Task 7+ 供应商调用。
+- **计划偏差：**
+  - Implementation Plan 只给出音色 shape 示例；按 design 唯一基线和 Task brief 补齐 Model/Provider DTO、稳定版本、secret registry、严格 ID 约束与幂等 seed 测试。
+  - 本机无真实 PostgreSQL 连接凭据；按 Goal 允许范围使用 fresh SQLite 做真实迁移/约束反射，并用 PostgreSQL offline DDL 验证方言兼容性，未把真实数据库连接伪报为通过。
+- **自审结论：** DTO 字段与 secret/raw code 边界、稳定排序/version、seed 状态保留、迁移 FK/唯一约束、中文 Docstring、无 Task 7 越界和 `git diff --check` 均通过；日志自审发现的 provider secret 脱敏缺口已按 RED/GREEN 修复。
+- **剩余风险：**
+  - 当前 JSON 数组内的语言、格式和 capability type 由服务层验证，数据库不对 JSON 元素值建立枚举约束；这是能力扩展字段的预期边界。
+  - 唯一告警仍为既有 FastAPI/Starlette TestClient 上游弃用告警；不影响目录协议和验收。
+- **独立审查 R1 修复（amend）：**
+  - SQLite FK 与孤儿数据 RED：Core engine 新连接的 `PRAGMA foreign_keys` 实际为 `0`；legacy orphan model 的严格 ID 校验继续触发 `AttributeError`。三个专项初始合并结果为 `3 failed`。现为 Core 创建的每个 SQLite DBAPI connection 启用 `PRAGMA foreign_keys=ON`，fresh schema 实际 orphan 写入被 `IntegrityError` 拒绝；对历史损坏数据，catalog 安全过滤，`require_model/require_voice` 统一抛 `CAPABILITY_UNAVAILABLE`。
+  - 并发 seed RED：两个独立 Session 经 barrier 同时观察 provider 不存在后，loser 泄漏 `uq_core_providers_code` 的 `IntegrityError`。现 provider/model/voice 三层均在释放初始 SQLite 读事务后，以 savepoint 尝试插入并在唯一键竞争时回读 winner；每层及时提交释放唯一键锁，兼容 PostgreSQL 默认 READ COMMITTED 和 SQLite。
+  - 并发验证用 provider/model/voice 三阶段 barrier 强制每层都发生同读空竞争，连续 5 轮两调用均收敛到完全相同的三组稳定 ID，最终各表每轮仅 1 条；并发重复 seed 仍保留运维手动禁用的 provider/model/voice 状态。
+  - R1 GREEN：Task 6 `14 passed, 1 warning`；Task 5+4 指定回归 `74 passed, 1 warning`；fresh SQLite `0001 -> 0003` upgrade/check、实际 orphan FK 拒绝、PostgreSQL offline DDL、compileall、中文 Docstring 和 diff-check 全部通过。
+- **独立审查 R2 修复（amend）：**
+  - 批次原子性 RED：后段 voice `name NOT NULL` 失败后，新 Session 仍读到已提交的 provider/model（provider count 为 `1`）；外层 `with session.begin()` 组合调用则在 seed 内部 commit 后触发 `InvalidRequestError: closed transaction inside context manager`。两项指定测试结果为 `2 failed`。
+  - 删除 seed 内全部 commit/savepoint 事务控制；SQLite 和 PostgreSQL 分别使用方言原生 `INSERT ... ON CONFLICT DO NOTHING` 在唯一键处原子竞争，并于同一调用方事务回读 winner。provider/model/voice 整批现在只由调用方 commit/rollback，约束失败和调用方异常都会全量回滚。
+  - 并发 worker 改为两个独立 Session 在 barrier 后各自用外层 `session.begin()` 调用；连续 5 轮每轮均同 ID/单记录，整项额外重复 5 次稳定，无 `IntegrityError`，并发重复 seed 仍保留运维禁用状态。
+  - R2 GREEN：Task 6 `16 passed, 1 warning`；新增后段约束失败全回滚和外层事务组合/调用方回滚均 PASS；Task 5+4 指定回归 `74 passed, 1 warning`；fresh SQLite、PostgreSQL offline DDL、compileall、中文 Docstring 和 diff-check 全部通过。
