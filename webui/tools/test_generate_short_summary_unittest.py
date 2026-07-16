@@ -2,6 +2,11 @@ import unittest
 
 from webui.tools import generate_short_summary
 from webui.tools.generate_short_summary import _format_progress_status, parse_and_fix_json
+from app.services.short_drama_narration_service import (
+    ShortDramaAnalysisRequest,
+    ShortDramaNarrationError,
+    build_short_drama_script,
+)
 
 
 class GenerateShortSummaryJsonTests(unittest.TestCase):
@@ -32,6 +37,23 @@ class GenerateShortSummaryJsonTests(unittest.TestCase):
         )
 
         self.assertEqual("270-450", char_range)
+
+    def test_missing_items_keeps_dedicated_webui_error_message(self):
+        with self.assertRaises(ShortDramaNarrationError) as caught:
+            build_short_drama_script(
+                ShortDramaAnalysisRequest(
+                    video_paths=["/tmp/first.mp4"],
+                    narration_result={
+                        "status": "success",
+                        "narration_script": '{"message": "valid json without items"}',
+                    },
+                )
+            )
+
+        self.assertEqual(
+            "Generated narration missing items field",
+            generate_short_summary._script_error_message_key(caught.exception),
+        )
 
 
 if __name__ == "__main__":

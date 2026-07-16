@@ -32,6 +32,7 @@ from PIL import ImageFont, Image, ImageDraw, ImageEnhance, ImageFilter
 from app.utils import utils
 from app.models.schema import AudioVolumeDefaults
 from app.services.audio_normalizer import AudioNormalizer, normalize_audio_for_mixing
+from app.services.media_probe import MediaProbeError, probe_media
 
 
 SUBTITLE_MASK_DEFAULTS = {
@@ -343,48 +344,20 @@ def _quote_filter_value(value: str) -> str:
 
 
 def _probe_video(video_path: str) -> Dict[str, Any]:
-    ffmpeg_binary = _get_ffmpeg_binary()
-    ffprobe_binary = _get_ffprobe_binary(ffmpeg_binary)
-    cmd = [
-        ffprobe_binary,
-        "-v",
-        "error",
-        "-print_format",
-        "json",
-        "-show_streams",
-        "-show_format",
-        video_path,
-    ]
-    result = subprocess.run(
-        cmd,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        text=True,
-        check=False,
-    )
-    if result.returncode != 0:
-        raise RuntimeError(f"ffprobe 读取视频失败: {result.stderr.strip()}")
+    """通过统一媒体探测服务返回渲染流程所需的视频元数据。"""
 
-    data = json.loads(result.stdout or "{}")
-    streams = data.get("streams", [])
-    video_stream = next((stream for stream in streams if stream.get("codec_type") == "video"), None)
-    if not video_stream:
+    try:
+        info = probe_media(video_path)
+    except MediaProbeError as exc:
+        raise RuntimeError(f"ffprobe 读取视频失败: {exc}") from exc
+    if not info.has_video or info.width is None or info.height is None:
         raise RuntimeError("ffprobe 未找到视频流")
 
-    duration = (
-        video_stream.get("duration")
-        or data.get("format", {}).get("duration")
-        or 0
-    )
-    duration = float(duration)
-    if duration <= 0:
-        raise RuntimeError("ffprobe 未获取到有效视频时长")
-
     return {
-        "width": int(video_stream["width"]),
-        "height": int(video_stream["height"]),
-        "duration": duration,
-        "has_audio": any(stream.get("codec_type") == "audio" for stream in streams),
+        "width": info.width,
+        "height": info.height,
+        "duration": info.duration_seconds,
+        "has_audio": info.has_audio,
     }
 
 
