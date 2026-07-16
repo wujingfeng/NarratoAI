@@ -6,10 +6,18 @@ from sqlalchemy.orm import Session
 
 from core_api.adapters.narrato.asr import AsrAdapter
 from core_api.adapters.narrato.media_probe import MediaProbeAdapter
+from core_api.adapters.narrato.short_drama import (
+    ShortDramaAdapter,
+    create_short_drama_provider,
+)
 from core_api.celery_app import celery_app
 from core_api.config import get_cached_settings
 from core_api.database import get_engine
-from core_api.infrastructure.oss_client import CdnUrlPolicy, HttpCdnDownloader, Oss2Client
+from core_api.infrastructure.oss_client import (
+    CdnUrlPolicy,
+    HttpCdnDownloader,
+    Oss2Client,
+)
 from core_api.runtime.artifact_store import ArtifactStore
 from core_api.tasks.handlers import AtomicTaskHandler
 from core_api.tasks.dispatch import DispatchOutboxPublisher
@@ -72,7 +80,9 @@ def _run_atomic_task(
         ) -> None:
             """使用独立短 Session 续租，避免跨线程复用 Worker 主事务。"""
 
-            with Session(get_engine(settings), expire_on_commit=False) as heartbeat_session:
+            with Session(
+                get_engine(settings), expire_on_commit=False
+            ) as heartbeat_session:
                 TaskService(heartbeat_session).heartbeat(
                     attempt_id,
                     token,
@@ -89,6 +99,72 @@ def _run_atomic_task(
                 api_url=settings.asr_local_api_url,
             )
 
+        short_drama_adapter = None
+        task = service.get_task(task_id)
+        if task.task_type in {"video_analysis", "script_generation"}:
+            model_snapshot = task.input_snapshot.get("model_snapshot")
+            provider_code = (
+                model_snapshot.get("provider_code")
+                if isinstance(model_snapshot, dict)
+                else None
+            )
+            provider_settings = (
+                model_snapshot.get("provider_settings", {})
+                if isinstance(model_snapshot, dict)
+                else {}
+            )
+            secret_ref = (
+                model_snapshot.get("secret_ref")
+                if isinstance(model_snapshot, dict)
+                else None
+            )
+            provider = create_short_drama_provider(
+                str(provider_code or ""),
+                provider_model_code=str(model_snapshot.get("provider_model_code") or "")
+                if isinstance(model_snapshot, dict)
+                else "",
+                api_key=str(settings.provider_secrets.get(str(secret_ref or ""), "")),
+                base_url=str(
+                    provider_settings.get("base_url")
+                    or provider_settings.get("api_base")
+                    or ""
+                )
+                if isinstance(provider_settings, dict)
+                else "",
+                prompt_category=str(
+                    provider_settings.get("prompt_category") or "short_drama_narration"
+                )
+                if isinstance(provider_settings, dict)
+                else "short_drama_narration",
+                model_limits={
+                    **(
+                        model_snapshot.get("provider_limits", {})
+                        if isinstance(model_snapshot, dict)
+                        and isinstance(model_snapshot.get("provider_limits"), dict)
+                        else {}
+                    ),
+                    **(
+                        model_snapshot.get("model_limits", {})
+                        if isinstance(model_snapshot, dict)
+                        and isinstance(model_snapshot.get("model_limits"), dict)
+                        else {}
+                    ),
+                },
+            )
+            artifact_downloader = HttpCdnDownloader(
+                CdnUrlPolicy(
+                    set(settings.cdn_allowed_hosts), prefix="/narrato/coreApi/"
+                ),
+                connect_timeout=settings.download_connect_timeout_seconds,
+                read_timeout=settings.download_read_timeout_seconds,
+                total_timeout=settings.download_total_timeout_seconds,
+            )
+            short_drama_adapter = ShortDramaAdapter(
+                provider=provider,
+                downloader=downloader,
+                artifact_downloader=artifact_downloader,
+                artifact_store=ArtifactStore(oss_client),
+            )
         handler = AtomicTaskHandler(
             task_service=service,
             work_root=settings.work_root,
@@ -100,6 +176,7 @@ def _run_atomic_task(
                 transcriber=transcribe,
                 artifact_store=ArtifactStore(oss_client),
             ),
+            short_drama_adapter=short_drama_adapter,
             heartbeat_once=heartbeat_once,
         )
         handler.run(

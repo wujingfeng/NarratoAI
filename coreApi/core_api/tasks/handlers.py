@@ -7,6 +7,7 @@ from collections.abc import Callable
 
 from core_api.adapters.narrato.asr import AsrAdapter
 from core_api.adapters.narrato.media_probe import AdapterError, MediaProbeAdapter
+from core_api.adapters.narrato.short_drama import ShortDramaAdapter
 from core_api.infrastructure.oss_client import InfrastructureError
 from core_api.runtime.artifact_store import ArtifactSecurityError
 from core_api.runtime.workspace import CoreTaskWorkspace
@@ -97,6 +98,7 @@ class AtomicTaskHandler:
         work_root: str | Path,
         media_probe_adapter: MediaProbeAdapter | None = None,
         asr_adapter: AsrAdapter | None = None,
+        short_drama_adapter: ShortDramaAdapter | None = None,
         lease_seconds: float = 900,
         heartbeat_once: HeartbeatOnce | None = None,
         heartbeat_interval_seconds: float | None = None,
@@ -105,6 +107,7 @@ class AtomicTaskHandler:
         self.work_root = Path(work_root)
         self.media_probe_adapter = media_probe_adapter
         self.asr_adapter = asr_adapter
+        self.short_drama_adapter = short_drama_adapter
         self.lease_seconds = lease_seconds
         self.heartbeat_once = heartbeat_once
         self.heartbeat_interval_seconds = heartbeat_interval_seconds or min(
@@ -143,6 +146,7 @@ class AtomicTaskHandler:
         workspace = CoreTaskWorkspace.create(
             self.work_root, task.id, attempt.attempt_no
         )
+
         def heartbeat_once(
             attempt_id: str, token: str, version: int, lease_seconds: float
         ) -> None:
@@ -172,14 +176,51 @@ class AtomicTaskHandler:
             interval_seconds=self.heartbeat_interval_seconds,
             heartbeat_once=heartbeat_once,
         )
+        if task.task_type in {"video_analysis", "script_generation"}:
+            self.task_service.update_attempt_progress(
+                attempt.id,
+                attempt.lease_token,
+                attempt.lease_version,
+                phase=(
+                    "analysis"
+                    if task.task_type == "video_analysis"
+                    else "script_generation"
+                ),
+                progress=10,
+            )
         try:
             with pump:
-                if task.task_type == "media_probe" and self.media_probe_adapter is not None:
+                if (
+                    task.task_type == "media_probe"
+                    and self.media_probe_adapter is not None
+                ):
                     result = self.media_probe_adapter.run(
                         workspace=workspace, **task.input_snapshot
                     )
                 elif task.task_type == "asr" and self.asr_adapter is not None:
                     result = self.asr_adapter.run(
+                        workspace=workspace,
+                        core_task_id=task.id,
+                        attempt_no=attempt.attempt_no,
+                        lease_guard=pump.guard,
+                        **task.input_snapshot,
+                    )
+                elif (
+                    task.task_type == "video_analysis"
+                    and self.short_drama_adapter is not None
+                ):
+                    result = self.short_drama_adapter.run_analysis(
+                        workspace=workspace,
+                        core_task_id=task.id,
+                        attempt_no=attempt.attempt_no,
+                        lease_guard=pump.guard,
+                        **task.input_snapshot,
+                    )
+                elif (
+                    task.task_type == "script_generation"
+                    and self.short_drama_adapter is not None
+                ):
+                    result = self.short_drama_adapter.run_script_generation(
                         workspace=workspace,
                         core_task_id=task.id,
                         attempt_no=attempt.attempt_no,

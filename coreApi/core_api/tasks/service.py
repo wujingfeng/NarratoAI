@@ -86,6 +86,25 @@ class TaskService:
             raise TaskNotFoundError("CORE_TASK_NOT_FOUND")
         return task
 
+    def find_idempotent_task(
+        self,
+        *,
+        caller: str,
+        route: str,
+        idempotency_key: str,
+        idempotency_payload: dict[str, Any],
+    ) -> CoreTask | None:
+        """按公开请求摘要查找首次任务；异体 Key 立即冲突。"""
+
+        scope = f"{caller}\x1f{route}\x1f{idempotency_key}"
+        digest = _digest_payload(idempotency_payload)
+        existing = self.session.scalar(
+            select(CoreTask).where(CoreTask.idempotency_scope == scope)
+        )
+        if existing is not None and existing.request_digest != digest:
+            raise IdempotencyConflictError("IDEMPOTENCY_CONFLICT")
+        return existing
+
     def create_core_task(
         self,
         *,
@@ -96,6 +115,7 @@ class TaskService:
         input_snapshot: dict[str, Any],
         caller_task_id: str | None = None,
         max_retries: int = 3,
+        idempotency_payload: dict[str, Any] | None = None,
     ) -> CoreTask:
         """按调用方、路径和 Key 幂等创建不可变 Core Task。"""
 
@@ -107,6 +127,7 @@ class TaskService:
             input_snapshot=input_snapshot,
             caller_task_id=caller_task_id,
             max_retries=max_retries,
+            idempotency_payload=idempotency_payload,
         ).task
 
     def create_core_task_result(
@@ -119,6 +140,7 @@ class TaskService:
         input_snapshot: dict[str, Any],
         caller_task_id: str | None = None,
         max_retries: int = 3,
+        idempotency_payload: dict[str, Any] | None = None,
     ) -> TaskCreation:
         """幂等创建任务，并告诉路由是否需要进行首次 Celery 唤醒。"""
 
@@ -127,7 +149,9 @@ class TaskService:
         scope = f"{caller}\x1f{route}\x1f{idempotency_key}"
         # caller_task_id 来自同一公开请求体，也必须参与“同 Key + 同请求”判定。
         digest = _digest_payload(
-            {"input_snapshot": input_snapshot, "caller_task_id": caller_task_id}
+            idempotency_payload
+            if idempotency_payload is not None
+            else {"input_snapshot": input_snapshot, "caller_task_id": caller_task_id}
         )
         existing = self.session.scalar(
             select(CoreTask).where(CoreTask.idempotency_scope == scope)
@@ -221,9 +245,7 @@ class TaskService:
             .where(
                 CoreTask.id == task_id,
                 CoreTask.state_version == expected_state_version,
-                CoreTask.status.in_(
-                    (CoreTaskStatus.QUEUED, CoreTaskStatus.RETRY_WAIT)
-                ),
+                CoreTask.status.in_((CoreTaskStatus.QUEUED, CoreTaskStatus.RETRY_WAIT)),
             )
             .values(
                 status=CoreTaskStatus.RUNNING,
@@ -369,7 +391,7 @@ class TaskService:
         )
         retries_used = attempt.attempt_no - 1
         if retry_delay_seconds is None:
-            retry_delay_seconds = min(300.0, 5.0 * (2 ** retries_used))
+            retry_delay_seconds = min(300.0, 5.0 * (2**retries_used))
         enqueue_task_dispatch(
             self.session,
             task,
@@ -377,6 +399,30 @@ class TaskService:
         )
         self.session.commit()
         return None
+
+    def update_attempt_progress(
+        self,
+        attempt_id: str,
+        lease_token: str,
+        lease_version: int,
+        *,
+        phase: str,
+        progress: int,
+    ) -> CoreTask:
+        """仅由 current attempt 更新规范化阶段和未完成进度。"""
+
+        if not phase or not 0 <= progress < 100:
+            raise ValueError("phase/progress 无效")
+        attempt, task = self._locked_attempt_and_task(attempt_id)
+        if not self._valid_current_lease(
+            task, attempt, lease_token, lease_version, now=utc_now()
+        ):
+            raise StaleLeaseError("STALE_LEASE")
+        task.phase = phase
+        task.progress = progress
+        task.updated_at = utc_now()
+        self.session.commit()
+        return task
 
     def complete_attempt(
         self,
@@ -526,7 +572,7 @@ class TaskService:
             self.session, task, event_id=f"evt_{task.id}_{task.state_version}"
         )
         if retry_delay_seconds is None:
-            exponential = min(300.0, 5.0 * (2 ** retries_used))
+            exponential = min(300.0, 5.0 * (2**retries_used))
             retry_delay_seconds = exponential + secrets.randbelow(1000) / 1000
         if retry_delay_seconds < 0:
             raise ValueError("retry_delay_seconds 不能小于零")

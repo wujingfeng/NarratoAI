@@ -14,7 +14,15 @@ from app.services.short_drama_narration_validation import normalize_script_video
 from app.services.subtitle_text import read_subtitle_text
 
 
-PUBLIC_SCRIPT_FIELDS = ["_id", "video_id", "video_name", "timestamp", "picture", "narration", "OST"]
+PUBLIC_SCRIPT_FIELDS = [
+    "_id",
+    "video_id",
+    "video_name",
+    "timestamp",
+    "picture",
+    "narration",
+    "OST",
+]
 SHORT_DRAMA_PROMPT_CATEGORY = "short_drama_narration"
 DEFAULT_NARRATION_CHARS_PER_SECOND = 5
 NARRATION_DURATION_COEFFICIENTS = {
@@ -138,7 +146,9 @@ def build_combined_subtitle_content(
     for index, subtitle_path in enumerate(normalize_paths(subtitle_paths), start=1):
         if not os.path.exists(subtitle_path):
             continue
-        video_path = normalized_videos[index - 1] if index <= len(normalized_videos) else ""
+        video_path = (
+            normalized_videos[index - 1] if index <= len(normalized_videos) else ""
+        )
         header = f"# 视频 {index}"
         if video_path:
             header += f": {os.path.basename(video_path)}"
@@ -183,7 +193,9 @@ def parse_and_fix_json(json_string: str) -> dict[str, Any] | None:
         return None
 
 
-def normalize_narration_items_video_sources(items: object, video_paths: Iterable[str]) -> list[dict[str, Any]]:
+def normalize_narration_items_video_sources(
+    items: object, video_paths: Iterable[str]
+) -> list[dict[str, Any]]:
     """将脚本片段的视频编号和文件名归一化到请求中的视频来源。"""
 
     return normalize_script_video_sources(items, normalize_paths(video_paths))
@@ -225,6 +237,34 @@ def build_short_drama_script(request: ShortDramaAnalysisRequest) -> list[dict]:
     if parsed is None:
         raise ShortDramaNarrationError("短剧脚本 JSON 解析失败", reason="invalid_json")
     if not isinstance(parsed.get("items"), list):
-        raise ShortDramaNarrationError("短剧脚本 JSON 缺少 items 数组", reason="missing_items")
-    normalized = normalize_narration_items_video_sources(parsed["items"], request.video_paths)
+        raise ShortDramaNarrationError(
+            "短剧脚本 JSON 缺少 items 数组", reason="missing_items"
+        )
+    normalized = normalize_narration_items_video_sources(
+        parsed["items"], request.video_paths
+    )
     return strip_planner_only_fields(normalized)
+
+
+CORE_TIMELINE_PUBLIC_FIELDS = (
+    "source_asset_id",
+    "start",
+    "end",
+    "narration",
+    "picture",
+    "original_sound",
+)
+
+
+def normalize_short_drama_timeline_items(items: object) -> list[dict[str, Any]]:
+    """为 Core 时间线裁剪公开字段，但不猜测、改写或重排来源。"""
+
+    if isinstance(items, dict):
+        items = items.get("items")
+    if not isinstance(items, list):
+        return []
+    return [
+        {field: item[field] for field in CORE_TIMELINE_PUBLIC_FIELDS if field in item}
+        for item in items
+        if isinstance(item, dict)
+    ]

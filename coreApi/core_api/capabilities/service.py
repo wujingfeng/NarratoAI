@@ -8,8 +8,14 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, joinedload
 
 from core_api.api.errors import CapabilityUnavailableError
+from core_api.adapters.narrato.short_drama import short_drama_provider_supported
 from core_api.capabilities.models import CoreModel, CoreProvider, CoreVoice
-from core_api.capabilities.schemas import CapabilityCatalogDTO, ModelDTO, ProviderDTO, VoiceDTO
+from core_api.capabilities.schemas import (
+    CapabilityCatalogDTO,
+    ModelDTO,
+    ProviderDTO,
+    VoiceDTO,
+)
 
 
 class CapabilityService:
@@ -36,14 +42,19 @@ class CapabilityService:
         providers = list(
             self.session.scalars(select(CoreProvider).order_by(CoreProvider.code)).all()
         )
-        callable_providers = [item for item in providers if self._provider_is_callable(item)]
+        callable_providers = [
+            item for item in providers if self._provider_is_callable(item)
+        ]
         callable_ids = {item.id for item in callable_providers}
         models = (
             list(
                 self.session.scalars(
                     select(CoreModel)
                     .options(joinedload(CoreModel.provider))
-                    .where(CoreModel.enabled.is_(True), CoreModel.provider_id.in_(callable_ids))
+                    .where(
+                        CoreModel.enabled.is_(True),
+                        CoreModel.provider_id.in_(callable_ids),
+                    )
                     .order_by(CoreModel.provider_id, CoreModel.id)
                 ).all()
             )
@@ -55,7 +66,10 @@ class CapabilityService:
                 self.session.scalars(
                     select(CoreVoice)
                     .options(joinedload(CoreVoice.provider))
-                    .where(CoreVoice.enabled.is_(True), CoreVoice.provider_id.in_(callable_ids))
+                    .where(
+                        CoreVoice.enabled.is_(True),
+                        CoreVoice.provider_id.in_(callable_ids),
+                    )
                     .order_by(CoreVoice.provider_id, CoreVoice.id)
                 ).all()
             )
@@ -64,6 +78,14 @@ class CapabilityService:
         )
 
         # 统一 DTO 是公开边界，原始模型/音色 code 与密钥引用不得越过此处。
+        models = [
+            item
+            for item in models
+            if not (
+                {"video_analysis", "script_generation"} & set(item.capability_types)
+            )
+            or short_drama_provider_supported(item.provider.code)
+        ]
         model_items = [
             ModelDTO(
                 model_id=item.id,
@@ -93,7 +115,9 @@ class CapabilityService:
             provider.code: set() for provider in callable_providers
         }
         for item in model_items:
-            capability_types_by_provider[item.provider_code].update(item.capability_types)
+            capability_types_by_provider[item.provider_code].update(
+                item.capability_types
+            )
         for item in voice_items:
             capability_types_by_provider[item.provider_code].add("tts")
         provider_items = [
@@ -117,7 +141,11 @@ class CapabilityService:
         return CapabilityCatalogDTO(version=version, **visible)
 
     def require_model(
-        self, model_id: str, capability_type: str | None = None
+        self,
+        model_id: str,
+        capability_type: str | None = None,
+        *,
+        language: str | None = None,
     ) -> CoreModel:
         """按稳定 ID 返回可调用模型，任何不匹配均使用统一错误。"""
 
@@ -130,7 +158,15 @@ class CapabilityService:
             model is None
             or not model.enabled
             or not self._provider_is_callable(model.provider)
-            or (capability_type is not None and capability_type not in model.capability_types)
+            or (
+                capability_type in {"video_analysis", "script_generation"}
+                and not short_drama_provider_supported(model.provider.code)
+            )
+            or (
+                capability_type is not None
+                and capability_type not in model.capability_types
+            )
+            or (language is not None and language not in model.languages)
         ):
             # 未知、停用、供应商不可用和约束不符都禁止回退默认模型。
             raise CapabilityUnavailableError()
@@ -156,8 +192,14 @@ class CapabilityService:
             or not voice.enabled
             or not self._provider_is_callable(voice.provider)
             or (language is not None and language not in voice.languages)
-            or (output_format is not None and output_format not in voice.supported_formats)
-            or (sample_rate is not None and sample_rate not in voice.supported_sample_rates)
+            or (
+                output_format is not None
+                and output_format not in voice.supported_formats
+            )
+            or (
+                sample_rate is not None
+                and sample_rate not in voice.supported_sample_rates
+            )
         ):
             # 所有约束失败使用同一码，避免调用方猜测或静默切换供应商。
             raise CapabilityUnavailableError()

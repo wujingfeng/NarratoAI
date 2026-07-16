@@ -247,8 +247,8 @@
 
 ## Task 7：实现 OSS、媒体探测和 ASR 原子任务
 
-- **状态：** 完成，待独立审查。
-- **Commit：** `feat: expose media probe and asr tasks`（本 Task 独立提交；精确哈希由 Task 8 回填，避免提交自引用改变哈希）。
+- **状态：** 完成；独立复审 R5 通过。
+- **Commit：** `6e9fca1 feat: expose media probe and asr tasks`。
 - **TDD RED：**
   - 先创建对象键/CDN URL/workspace、视频/SRT 限制以及 media/asr API/handler 集成测试；指定 unit 命令真实失败于 `ModuleNotFoundError: core_api.infrastructure` 与 `ModuleNotFoundError: core_api.adapters`（2 个 collection errors），证明目标能力缺失。
   - 安全复核补充 double-encoded traversal 与本地路径 POST 测试，真实得到 `2 failed`：`%252e%252e` 未拒绝、`/private/tmp/local.mp4` 被错误接受为 `202`；随后最小修复多轮 decode 检查与 API allowlist 校验，专项 `12 passed`。
@@ -303,3 +303,83 @@
   - 新增持久 `recover_after` 与 `(status, recover_after)` 索引；publisher 成功时按投递 `attempt_count` 计算指数 visibility deadline，失败/重 arm 清空 deadline。scanner 现在完全在 SQL 中筛选 `recover_after <= now`、按 deadline 排序后 LIMIT，并保留 `FOR UPDATE SKIP LOCKED`。
   - limit=1、前四条更旧但高 attempt 未到期、第五条低 attempt 已到期时，queued 与 retry_wait 均在本轮准确恢复；不再存在固定候选倍数或 due 行饿死。0004 legacy backfill 为 pending 事件显式写 NULL deadline，SQLite/PG migration 与新索引一致。
   - R4 GREEN：Task 7+恢复+迁移 `115 passed`；Core unit `176 passed`；Core integration `37 passed`；Task 5/6 `49 passed`；fresh/default SQLite、PG offline DDL、compileall、pip check、diff-check 与根项目 `40 passed` 全部通过。
+
+
+## Task 8：实现剧情分析、文案生成和脚本校验任务
+
+- **状态：** 完成，待独立审查。
+- **Commit：** `feat: expose short drama analysis tasks`（本 Task 独立提交；精确哈希由 Task 9 回填，避免提交自引用改变哈希）。
+- **Task 7 Gate 回填：** 独立复审 R5 对 `6e9fca1` 的 Spec Compliance 与 Code Quality 均为 PASS，Critical/Important 均为 0；可靠 dispatch 的持久 `recover_after` 公平性缺口已关闭。
+- **TDD RED：**
+  - 初次执行 `.venv/bin/pytest tests/unit/test_short_drama_adapter.py -q`，真实在收集阶段失败于 `ModuleNotFoundError: No module named 'core_api.adapters.narrato.short_drama'`（1 个 collection error），确认目标 Adapter 尚不存在。
+  - 后续先补再修的真实行为 RED 包括：供应商 scene 改变显式 source 首次出现顺序未被拒绝（`1 failed`）；合法 UTF-16 SRT 在纯文本提取处失败（`1 failed`）；未配置 Provider 在领取 attempt 前抛错（`1 failed`）；analysis Artifact source map 与脚本请求不一致仍成功（`1 failed`）；模型语言不匹配仍返回 202（`1 failed`）；新能力 phase 终态仍为 `None`（`1 failed`）。
+- **最小实现：**
+  - 新增薄 `ShortDramaProvider` Protocol、确定性 `FakeShortDramaProvider` 与注入式 `ShortDramaAdapter`；固定链路为显式字幕剧情分析、文案生成、画面匹配、完整确定性校验、最多一次 repair、再次完整校验。供应商临时错误为 retryable，输入/格式/校验错误为 non-retryable；未配置真实 Provider 在 attempt 内稳定失败，禁止回退 Fake。
+  - source 数组是唯一顺序事实，`source_asset_id` 唯一；字幕只来自显式业务 URL 或 Core subtitle Artifact，本 Task 不隐式 ASR。validator 校验非空数组/字段类型/未知 source/首次出现顺序/非负时间/end>start/媒体时长/同源有序/非空 narration，Task2 纯服务统一裁剪公开字段，不保留本地路径或供应商私有字段。
+  - 新增 `POST /api/v1/video-analysis/tasks` 与 `POST /api/v1/script-generation/tasks`：固定 Bearer、非空幂等 Key、extra forbid、1～5 sources、安全 CDN URL、稳定模型 ID、能力类型与语言校验；保存 model/catalog/provider 与用户配置不可变快照。相同公开请求在能力后续停用时仍返回首次 202 快照，异体保持 409。
+  - handler registry 接入 Task7 state-version/not-before claim、attempt lease、周期 heartbeat、上传前 fencing、retry_wait/backoff 和 recovery；analysis/script 分别记录稳定 phase，重复 wake 不重复执行或登记 Artifact。
+  - analysis 成功登记 UTF-8 canonical `analysis` JSON；script 成功登记 `timeline` 与 `editor_draft` JSON。内容包含 schema/model/source mapping，不含 provider raw、secret 或服务器路径；JSON/SRT 均有 5 MiB 上限，analysis Artifact 必须绑定相同 source order。
+- **GREEN 验证：**
+  - Task 8 指定 unit/integration/Fake E2E：`30 passed, 1 warning`。覆盖 invalid→一次 repair→success、repair 后仍无效、显式 B/A 顺序、duplicate wake、retryable→retry_wait→attempt 2 恢复、Artifact 内容/登记、能力/鉴权/幂等/extra/source 守卫。
+  - Core 全 unit + integration：`238 passed, 12 warnings`。
+  - `.venv/bin/alembic upgrade head && .venv/bin/alembic check`：PASS，`No new upgrade operations detected.`；`.venv/bin/python -m compileall core_api`：PASS。
+  - 原项目指定 Python 3.11 回归：`20 passed, 3 warnings in 15.74s`。
+  - `/opt/homebrew/bin/ruff check`（本 Task 修改文件）、公开 Docstring AST 扫描与 `git diff --check`：PASS。
+- **关键决策与计划偏差：**
+  - Implementation Plan 只列两个路由和一个 Adapter 文件；按 design 的能力停用、幂等首次响应、持久恢复和 Artifact 要求，最小扩展 TaskService 公开请求摘要重放、语言能力校验及 handler phase 更新，不新增表或迁移。
+  - 使用 Task7 两类 CDN policy：业务输入限定 `/narrato/api/`，Core 产物限定 `/narrato/coreApi/`；不放宽 SSRF、重定向或路径规则。
+  - 默认 Fake Provider 不访问网络；真实供应商 Adapter/Smoke 按 Goal 属可选外部条件，未知 provider 不静默回退并稳定终止 attempt。
+- **自审结论：** repair 调用上限、source order、能力校验、首次幂等、JSON schema/size、Artifact fencing/登记、duplicate/recovery、GET/POST/no cancel、中文 Docstring、无 Task9 TTS/render 越界均通过。
+- **剩余风险：**
+  - 当前真实 LLM Provider 未配置凭据且未执行真实 Smoke；按 Goal 不作为本 Task 阻塞，Fake Provider E2E 已覆盖协议与恢复主链。
+  - Core 唯一直接告警为既有 Starlette TestClient 弃用；integration 的 Alembic/sqlite3 告警和原项目 Pydantic 告警均为既有弃用告警。
+
+### Task 8 独立审查修复
+
+- **审查 RED：** 独立复审发现 1 Critical + 3 Important；新增 validator 类型/finite/allowlist 测试首次为 `3 failed, 20 passed`，分别复现数字字符串与 NaN 被接受、私有字段未裁剪。
+- **C1 关闭：** 新增 `NarratoShortDramaProvider`，薄适配既有 `SubtitleAnalyzerAdapter` 的分析、正文生成、画面匹配和一次修复；生产 resolver 使用冻结 provider/model/base URL 与配置内 secret，未知 provider 保持 unavailable 且不回退 Fake。无网络注入测试证明 `provider_model_code` 和四段既有能力调用。
+- **I1/I2/I3 关闭：** validator 仅接受有限真数并自行生成公开 DTO；analysis Artifact 保存完整安全 source map，script 严格验证必需 metadata/顺序/字幕引用；任务冻结 provider/model/secret_ref/公开 settings/limits/capability/language，Worker 只消费冻结快照，公开 Artifact 仅投影稳定 model/catalog 及 language/config/full source map。
+- **复验：** Task 8 指定测试 `38 passed, 1 warning`；Core unit + integration + Task 8 Fake E2E `251 passed, 12 warnings`；原项目短剧回归 `12 passed, 1 warning`；compileall 与 `git diff --check` PASS。
+- **剩余风险：** 真实供应商凭据 Smoke 仍为可选外部条件；生产 resolver 已由 Fake transport 无网络契约测试覆盖。
+
+### Task 8 独立审查 R2 修复
+
+- **R2 RED：** Core 独立 venv 首次导入真实 `SubtitleAnalyzerAdapter` 失败于 `ModuleNotFoundError: loguru`；新增真实 Adapter、重试分类和配置应用测试后为 `8 failed, 25 passed`，复现依赖不闭合、异常泄漏、503/中英文超时与限流未重试等缺口。
+- **生产装配：** `coreApi/pyproject.toml` 显式声明 `loguru/openai/pillow/requests/toml`；移除 `app.config` 未使用且会引入 Streamlit/媒体栈的 `app.utils` import。resolver 只声明 Fake 与仓库真实注册的 OpenAI-compatible；生产 factory 显式注册 `OpenAICompatibleTextProvider` 并构造真实 `SubtitleAnalyzerAdapter`。Core venv 实际 import/construct 输出 `REAL_ADAPTER_OK`，`pip check` 为 `No broken requirements found`。
+- **真实四段契约：** 使用真实 `SubtitleAnalyzerAdapter` 类，仅 monkeypatch `UnifiedLLMService` 网络层，验证 analysis→copy→match invalid→exactly-one repair→validator；兼容真实 `{"items": [...]}` / list 返回并统一 sanitize。
+- **字幕继承：** script 请求省略字幕时，从 analysis Artifact source map 继承冻结 subtitle URL/Core Artifact/text，重新按 SRT 协议读取后把真实字幕传给 Provider；最终 timeline/editor Artifact 使用 resolved source map。显式提供的字幕引用仍必须精确一致。
+- **配置与限制：** 冻结并应用 `prompt_category`、`original_sound_ratio`（77 用例）、`narration_style`；只持久化并执行 `max_input_chars/max_output_items`，其他 model/provider limit 不进入执行快照，禁止静默接受未使用字段。
+- **重试分类：** 遍历 exception cause/context，按 httpx/requests timeout/connection、408/429/5xx 与常见中英文超时/限流文本进入 retry；4xx 参数和 validation 保持 non-retryable，公开错误仍为稳定码。
+- **R2 GREEN：** Task 8 指定 `49 passed, 1 warning`；Core 全量 `262 passed, 12 warnings`；根项目回归 `26 passed, 3 warnings`；pip install/check、真实 import/construct、compileall、ruff、diff-check 全部通过。
+
+### Task 8 独立审查 R3 修复
+
+- **R3 RED：** 新增 clean Core 启动、双 Provider 并发隔离、日志内容泄漏及异常文本分类测试，首次为 `5 failed, 37 passed`：任意 cwd 且无 `PYTHONPATH` 时 `No module named app`，factory 不支持 request-local client，legacy 输出完整 prompt，502/503 文本未进入 retry。
+- **请求级生产 Provider：** 默认生产路径改为 Core-local、每 attempt 私有 `openai.OpenAI(api_key=<snapshot secret>, base_url=<snapshot base>)`；每次 completion 都显式传冻结 `provider_model_code`，不读取根 config、不注册 `LLMServiceManager`、不使用进程 singleton/cache。保留 `analyzer_factory` 仅作为测试兼容注入，不进入生产 resolver。
+- **隔离证据：** 双线程同时运行 model-a/secret-a/base-a 与 model-b/secret-b/base-b，Fake transport 捕获每次真实 outgoing 参数，集合严格为两套冻结三元组且无交叉；四段 analysis/generation/matching/repair 仍走相同 validator 与 exactly-one repair。
+- **clean 启动：** 新增 `core_api.legacy_bootstrap`，基于已安装 `core_api` 模块 `__file__` 明确定位单仓库 legacy app，不依赖 cwd 或手工 `PYTHONPATH`。从 `/private/tmp` 用 Core venv 导入 `core_api.main` 与 Celery tasks 输出 `CORE_CLEAN_START_OK`。
+- **重试与日志：** cause/message 分类补 500/502/503/504、server/gateway/service unavailable、connection reset 与中文上游不可用；validation/4xx 保持 non-retryable。Core JSON logger 只记录 stage、长度、SHA-256；legacy migration adapter 的完整 prompt 日志改为长度/hash，unique prompt/response/secret 捕获和静态 log-content scan 均无泄漏。
+- **R3 GREEN：** Task 8 指定 `57 passed, 1 warning`；Core 全量 `270 passed, 12 warnings`；根项目含 legacy Adapter 回归 `35 passed, 3 warnings`；并发/日志专项 `3 passed`；clean start、pip check、compileall、ruff、diff-check、log scan 全部通过。
+
+### Task 8 独立审查 R4 修复
+
+- **R4 RED：** 新增四阶段 legacy 异常唯一敏感串、四次真实 outgoing body 与完整 timeline schema 断言，首次为 `5 failed, 42 passed, 1 warning`：analysis/generation/matching/repair 均把供应商异常正文带入日志或返回值，冻结 `temperature=0.77` 实际仍发送 `[0.7, 0.7, 0.3, 0.3]`。
+- **日志闭环：** `migration_adapter` 四阶段及相邻 async/vision/narration 异常路径统一只记录 `stage/error_type/code`，公开返回固定 `LLM_STAGE_FAILED`；不再记录 `str(e)`、traceback、供应商响应、字幕、prompt 或 secret。专项用四个不同敏感串逐路径验证日志与返回均无原文。
+- **生产请求契约：** 请求冻结的 `temperature` 现在贯穿 analysis/generation/matching/repair 四次 outgoing request；matching/repair prompt 均携带严格 `items` JSON 契约、`source_asset_id/start/end/narration` 语义、有限数约束、显式 source order 与每个 source duration。Fake transport 逐请求捕获并断言四次 model、temperature、JSON mode 和完整 source map；未支持的模型配置仍由请求 schema/快照 allowlist 拒绝，不静默接受未执行字段。
+- **可安装打包：** wheel 同时打包 `core_api` 与 Worker 必需的 legacy `app` 模块；`fun_asr_subtitle` 去除对 Streamlit-heavy `app.utils` 的顶层依赖。`legacy_bootstrap` 优先使用已安装 `app`，仅在显式 `NARRATO_CORE_ENABLE_MONOREPO_FALLBACK=1` 时允许基于仓库路径的开发 fallback，生产缺包返回明确启动错误。
+- **R4 GREEN：** Task 8 指定 `61 passed, 1 warning`；Core 全量 `274 passed, 12 warnings`；根项目相关回归 `52 passed`；`python -m build --wheel --no-isolation` 成功。最终 wheel 安装到全新 `/private/tmp/task8-wheel-venv-final` 后，在仓库外 cwd 且移除 `PYTHONPATH` 可导入 `core_api.main`、Celery tasks、media/ASR legacy 模块，并构造 media/asr/analysis 三 Adapter 的 `AtomicTaskHandler`，输出 `FINAL_WHEEL_SMOKE_OK`；`pip check` 为 `No broken requirements found`。compileall、ruff format/check、diff-check 与静态敏感日志 scan 均通过。
+- **剩余风险：** 真实供应商凭据 Smoke 仍为 Goal 明确允许的可选外部条件；wheel 的 FFprobe/FunASR 实际调用仍依赖部署环境提供对应本地进程与二进制，但 import、装配和 Fake Provider 路径已在 clean venv 验证。
+
+### Task 8 独立审查 R5 修复
+
+- **R5 RED：** 真实 `OpenAICompatibleTextProvider -> UnifiedLLMService` 异常链、四阶段 outgoing token 配额与模型上限测试首次为 `3 failed, 46 passed`：Loguru 泄漏 unique response/subtitle/secret，四次请求均缺 `max_tokens`，超过冻结模型限额未拒绝。
+- **日志与 token 契约：** 新增统一安全错误元数据，仅记录 `stage/error_type/code/error_length/error_sha256`；Unified、真实 OpenAI-compatible provider、manager 与 migration 全链不记录异常正文或 traceback。`max_tokens` 进入公共 config 与 provider/model 冻结 allowlist，创建任务时超过冻结上限明确返回 422；analysis/generation/matching/repair 四次请求均发送同一冻结 `temperature/max_tokens`，Fake transport 逐 body 验证。
+- **Selective wheel：** custom `build_py` 仅发布 `app` 骨架及 Core Worker 真正使用的 `app.services.media_probe`、`app.services.fun_asr_subtitle`；wheel RECORD 不含 test、`app.utils`、voice、generate_video 或无关 legacy LLM/UI 模块，直接依赖 requests/loguru 已在 METADATA 声明。全新 `/private/tmp/task8-r5-venv`、仓库外 cwd、无 `PYTHONPATH` 下用 fake subprocess 运行 media probe、小型 Fake HTTP/字幕 fixture 运行 FunASR、Fake Provider 真实执行 `AtomicTaskHandler` analysis 并登记 Artifact；未发布模块均为 `ModuleNotFoundError`，`pip check` 无 broken requirements。
+- **R5 GREEN：** Task 8 指定 `64 passed, 1 warning`；Core 全量 `277 passed, 12 warnings`；根项目相关回归 `53 passed, 1 warning`；selective runtime 输出 `R5_SELECTIVE_RUNTIME_SMOKE_OK`。ruff、compileall、diff-check 和目标日志静态 scan 通过。
+
+### Task 8 独立审查 R6 修复
+
+- **R6 RED：** direct checkout 可构建 selective wheel，但 `python -m build --sdist` 后从解压 release tree 重建的 wheel 完全缺少 `app`，证明外部 sibling `../app` 未进入 sdist，发布链不可重复。
+- **可重复发布源：** 将严格四文件 legacy runtime 以受控 `vendor_legacy/app` 源树纳入 Core sdist；direct wheel 与 sdist→wheel 均只发现该源树。自动化同步测试逐字节比较 monorepo source，roundtrip 测试复制 clean source、构建 sdist、解压重建 wheel，并断言 sdist vendor 与 wheel RECORD 都严格等于四文件白名单，无 tests/utils/voice 等漂移。
+- **R6 runtime：** direct wheel 和 sdist 重建 wheel 分别安装到全新 venv；仓库外 cwd、无 `PYTHONPATH` 下均实跑 media probe、Fake HTTP/SRT FunASR、AtomicTaskHandler analysis Artifact，以及 invalid→exactly-one repair→valid script，未发布模块保持 `ModuleNotFoundError`，两次输出 `R6_RELEASE_RUNTIME_SMOKE_OK` 且 `pip check` 无 broken requirements。
+- **R6 GREEN：** Task 8 指定 `64 passed, 1 warning`；Core 全量（含 2 个发布 roundtrip 测试）`279 passed, 12 warnings`；根项目相关回归 `53 passed, 1 warning`；direct/sdist build、RECORD 白名单、ruff、compileall 与 diff-check 均通过。

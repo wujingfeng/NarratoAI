@@ -5,6 +5,7 @@
 """
 
 import asyncio
+import hashlib
 from typing import List, Dict, Any, Optional, Union
 from pathlib import Path
 import PIL.Image
@@ -15,9 +16,26 @@ from .exceptions import LLMServiceError
 from .manager import LLMServiceManager
 # 导入新的提示词管理系统
 from app.services.prompts import PromptManager
+from .safe_logging import log_llm_error
 
 # 提供商注册由 webui.py:main() 显式调用（见 LLM 提供商注册机制重构）
 # 这样更可靠，错误也更容易调试
+
+
+def _log_safe_error(stage: str, error: Exception) -> None:
+    """只记录稳定阶段、异常类型和错误码，不记录异常正文。"""
+    log_llm_error(stage, error)
+
+
+def _safe_error_result(error: Exception, *, stage: str, temperature: float) -> Dict[str, Any]:
+    _log_safe_error(stage, error)
+    return {
+        "status": "error",
+        "message": "LLM_STAGE_FAILED",
+        "error_code": "LLM_STAGE_FAILED",
+        "error_type": type(error).__name__,
+        "temperature": temperature,
+    }
 
 
 def _run_async_safely(coro_func, *args, **kwargs):
@@ -45,7 +63,7 @@ def _run_async_safely(coro_func, *args, **kwargs):
     try:
         # 尝试获取当前事件循环
         try:
-            loop = asyncio.get_running_loop()
+            asyncio.get_running_loop()
             # 如果有运行中的事件循环，使用线程池执行
             import concurrent.futures
             with concurrent.futures.ThreadPoolExecutor() as executor:
@@ -55,8 +73,8 @@ def _run_async_safely(coro_func, *args, **kwargs):
             # 没有运行中的事件循环，直接运行
             return run_in_new_loop()
     except Exception as e:
-        logger.error(f"异步执行失败: {str(e)}")
-        raise LLMServiceError(f"异步执行失败: {str(e)}")
+        _log_safe_error("async_bridge", e)
+        raise LLMServiceError("异步执行失败") from None
 
 
 class LegacyLLMAdapter:
@@ -113,8 +131,8 @@ class LegacyLLMAdapter:
             return result if isinstance(result, str) else str(result)
 
         except Exception as e:
-            logger.error(f"生成解说文案失败: {str(e)}")
-            raise
+            _log_safe_error("legacy_narration", e)
+            raise LLMServiceError("生成解说文案失败") from None
 
 
 class VisionAnalyzerAdapter:
@@ -191,8 +209,8 @@ class VisionAnalyzerAdapter:
             return compatible_results
 
         except Exception as e:
-            logger.error(f"图片分析失败: {str(e)}")
-            raise
+            _log_safe_error("vision_analysis", e)
+            raise LLMServiceError("图片分析失败") from None
 
 
 class SubtitleAnalyzerAdapter:
@@ -307,7 +325,11 @@ class SubtitleAnalyzerAdapter:
                     "narration_char_range": narration_char_range,
                 },
             )
-            logger.info(f"生成解说文案的prompt={prompt}")
+            logger.info(
+                "生成解说文案请求: prompt_length={}, prompt_sha256={}",
+                len(prompt),
+                hashlib.sha256(prompt.encode("utf-8")).hexdigest(),
+            )
 
             narration_copy = self._generate_plain_text(prompt, system_prompt, temperature)
             return {
@@ -317,12 +339,7 @@ class SubtitleAnalyzerAdapter:
                 "temperature": temperature,
             }
         except Exception as e:
-            logger.error(f"解说文案正文生成失败: {str(e)}")
-            return {
-                "status": "error",
-                "message": str(e),
-                "temperature": temperature,
-            }
+            return _safe_error_result(e, stage="narration_copy", temperature=temperature)
 
     def match_narration_copy_to_script(
         self,
@@ -363,12 +380,7 @@ class SubtitleAnalyzerAdapter:
                 "temperature": temperature,
             }
         except Exception as e:
-            logger.error(f"解说文案画面匹配失败: {str(e)}")
-            return {
-                "status": "error",
-                "message": str(e),
-                "temperature": temperature,
-            }
+            return _safe_error_result(e, stage="script_matching", temperature=temperature)
 
     def plan_narration_segments(
         self,
@@ -454,12 +466,7 @@ class SubtitleAnalyzerAdapter:
                 "temperature": temperature,
             }
         except Exception as e:
-            logger.error(f"解说文案修复失败: {str(e)}")
-            return {
-                "status": "error",
-                "message": str(e),
-                "temperature": temperature,
-            }
+            return _safe_error_result(e, stage="script_repair", temperature=temperature)
     
     def analyze_subtitle(self, subtitle_content: str) -> Dict[str, Any]:
         """
@@ -491,12 +498,7 @@ class SubtitleAnalyzerAdapter:
             }
             
         except Exception as e:
-            logger.error(f"字幕分析失败: {str(e)}")
-            return {
-                "status": "error",
-                "message": str(e),
-                "temperature": 1.0
-            }
+            return _safe_error_result(e, stage="subtitle_analysis", temperature=1.0)
     
     def generate_narration_script(
         self,
@@ -551,12 +553,9 @@ class SubtitleAnalyzerAdapter:
             }
             
         except Exception as e:
-            logger.error(f"解说文案生成失败: {str(e)}")
-            return {
-                "status": "error",
-                "message": str(e),
-                "temperature": temperature
-            }
+            return _safe_error_result(
+                e, stage="legacy_script_generation", temperature=temperature
+            )
 
 
 # 为了向后兼容，提供一些全局函数

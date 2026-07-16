@@ -1,6 +1,19 @@
 from __future__ import annotations
 
+# ruff: noqa: E402 -- source-checkout path must be fixed before Core imports.
+
+import os
+import sys
+from pathlib import Path
 from collections.abc import Iterator
+
+os.environ.setdefault("NARRATO_CORE_ENABLE_MONOREPO_FALLBACK", "1")
+repository_root = str(Path(__file__).resolve().parents[2])
+if repository_root in sys.path:
+    sys.path.remove(repository_root)
+sys.path.insert(0, repository_root)
+for module_name in [name for name in sys.modules if name == "app" or name.startswith("app.")]:
+    del sys.modules[module_name]
 
 import pytest
 from fastapi.testclient import TestClient
@@ -104,3 +117,6 @@ def task(task_service):
         idempotency_key="create-default-task",
         input_snapshot={"video_url": "https://cdn.example.test/video.mp4"},
     )
+
+# 固定 source-checkout 测试使用完整 monorepo app，而非 editable wheel 的 vendor 子集。
+__import__('app')
