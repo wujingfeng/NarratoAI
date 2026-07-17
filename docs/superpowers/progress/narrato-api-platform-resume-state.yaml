@@ -2,7 +2,7 @@ branch: codex/narrato-api-platform
 worktree: /private/tmp/NarratoAI-narrato-api-platform
 current_gate: "Phase 5 / Gate B pending"
 last_complete_task:
-  id: Task 15C
+  id: Task 15D
   commits:
     - "6ea93bf feat: add workflow state machine template (Task 14A)"
     - "60de8c8 feat: add workflow persistence models (Task 14B)"
@@ -13,15 +13,29 @@ last_complete_task:
     - "3d4085e feat: add editor render lock boundary (Task 15A)"
     - "4ca8568 feat: add editor draft last-write-wins (Task 15B)"
     - "9a0d304 feat: guard non-terminal project deletion (Task 15C)"
+    - "a56de56 feat: guard failed project artifact visibility (Task 15D)"
 current_task:
-  id: Task 15C
+  id: Task 15D
   status: completed
   completed_subtasks:
     - Task 15A editor lock and permanent waiting boundary
     - Task 15B editor draft last-write-wins
     - Task 15C terminal project deletion eligibility guard
-implementation_commit: "9a0d304 feat: guard non-terminal project deletion"
+    - Task 15D failed-project artifact visibility guard
+implementation_commit: "a56de56 feat: guard failed project artifact visibility"
 tests:
+  task_15d_red:
+    command: "cd docs/api/narratoApi && .venv/bin/python -m pytest tests/unit/test_artifact_visibility.py -q"
+    result: "Expected RED: ImportError because visible_artifacts was missing from narrato_api.projects.service."
+  task_15d_green_and_direct:
+    command: "cd docs/api/narratoApi && PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv/bin/python -m pytest tests/unit/test_artifact_visibility.py tests/unit/test_project_deletion_rules.py -q"
+    result: "15 passed in 0.02s."
+  task_15d_ruff:
+    command: "cd docs/api/narratoApi && .venv/bin/ruff check narrato_api/projects/service.py tests/unit/test_artifact_visibility.py"
+    result: pass
+  task_15d_diff_check:
+    command: "git diff --check"
+    result: pass
   task_15c_red:
     command: "cd docs/api/narratoApi && PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv/bin/python -m pytest tests/unit/test_project_deletion_rules.py -q"
     result: "Expected RED: ModuleNotFoundError because narrato_api.projects.service was missing."
@@ -38,12 +52,15 @@ key_decisions:
   - "Task 15A provides permanent waiting, render locking, immutable revision snapshots, and one render-request Outbox boundary only."
   - "Task 15B adds one EditorDraft per project; ordered saves overwrite its content under last-write-wins semantics."
   - "Task 15C provides only a terminal deletion eligibility guard: completed/failed pass, all non-terminal states raise PROJECT_NOT_TERMINAL, and no deletion occurs."
+  - "Task 15D provides only a service-layer visibility guard: completed projects retain their registered artifact sequence; failed and all other statuses expose an empty list."
+  - "Task 15D deliberately creates no artifact entity, export endpoint, Jianying generation, router, Core call, or downstream behavior."
   - "Task 15C does not implement artifacts/results, export/Jianying, router, Core calls, downstream execution, or another Task 15 boundary."
 remaining_risks:
   - "SQLite tests cover persistence boundaries but real PostgreSQL multi-connection/row-lock behavior remains unverified."
   - "Real OSS/Core integration remains unverified."
   - "Project-wide mypy still has 6 existing assets-module errors outside these tasks."
   - "Focused pytest commands require PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 because default plugin loading is unreliable in this environment."
+  - "The visibility guard is a service boundary only; future real result/export read paths must use it when those task boundaries are implemented."
 workspace_status:
   clean: false
   expected_uncommitted:
@@ -52,13 +69,13 @@ workspace_status:
     - path: docs/web/docs/Oss.php
       reason: pre-existing untracked file
 next_atomic_task:
-  id: Task 15D
-  scope: "Choose only one independently verifiable Task 15 boundary, with failed-project artifact visibility guard preferred; do not begin another Task 15 subtask or later task after its checkpoint."
+  id: Task 15E
+  scope: "Implement only a completed-project export eligibility guard as one independently verifiable Task 15 boundary; do not implement export artifacts, Jianying generation, routers, Core calls, or any later task."
   relevant_files:
     - docs/superpowers/plans/2026-07-16-narrato-api-platform.md
     - docs/superpowers/specs/2026-07-16-narrato-api-platform-design.md
-    - docs/api/narratoApi/tests/unit/test_artifact_visibility.py
+    - docs/api/narratoApi/tests/unit/test_export_eligibility.py
   acceptance_criteria:
-    - "Use TDD and implement only the failed-project artifact visibility guard."
-    - "Failed projects expose no artifact visibility while avoiding artifact entity, export, router, Core, or downstream implementation."
+    - "Use TDD and implement only the completed-project export eligibility guard."
+    - "Only completed is export-eligible; failed and all non-completed states have no export eligibility, while avoiding artifact entity, export generation, Jianying, router, Core, or downstream implementation."
     - "Run new and directly affected tests, inspect diff, commit implementation, then update and commit a checkpoint before stopping."
