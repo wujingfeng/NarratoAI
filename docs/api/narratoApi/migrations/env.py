@@ -9,9 +9,13 @@ from sqlalchemy import engine_from_config, pool
 from narrato_api.database import Base
 from narrato_api.auth import models as _auth_models
 from narrato_api.billing import models as _billing_models
+from narrato_api.projects import models as _project_models
+from narrato_api.assets import models as _asset_models
 
 assert _auth_models.User.__tablename__ == "users"
 assert _billing_models.CreditAccount.__tablename__ == "credit_accounts"
+assert _project_models.Project.__tablename__ == "projects"
+assert _asset_models.Asset.__tablename__ == "assets"
 
 config = context.config
 if config.config_file_name is not None:
