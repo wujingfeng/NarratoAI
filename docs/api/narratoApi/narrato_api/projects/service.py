@@ -61,7 +61,9 @@ def ensure_project_deletable(status: str) -> None:
     """只校验终态项目是否具备删除资格，不执行删除。"""
 
     if status not in _DELETABLE_PROJECT_STATES:
-        raise ProjectStateConflict("project must be completed or failed before deletion")
+        raise ProjectStateConflict(
+            "project must be completed or failed before deletion"
+        )
 
 
 def _new_deletion_job_id() -> str:
@@ -104,7 +106,9 @@ def request_project_deletion(
     project.status = "deleting"
     session.add(job)
     session.flush()
-    return ProjectDeletionRequest(job_id=job.id, project_id=project.id, status=job.status)
+    return ProjectDeletionRequest(
+        job_id=job.id, project_id=project.id, status=job.status
+    )
 
 
 def ensure_project_exportable(status: str) -> None:
