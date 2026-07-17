@@ -8,11 +8,15 @@
 2. 读取 `docs/superpowers/progress/narrato-api-platform-resume-state.yaml` 与 `narrato-api-platform-summary.md`。
 3. 若状态与 Git、实际文件或测试证据不一致，以实际证据重建状态；不得重复已提交且验证通过的功能，也不得丢弃未提交改动。
 
-## 本窗口唯一原子任务：Task 15P
+## 当前真实基线
 
-只实现 **typed Core Jianying manifest client boundary**：只为用户归属的 completed 项目，转发既有持久化 artifact resource metadata 和 immutable editor snapshot/timeline 输入。严格 TDD：先写测试并观察预期 RED，再最小实现使其 GREEN。
+- Task 15 已完成并通过 Gate：新鲜 SQLite migration 到 `0013_project_deletion_worker`，Task 15 直接子集 `100 passed, 1 warning`。
+- 最新 Task 15 实施提交：`4ad100d style(api): format project service for Task 15 Gate`。
+- 后续从 Task 16 开始，Task 15 不得重新实现。
 
-不创建 ZIP，不写 filesystem/OSS，不修改浏览器 UI，不实现真实 OSS/Worker 删除，不提前实施下一项。完成实现、目标测试、差异检查和 Implementation Commit 后，更新三个进度文件并提交 checkpoint，随后立即结束。
+## 本窗口唯一原子任务：Task 16
+
+只实现 React Web 认证接入：统一 API client、Token 存储、Authorization Header、全局 401 清理、登录页与应用接线。严格 TDD：先让 `scripts/verify-api-auth.mjs` 失败，再最小实现使其通过；运行该脚本和直接相关的 Web build。不得实施 Task 17。
 
 ## 不可删除的永久规则
 
