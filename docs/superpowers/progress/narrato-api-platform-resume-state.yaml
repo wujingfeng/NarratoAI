@@ -2,7 +2,7 @@ branch: codex/narrato-api-platform
 worktree: /private/tmp/NarratoAI-narrato-api-platform
 current_gate: "Phase 5 / Gate B pending"
 last_complete_task:
-  id: Task 15A
+  id: Task 15B
   commits:
     - "6ea93bf feat: add workflow state machine template (Task 14A)"
     - "60de8c8 feat: add workflow persistence models (Task 14B)"
@@ -11,38 +11,40 @@ last_complete_task:
     - "b6da053 feat: dispatch workflow outbox events (Task 14E)"
     - "ddd012d fix: preserve app logs during migrations (Task 14 Gate review fix)"
     - "3d4085e feat: add editor render lock boundary (Task 15A)"
+    - "4ca8568 feat: add editor draft last-write-wins (Task 15B)"
 current_task:
-  id: Task 15A
+  id: Task 15B
   status: completed
   completed_subtasks:
     - Task 15A editor lock and permanent waiting boundary
-implementation_commit: "3d4085e feat: add editor render lock boundary"
+    - Task 15B editor draft last-write-wins
+implementation_commit: "4ca8568 feat: add editor draft last-write-wins"
 tests:
-  task_15a_red:
-    command: "cd docs/api/narratoApi && PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv/bin/python -m pytest tests/unit/test_editor_lock.py -q"
-    result: "Expected RED: collection failed with ModuleNotFoundError: No module named narrato_api.editor."
-  task_15a_green:
-    command: "cd docs/api/narratoApi && PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv/bin/python -m pytest tests/unit/test_editor_lock.py -q"
-    result: "2 passed"
-  task_15a_direct:
-    command: "cd docs/api/narratoApi && PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv/bin/python -m pytest tests/unit/test_editor_lock.py tests/unit/test_workflow_service.py tests/unit/test_workflow_models.py tests/unit/test_workflows_migration.py -q"
-    result: "8 passed, 3 warnings"
-  task_15a_ruff:
-    command: "cd docs/api/narratoApi && .venv/bin/python -m ruff check narrato_api/editor migrations/env.py migrations/versions/0008_editor_revisions.py tests/unit/test_editor_lock.py"
+  task_15b_red:
+    command: "cd docs/api/narratoApi && PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv/bin/python -m pytest tests/unit/test_editor_last_write_wins.py -q"
+    result: "Expected RED: ImportError because EditorDraft was missing from narrato_api.editor.models."
+  task_15b_green:
+    command: "cd docs/api/narratoApi && PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv/bin/python -m pytest tests/unit/test_editor_last_write_wins.py tests/unit/test_editor_lock.py -q"
+    result: "3 passed"
+  task_15b_direct:
+    command: "cd docs/api/narratoApi && PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv/bin/python -m pytest tests/unit/test_editor_last_write_wins.py tests/unit/test_editor_lock.py tests/unit/test_workflow_service.py tests/unit/test_workflow_models.py tests/unit/test_workflows_migration.py -q"
+    result: "9 passed, 3 warnings"
+  task_15b_ruff:
+    command: "cd docs/api/narratoApi && .venv/bin/python -m ruff check narrato_api/editor migrations/env.py migrations/versions/0009_editor_drafts.py tests/unit/test_editor_last_write_wins.py tests/unit/test_editor_lock.py"
     result: pass
-  task_15a_alembic:
+  task_15b_alembic:
     command: "cd docs/api/narratoApi && .venv/bin/python -m alembic upgrade head && .venv/bin/python -m alembic check"
-    result: "pass; upgrade applied 0008_editor_revisions and check found no new upgrade operations"
-  task_15a_diff_check:
+    result: "pass; upgrade applied 0009_editor_drafts and check found no new upgrade operations"
+  task_15b_diff_check:
     command: "git diff --check"
     result: pass
 key_decisions:
-  - "Task 14 remains limited to versioned workflow persistence, reconciliation, and outbox boundaries; it does not include Core HTTP, router, polling, SSE, scanner, or downstream execution."
-  - "Task 15A creates only immutable editor draft snapshots and the render-lock transaction; it does not implement LWW, result/artifact, deletion, export/Jianying, router, Core calls, or downstream behavior."
-  - "A waiting_for_edit project has no expiration path in EditorService; an old project remains editable until the render submission locks it."
-  - "Render submission atomically locks the project, changes project/workflow state to render_queued, and persists one pending workflow.render_requested Outbox event."
+  - "Task 15A provides permanent waiting, render locking, immutable revision snapshots, and one render-request Outbox boundary only."
+  - "Task 15B adds one EditorDraft per project; ordered saves overwrite its content under last-write-wins semantics."
+  - "submit_render snapshots the current mutable EditorDraft into an immutable EditorRevision before locking project/workflow state and persisting Outbox."
+  - "Task 15B does not implement results/artifacts, deletion, export/Jianying, router, Core calls, downstream execution, or another Task 15 boundary."
 remaining_risks:
-  - "SQLite tests cover transaction boundaries but real PostgreSQL multi-connection/row-lock behavior remains unverified."
+  - "SQLite covers the persistence transaction but real PostgreSQL multi-connection/row-lock behavior remains unverified."
   - "Real OSS/Core integration remains unverified."
   - "Project-wide mypy still has 6 existing assets-module errors outside these tasks."
   - "Focused pytest commands require PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 because default plugin loading is unreliable in this environment."
@@ -54,14 +56,14 @@ workspace_status:
     - path: docs/web/docs/Oss.php
       reason: pre-existing untracked file
 next_atomic_task:
-  id: Task 15B
-  scope: "Choose only one independently verifiable editor subtask, with LWW draft saving preferred; do not begin another Task 15 subtask or later task after its checkpoint."
+  id: Task 15C
+  scope: "Choose only one independently verifiable Task 15 boundary, with terminal project deletion guard preferred; do not begin another Task 15 subtask or later task after its checkpoint."
   relevant_files:
     - docs/superpowers/plans/2026-07-16-narrato-api-platform.md
     - docs/superpowers/specs/2026-07-16-narrato-api-platform-design.md
-    - docs/api/narratoApi/narrato_api/editor/
-    - docs/api/narratoApi/tests/unit/test_editor_last_write_wins.py
+    - docs/api/narratoApi/projects/
+    - docs/api/narratoApi/tests/unit/test_project_deletion_rules.py
   acceptance_criteria:
-    - "Use TDD and implement only the selected LWW editor draft-save boundary."
-    - "Concurrent or ordered saves leave exactly the latest accepted draft current without changing the Task 15A render-lock boundary."
+    - "Use TDD and implement only the selected terminal deletion-state guard."
+    - "Only completed or failed projects are eligible; non-terminal states raise a stable conflict without implementing actual deletion or any other Task 15 feature."
     - "Run new and directly affected tests, inspect diff, commit implementation, then update and commit a checkpoint before stopping."
