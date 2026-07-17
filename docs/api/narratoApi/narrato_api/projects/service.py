@@ -15,6 +15,7 @@ class ProjectStateConflict(ValueError):
 
 _DELETABLE_PROJECT_STATES = frozenset({"completed", "failed"})
 _ARTIFACT_VISIBLE_PROJECT_STATES = frozenset({"completed"})
+_EXPORTABLE_PROJECT_STATES = frozenset({"completed"})
 
 
 def ensure_project_deletable(status: str) -> None:
@@ -22,6 +23,15 @@ def ensure_project_deletable(status: str) -> None:
 
     if status not in _DELETABLE_PROJECT_STATES:
         raise ProjectStateConflict("project must be completed or failed before deletion")
+
+
+def ensure_project_exportable(status: str) -> None:
+    """只校验项目是否具备导出资格，不执行导出。"""
+
+    if status not in _EXPORTABLE_PROJECT_STATES:
+        conflict = ProjectStateConflict("project must be completed before export")
+        conflict.code = "PROJECT_NOT_COMPLETED"
+        raise conflict
 
 
 def visible_artifacts(status: str, artifacts: Iterable[Artifact]) -> list[Artifact]:
