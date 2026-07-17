@@ -12,8 +12,11 @@ from narrato_api.auth.router import bearer_token, get_auth_service
 from narrato_api.auth.service import AuthService
 from narrato_api.exports.service import build_owned_completed_project_jianying_manifest
 from narrato_api.projects.service import (
+    ProjectNotFoundError,
     ProjectResultLookupError,
     lookup_completed_project_result,
+    request_project_deletion,
+    ProjectStateConflict,
 )
 
 router = APIRouter()
@@ -47,6 +50,52 @@ class JianyingManifestData(StrictModel):
 
     package_name: str
     resources: list[JianyingManifestResourceData]
+
+
+class ProjectDeletionRequestData(StrictModel):
+    """已登记、尚未执行实际删除的项目删除请求。"""
+
+    job_id: str
+    project_id: str
+    status: str
+
+
+@router.post(
+    "/projects/{project_id}/deletion-requests",
+    status_code=202,
+    response_model=ApiResponse[ProjectDeletionRequestData],
+)
+def request_deletion(
+    project_id: str,
+    request: Request,
+    token: Annotated[str, Depends(bearer_token)],
+    auth: Annotated[AuthService, Depends(get_auth_service)],
+    request_id: Annotated[str, Depends(get_request_id)],
+) -> ApiResponse[ProjectDeletionRequestData]:
+    """为当前用户的终态项目登记幂等删除审计请求。"""
+
+    user = auth.resolve_user(token)
+    with Session(request.app.state.database_engine) as session:
+        try:
+            with session.begin():
+                deletion = request_project_deletion(
+                    session, user_id=user.id, project_id=project_id
+                )
+        except ProjectNotFoundError as error:
+            raise ApiError("PROJECT_NOT_FOUND", "Project not found", 404) from error
+        except ProjectStateConflict as error:
+            raise ApiError("PROJECT_NOT_TERMINAL", "Project is not terminal", 409) from error
+
+    return ApiResponse(
+        code="PROJECT_DELETION_REQUESTED",
+        message="Project deletion requested",
+        data=ProjectDeletionRequestData(
+            job_id=deletion.job_id,
+            project_id=deletion.project_id,
+            status=deletion.status,
+        ),
+        request_id=request_id,
+    )
 
 
 @router.get("/projects/{project_id}/result", response_model=ApiResponse[ProjectResultData])

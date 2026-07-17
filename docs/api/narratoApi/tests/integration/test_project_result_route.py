@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import Session, sessionmaker
 
 from narrato_api.artifacts.models import RegisteredArtifact
 from narrato_api.auth.models import User
@@ -14,7 +14,7 @@ from narrato_api.auth.router import get_auth_service
 from narrato_api.config import Settings
 from narrato_api.database import Base
 from narrato_api.main import create_app
-from narrato_api.projects.models import Project
+from narrato_api.projects.models import DeletionJob, Project
 
 
 class FakeAuthService:
@@ -48,6 +48,12 @@ def project_result_fixture(tmp_path) -> Iterator[TestClient]:
                     user_id="usr_owner",
                     product="short_drama",
                     status="draft",
+                ),
+                Project(
+                    id="prj_failed",
+                    user_id="usr_owner",
+                    product="short_drama",
+                    status="failed",
                 ),
                 RegisteredArtifact(
                     id="art_render",
@@ -121,3 +127,64 @@ def test_get_project_result_requires_authentication(
 
     assert response.status_code == 401
     assert response.json()["code"] == "AUTHENTICATION_REQUIRED"
+
+
+@pytest.mark.parametrize("project_id", ["prj_completed", "prj_failed"])
+def test_terminal_owner_can_request_project_deletion_once(
+    project_result_fixture: TestClient, project_id: str
+) -> None:
+    """终态项目创建审计 Job 并将项目原子切换为 deleting。"""
+
+    first = project_result_fixture.post(
+        f"/api/v1/projects/{project_id}/deletion-requests",
+        headers={"Authorization": "Bearer owner-token"},
+    )
+    second = project_result_fixture.post(
+        f"/api/v1/projects/{project_id}/deletion-requests",
+        headers={"Authorization": "Bearer owner-token"},
+    )
+
+    assert first.status_code == second.status_code == 202
+    assert first.json()["code"] == second.json()["code"] == "PROJECT_DELETION_REQUESTED"
+    assert first.json()["data"]["project_id"] == project_id
+    assert first.json()["data"]["status"] == "pending"
+    assert second.json()["data"] == first.json()["data"]
+    with Session(project_result_fixture.app.state.database_engine) as session:
+        jobs = list(
+            session.query(DeletionJob).filter(DeletionJob.project_id == project_id)
+        )
+        project = session.get(Project, project_id)
+    assert len(jobs) == 1
+    assert jobs[0].user_id == "usr_owner"
+    assert jobs[0].status == "pending"
+    assert jobs[0].created_at is not None and jobs[0].updated_at is not None
+    assert project is not None and project.status == "deleting"
+
+
+@pytest.mark.parametrize("project_id", ["prj_draft", "prj_missing"])
+def test_non_terminal_or_missing_project_cannot_request_deletion(
+    project_result_fixture: TestClient, project_id: str
+) -> None:
+    response = project_result_fixture.post(
+        f"/api/v1/projects/{project_id}/deletion-requests",
+        headers={"Authorization": "Bearer owner-token"},
+    )
+
+    expected_status = 409 if project_id == "prj_draft" else 404
+    expected_code = "PROJECT_NOT_TERMINAL" if project_id == "prj_draft" else "PROJECT_NOT_FOUND"
+    assert (response.status_code, response.json()["code"]) == (expected_status, expected_code)
+
+
+def test_foreign_project_cannot_request_deletion(
+    project_result_fixture: TestClient,
+) -> None:
+    response = project_result_fixture.post(
+        "/api/v1/projects/prj_completed/deletion-requests",
+        headers={"Authorization": "Bearer other-token"},
+    )
+
+    assert (response.status_code, response.json()["code"], response.json()["data"]) == (
+        404,
+        "PROJECT_NOT_FOUND",
+        None,
+    )

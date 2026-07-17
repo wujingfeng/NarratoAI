@@ -18,6 +18,7 @@ from narrato_api.workflows import models as _workflow_models
 assert _auth_models.User.__tablename__ == "users"
 assert _billing_models.CreditAccount.__tablename__ == "credit_accounts"
 assert _project_models.Project.__tablename__ == "projects"
+assert _project_models.DeletionJob.__tablename__ == "deletion_jobs"
 assert _asset_models.Asset.__tablename__ == "assets"
 assert _artifact_models.RegisteredArtifact.__tablename__ == "artifacts"
 assert _editor_models.EditorDraft.__tablename__ == "editor_drafts"
