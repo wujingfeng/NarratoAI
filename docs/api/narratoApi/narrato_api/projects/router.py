@@ -5,12 +5,17 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Request
 from sqlalchemy.orm import Session
 
-from narrato_api.api.dependencies import get_request_id
+from narrato_api.api.dependencies import get_request_id, get_settings
 from narrato_api.api.errors import ApiError
 from narrato_api.api.responses import ApiResponse, StrictModel
 from narrato_api.auth.router import bearer_token, get_auth_service
 from narrato_api.auth.service import AuthService
-from narrato_api.exports.service import build_owned_completed_project_jianying_manifest
+from narrato_api.config import Settings
+from narrato_api.exports.service import (
+    JianyingManifestSnapshotNotFoundError,
+    build_owned_completed_project_jianying_manifest,
+)
+from narrato_api.integrations.core_client import CoreClientError, HttpCoreClient
 from narrato_api.projects.service import (
     ProjectNotFoundError,
     ProjectResultLookupError,
@@ -20,6 +25,16 @@ from narrato_api.projects.service import (
 )
 
 router = APIRouter()
+
+
+def get_jianying_core_client(
+    settings: Annotated[Settings, Depends(get_settings)],
+) -> HttpCoreClient:
+    """创建仅用于剪映 Manifest 的 Core 客户端。"""
+
+    return HttpCoreClient(
+        base_url=str(settings.core_base_url), request_token=settings.core_request_token
+    )
 
 
 class ProjectResultArtifactData(StrictModel):
@@ -37,19 +52,24 @@ class ProjectResultData(StrictModel):
     artifacts: list[ProjectResultArtifactData]
 
 
-class JianyingManifestResourceData(StrictModel):
-    """剪映客户端流式组包所需的远程资源。"""
+class JianyingManifestFileData(StrictModel):
+    """Core 已生成的一项内联或 CDN 剪映文件。"""
 
-    artifact_id: str
-    cdn_url: str
     zip_path: str
+    content: str | None = None
+    content_base64: str | None = None
+    url: str | None = None
+    size: int | None = None
+    checksum: str | None = None
+    content_type: str | None = None
 
 
 class JianyingManifestData(StrictModel):
-    """不创建 ZIP 的剪映纯数据清单。"""
+    """Core 生成的无 ZIP 剪映基础文件和资源映射。"""
 
+    template_version: str
     package_name: str
-    resources: list[JianyingManifestResourceData]
+    files: list[JianyingManifestFileData]
 
 
 class ProjectDeletionRequestData(StrictModel):
@@ -84,7 +104,9 @@ def request_deletion(
         except ProjectNotFoundError as error:
             raise ApiError("PROJECT_NOT_FOUND", "Project not found", 404) from error
         except ProjectStateConflict as error:
-            raise ApiError("PROJECT_NOT_TERMINAL", "Project is not terminal", 409) from error
+            raise ApiError(
+                "PROJECT_NOT_TERMINAL", "Project is not terminal", 409
+            ) from error
 
     return ApiResponse(
         code="PROJECT_DELETION_REQUESTED",
@@ -98,7 +120,9 @@ def request_deletion(
     )
 
 
-@router.get("/projects/{project_id}/result", response_model=ApiResponse[ProjectResultData])
+@router.get(
+    "/projects/{project_id}/result", response_model=ApiResponse[ProjectResultData]
+)
 def get_project_result(
     project_id: str,
     request: Request,
@@ -146,29 +170,41 @@ def build_project_jianying_manifest(
     request: Request,
     token: Annotated[str, Depends(bearer_token)],
     auth: Annotated[AuthService, Depends(get_auth_service)],
+    core_client: Annotated[HttpCoreClient, Depends(get_jianying_core_client)],
     request_id: Annotated[str, Depends(get_request_id)],
 ) -> ApiResponse[JianyingManifestData]:
-    """只为当前用户已完成项目返回剪映纯数据清单。"""
+    """只为当前用户已完成项目返回 Core 生成的剪映 Manifest。"""
 
     user = auth.resolve_user(token)
     with Session(request.app.state.database_engine) as session:
         try:
             manifest = build_owned_completed_project_jianying_manifest(
-                session, user_id=user.id, project_id=project_id
+                session,
+                user_id=user.id,
+                project_id=project_id,
+                core_client=core_client,
             )
         except ProjectResultLookupError as error:
             raise ApiError(
                 "PROJECT_RESULT_NOT_FOUND", "Project result not found", 404
+            ) from error
+        except JianyingManifestSnapshotNotFoundError as error:
+            raise ApiError(
+                error.code, "Project editor snapshot not found", 409
+            ) from error
+        except CoreClientError as error:
+            raise ApiError(
+                "CORE_UNAVAILABLE", "Core manifest service is unavailable", 503
             ) from error
 
     return ApiResponse(
         code="JIANYING_MANIFEST",
         message="Jianying manifest",
         data=JianyingManifestData(
-            package_name=manifest["package_name"],
-            resources=[
-                JianyingManifestResourceData(**resource)
-                for resource in manifest["resources"]
+            template_version=manifest.template_version,
+            package_name=manifest.package_name,
+            files=[
+                JianyingManifestFileData(**file) for file in manifest.to_dict()["files"]
             ],
         ),
         request_id=request_id,

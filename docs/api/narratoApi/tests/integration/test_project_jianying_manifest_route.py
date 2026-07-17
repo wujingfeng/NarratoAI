@@ -13,17 +13,46 @@ from narrato_api.auth.models import User
 from narrato_api.auth.router import get_auth_service
 from narrato_api.config import Settings
 from narrato_api.database import Base
+from narrato_api.editor.models import EditorRevision
+from narrato_api.integrations.core_client import (
+    CoreJianyingManifest,
+    CoreJianyingManifestFile,
+)
 from narrato_api.main import create_app
 from narrato_api.projects.models import Project
+from narrato_api.projects.router import get_jianying_core_client
 
 
 class FakeAuthService:
     def resolve_user(self, token: str) -> User:
         if token == "owner-token":
-            return User(id="usr_owner", email="owner@example.test", password_hash="hash")
+            return User(
+                id="usr_owner", email="owner@example.test", password_hash="hash"
+            )
         if token == "other-token":
-            return User(id="usr_other", email="other@example.test", password_hash="hash")
+            return User(
+                id="usr_other", email="other@example.test", password_hash="hash"
+            )
         raise RuntimeError("unexpected token")
+
+
+class FakeCoreClient:
+    def build_jianying_manifest(self, **_kwargs: object) -> CoreJianyingManifest:
+        return CoreJianyingManifest(
+            template_version="10.6.0",
+            package_name="NarratoAI_erv_1.zip",
+            files=(
+                CoreJianyingManifestFile(
+                    zip_path="draft_content.json",
+                    content="{}",
+                    content_base64=None,
+                    url=None,
+                    size=None,
+                    checksum=None,
+                    content_type="application/json",
+                ),
+            ),
+        )
 
 
 @pytest.fixture
@@ -54,7 +83,27 @@ def jianying_manifest_fixture(tmp_path) -> Iterator[TestClient]:
                     project_id="prj_completed",
                     kind="video",
                     cdn_url="https://cdn.example.test/exports/render.mp4",
+                    size=1024,
+                    checksum="sha256:" + "a" * 64,
+                    content_type="video/mp4",
+                    width=1920,
+                    height=1080,
+                    duration=1.0,
                     created_at=datetime(2026, 7, 17, tzinfo=timezone.utc),
+                ),
+                EditorRevision(
+                    id="erv_1",
+                    project_id="prj_completed",
+                    content={
+                        "timeline": [
+                            {
+                                "source_asset_id": "ast_1",
+                                "start": 0,
+                                "end": 1,
+                                "narration": "Hi",
+                            }
+                        ]
+                    },
                 ),
             ]
         )
@@ -67,6 +116,7 @@ def jianying_manifest_fixture(tmp_path) -> Iterator[TestClient]:
         )
     )
     app.dependency_overrides[get_auth_service] = FakeAuthService
+    app.dependency_overrides[get_jianying_core_client] = FakeCoreClient
     with TestClient(app) as client:
         yield client
     engine.dispose()
@@ -82,12 +132,17 @@ def test_post_jianying_manifest_returns_completed_owner_pure_manifest(
 
     assert response.status_code == 200
     assert response.json()["data"] == {
-        "package_name": "jianying-export.zip",
-        "resources": [
+        "template_version": "10.6.0",
+        "package_name": "NarratoAI_erv_1.zip",
+        "files": [
             {
-                "artifact_id": "art_render",
-                "cdn_url": "https://cdn.example.test/exports/render.mp4",
-                "zip_path": "video/e8813bf292ad62fa631f56aefa4de4e4.mp4",
+                "zip_path": "draft_content.json",
+                "content": "{}",
+                "content_base64": None,
+                "url": None,
+                "size": None,
+                "checksum": None,
+                "content_type": "application/json",
             }
         ],
     }
