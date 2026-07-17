@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 from hashlib import sha256
-from typing import TypedDict
+from typing import NotRequired, TypedDict
 
 from sqlalchemy.orm import Session
 
@@ -16,6 +16,12 @@ class JianyingResource(TypedDict):
     artifact_id: str
     cdn_url: str
     zip_path: str
+    size: NotRequired[int]
+    checksum: NotRequired[str]
+    content_type: NotRequired[str]
+    width: NotRequired[int]
+    height: NotRequired[int]
+    duration: NotRequired[float]
 
 
 class JianyingManifest(TypedDict):
@@ -42,15 +48,24 @@ def build_jianying_manifest(
 
     resources: list[JianyingResource] = []
     for artifact in sorted(artifacts, key=lambda item: item.id):
-        directory, extension = _KIND_DESTINATIONS.get(artifact.kind, _DEFAULT_DESTINATION)
-        digest = sha256(artifact.id.encode("utf-8")).hexdigest()[:32]
-        resources.append(
-            {
-                "artifact_id": artifact.id,
-                "cdn_url": artifact.cdn_url,
-                "zip_path": f"{directory}/{digest}{extension}",
-            }
+        directory, extension = _KIND_DESTINATIONS.get(
+            artifact.kind, _DEFAULT_DESTINATION
         )
+        digest = sha256(artifact.id.encode("utf-8")).hexdigest()[:32]
+        resource: JianyingResource = {
+            "artifact_id": artifact.id,
+            "cdn_url": artifact.cdn_url,
+            "zip_path": f"{directory}/{digest}{extension}",
+        }
+        for field in ("size", "checksum", "content_type"):
+            value = getattr(artifact, field)
+            if value is not None:
+                resource[field] = value
+        for field in ("width", "height", "duration"):
+            value = getattr(artifact, field)
+            if value is not None:
+                resource[field] = value
+        resources.append(resource)
 
     return {"package_name": "jianying-export.zip", "resources": resources}
 

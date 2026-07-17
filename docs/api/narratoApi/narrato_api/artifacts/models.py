@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from sqlalchemy import DateTime, ForeignKey, Index, String
+from sqlalchemy import BigInteger, DateTime, Float, ForeignKey, Index, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from narrato_api.database import Base
@@ -18,7 +18,9 @@ class RegisteredArtifact(Base):
     """项目完成后明确登记、可供导出的产物。"""
 
     __tablename__ = "artifacts"
-    __table_args__ = (Index("ix_artifacts_project_created", "project_id", "created_at"),)
+    __table_args__ = (
+        Index("ix_artifacts_project_created", "project_id", "created_at"),
+    )
 
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
     project_id: Mapped[str] = mapped_column(
@@ -26,6 +28,12 @@ class RegisteredArtifact(Base):
     )
     kind: Mapped[str] = mapped_column(String(64), nullable=False)
     cdn_url: Mapped[str] = mapped_column(String(2048), nullable=False)
+    size: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    checksum: Mapped[str | None] = mapped_column(String(72), nullable=True)
+    content_type: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    width: Mapped[int | None] = mapped_column(nullable=True)
+    height: Mapped[int | None] = mapped_column(nullable=True)
+    duration: Mapped[float | None] = mapped_column(Float, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=utc_now
     )

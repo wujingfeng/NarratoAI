@@ -14,6 +14,12 @@ def register_artifact(
     project_id: str,
     kind: str,
     cdn_url: str,
+    size: int | None = None,
+    checksum: str | None = None,
+    content_type: str | None = None,
+    width: int | None = None,
+    height: int | None = None,
+    duration: float | None = None,
 ) -> RegisteredArtifact:
     """将项目归属的产物加入调用方已管理的数据库事务。"""
 
@@ -22,6 +28,12 @@ def register_artifact(
         project_id=project_id,
         kind=kind,
         cdn_url=cdn_url,
+        size=size,
+        checksum=checksum,
+        content_type=content_type,
+        width=width,
+        height=height,
+        duration=duration,
     )
     session.add(artifact)
     return artifact
