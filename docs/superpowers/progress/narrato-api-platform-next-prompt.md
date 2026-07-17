@@ -1,29 +1,19 @@
 # SEGMENTED_GOAL_PROTOCOL_V2：NarratoAI API 平台永久续接提示词
 
-在既有 worktree `/private/tmp/NarratoAI-narrato-api-platform`、分支 `codex/narrato-api-platform` 中继续开发。不得创建新 worktree，不得 `reset`、`restore`、`clean`、删除或覆盖已有改动；不得触碰预存未跟踪 `/.superpowers/` 与 `docs/web/docs/Oss.php`。
+在既有 worktree `/private/tmp/NarratoAI-narrato-api-platform`、分支 `codex/narrato-api-platform` 中继续。不得创建新 worktree，不得 `reset`、`restore`、`clean`、删除或覆盖已有改动；不得触碰预存未跟踪 `/.superpowers/` 与 `docs/web/docs/Oss.php`。
 
 ## 当前真实基线
 
-- 最近实施提交：`322f2d5d00798af880d55b95edbd8b139899d749 feat: reconcile Core workflow results`。
+- 最近实施提交：`b6da053 feat: dispatch workflow outbox events`。
 - Gate：`Phase 5 / Gate B pending`。
-- Task 14 为 `in_progress`，Task 14A、Task 14B、Task 14C、Task 14D 已完成。
-- Task 14D 已验证 callback 与 polling 的统一终态收口，`event_id + state_version` 的持久化幂等，以及不覆盖已确认终态。
+- Task 14 的 Task 14A、14B、14C、14D、14E 已完成。
+- Task 14E 已验证：pending Outbox 事件被条件更新原子 claim；仅对窄注入 wake-up callable 传稳定 event ID 与 idempotency key；重复/已 claim 不重复 wake；wake 失败恢复 durable retryable pending 状态。
+- Task 14E 聚焦与直接受影响测试结果：`9 passed, 2 warnings`；Ruff 和 `git diff --check` 已通过。
 - 预期未提交内容仅为 `.superpowers/` 与 `docs/web/docs/Oss.php`。
 
-## 本窗口唯一原子任务：Task 14E
+## 本窗口唯一原子任务：Gate B
 
-只实现 **WorkflowOutbox 的最小 durable claim-and-wake-up 服务**及其聚焦测试。一个 pending 事件只能由一个事务领取，领取后才调用一个窄的注入 wake-up callable 并传入稳定 idempotency key；wake-up 失败必须保留/恢复可重试的 durable 事件。不得实现实际 Celery、Core HTTP、数据库重投扫描或其他运行时。
-
-可涉及：
-
-- `docs/api/narratoApi/narrato_api/workflows/dispatcher.py`
-- `docs/api/narratoApi/narrato_api/workflows/models.py`
-- `docs/api/narratoApi/tests/unit/test_workflow_dispatcher.py`
-- Task 14E 必须的最小迁移或 package 关联文件。
-
-验收：同一 Outbox 事件不会重复调用 wake-up callable；失败 wake-up 不丢失事件且保持 retryable；聚焦 dispatcher 和直接受影响 workflow 测试通过。严格 TDD：先新增测试并看到明确 RED，再最小实现 GREEN。
-
-严格禁止 Core HTTP client、callback router、polling loop、SSE、数据库 re-delivery scanner、Task 15、下游业务执行或任何其他运行时功能。完成本原子任务和检查点后，禁止继续下一个任务。
+仅执行 **Gate B** 的集中需求复核、独立代码审查和全量测试验证。以 Task 14 相关设计、计划、提交和实际代码为依据，记录可审查证据；若发现普通缺陷，可在本 Gate 内最小修复并验证。禁止提前开始后续功能、Task 15、Core HTTP、router、polling、SSE、数据库 re-delivery scanner 或任何新运行时行为。
 
 ## 不可删除的永久规则
 
@@ -39,14 +29,14 @@
 
 1. 执行 `git status --short`、`git branch --show-current`、`git log --oneline --decorate -20`。
 2. 阅读 `docs/superpowers/progress/narrato-api-platform-resume-state.yaml`、`narrato-api-platform-summary.md` 和本文件；如有不一致，以 Git、实际文件和测试为准重建状态文件。
-3. 只读取 Task 14E 相关设计/计划章节；不得仅凭任务编号假设进度。
-4. 目标测试固定使用 `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1`；先运行新增测试确认 RED，再运行目标与直接受影响模块测试。
-5. 完成后检查实际 diff 与修改范围，先提交业务代码/测试，再更新并提交三个进度文件为独立 checkpoint。
+3. 只读取 Gate B 所需的 Task 14 设计/计划章节和相关提交、测试证据；不得无目的读取完整大文档或成功日志。
+4. 集中运行 Gate 所需的需求复核、独立审查和全量测试；不得把聚焦测试通过伪报为全量测试通过。
+5. 完成后检查实际 diff 与修改范围，提交必要修复后，再更新并提交三个进度文件为独立 checkpoint。
 6. checkpoint 后检查 `git status --short`；任何预期未提交改动必须逐项记录在状态文件中。
 
 ## 最终回复要求
 
-报告完成原子任务、Implementation Commit、Checkpoint Commit、测试结果、当前 Gate、下一个原子任务和工作区状态。若仍有未完成任务，必须明确输出：
+报告 Gate B 结果、相关提交、测试结果、当前 Gate、下一个原子任务和工作区状态。若仍有未完成任务，必须明确输出：
 
 > 请新建窗口，并再次使用 SEGMENTED_GOAL_PROTOCOL_V2 永久续接提示词。
 
