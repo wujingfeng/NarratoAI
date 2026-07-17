@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterator
+from datetime import datetime, timedelta, timezone
 
 import pytest
 from fastapi.testclient import TestClient
@@ -46,10 +47,16 @@ class FakeCoreClient:
     def __init__(self, result: MediaProbeResult) -> None:
         self.result = result
         self.calls: list[dict[str, str]] = []
+        self.poll_result = MediaProbeResult(valid=None, core_task_id="core_1")
+        self.poll_calls: list[str] = []
 
     def probe_media(self, **kwargs: str) -> MediaProbeResult:
         self.calls.append(kwargs)
         return self.result
+
+    def get_probe_result(self, core_task_id: str) -> MediaProbeResult:
+        self.poll_calls.append(core_task_id)
+        return self.poll_result
 
 
 @pytest.fixture
@@ -166,3 +173,80 @@ def test_complete_rejects_unissued_or_other_project_object_key(upload_fixture) -
 
     assert response.status_code == 422
     assert response.json()["code"] == "UPLOAD_OBJECT_REJECTED"
+
+
+def test_asset_read_reconciles_later_succeeded_core_probe_for_owner(upload_fixture) -> None:
+    client, sessions, _oss, core = upload_fixture
+    core.result = MediaProbeResult(valid=None, core_task_id="core_1")
+
+    complete = client.post(
+        "/api/v1/projects/prj_1/uploads/complete",
+        headers={"Authorization": "Bearer valid-token"},
+        json=_issued_payload(client),
+    )
+
+    assert complete.status_code == 202
+    assert complete.json()["data"]["status"] == "validating"
+    assert core.poll_calls == []
+    asset_id = complete.json()["data"]["id"]
+    with sessions() as session:
+        asset = session.get(Asset, asset_id)
+        assert asset is not None and asset.core_task_id == "core_1"
+
+    core.poll_result = MediaProbeResult(valid=True, core_task_id="core_1")
+    fetched = client.get(
+        f"/api/v1/assets/{asset_id}", headers={"Authorization": "Bearer valid-token"}
+    )
+
+    assert fetched.status_code == 200
+    assert fetched.json()["data"]["status"] == "ready"
+    assert core.poll_calls == ["core_1"]
+    with sessions() as session:
+        asset = session.get(Asset, asset_id)
+        assert asset is not None and asset.status == "ready"
+
+
+def test_upload_complete_maps_oss_head_failure_to_service_unavailable(upload_fixture) -> None:
+    client, _sessions, oss, _core = upload_fixture
+
+    from narrato_api.integrations.oss_client import OssClientError
+
+    def unavailable(_bucket: str, _object_key: str) -> OssObject:
+        raise OssClientError("temporary failure")
+
+    oss.head_object = unavailable  # type: ignore[method-assign]
+    response = client.post(
+        "/api/v1/projects/prj_1/uploads/complete",
+        headers={"Authorization": "Bearer valid-token"},
+        json=_issued_payload(client),
+    )
+
+    assert response.status_code == 503
+    assert response.json()["code"] == "OSS_UNAVAILABLE"
+
+
+def test_expired_upload_reservations_do_not_permanently_consume_video_quota(upload_fixture) -> None:
+    client, sessions, _oss, _core = upload_fixture
+    request = {
+        "asset_type": "video",
+        "filename": "episode.mp4",
+        "size_bytes": 100,
+        "content_type": "video/mp4",
+    }
+    for _ in range(5):
+        assert client.post(
+            "/api/v1/projects/prj_1/uploads/policy",
+            headers={"Authorization": "Bearer valid-token"},
+            json=request,
+        ).status_code == 200
+    with sessions.begin() as session:
+        for asset in session.query(Asset).all():
+            asset.reservation_expires_at = datetime.now(timezone.utc) - timedelta(seconds=1)
+
+    response = client.post(
+        "/api/v1/projects/prj_1/uploads/policy",
+        headers={"Authorization": "Bearer valid-token"},
+        json=request,
+    )
+
+    assert response.status_code == 200

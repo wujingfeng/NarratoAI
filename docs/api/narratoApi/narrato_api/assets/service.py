@@ -3,8 +3,9 @@ from __future__ import annotations
 import secrets
 import time
 from collections.abc import Callable
+from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, or_, select
 from sqlalchemy.orm import Session
 
 from narrato_api.api.errors import ApiError
@@ -14,11 +15,21 @@ from narrato_api.integrations.core_client import CoreClientError, MediaProbeResu
 from narrato_api.integrations.oss_client import OssClientError, OssObject
 from narrato_api.projects.models import Project
 
+POLICY_RESERVATION_TTL = timedelta(minutes=10)
+
 
 def new_asset_id() -> str:
     """生成不可由用户输入控制的资产 ID。"""
 
     return f"ast_{time.time_ns():016x}{secrets.token_hex(8)}"
+
+
+def project_for_update_statement(*, user_id: str, project_id: str):
+    """构造 PostgreSQL 项目行锁；SQLite 测试环境不模拟该并发语义。"""
+
+    return select(Project).where(
+        Project.id == project_id, Project.user_id == user_id
+    ).with_for_update()
 
 
 class UploadService:
@@ -36,20 +47,6 @@ class UploadService:
         self.oss_client = oss_client
         self.core_client = core_client
         self.oss_bucket = oss_bucket
-
-    def existing_video_count(self, *, user_id: str, project_id: str) -> int:
-        """在项目归属确认后读取视频声明配额。"""
-
-        with self.session_factory() as session:
-            self._owned_project(session, user_id=user_id, project_id=project_id)
-            return int(
-                session.scalar(
-                    select(func.count()).select_from(Asset).where(
-                        Asset.project_id == project_id, Asset.asset_type == "video"
-                    )
-                )
-                or 0
-            )
 
     def complete(
         self,
@@ -91,12 +88,13 @@ class UploadService:
                     raise ApiError("UPLOAD_CONTENT_TYPE_REJECTED", "Uploaded object is invalid", 422)
                 object_info = self.oss_client.head_object(self.oss_bucket, object_key)
                 self._validate_head(object_info, size_bytes, expected_content_type)
+                asset.reservation_expires_at = None
                 session.commit()
                 session.refresh(asset)
         except AssetDeclarationError as error:
             raise ApiError("UPLOAD_DECLARATION_REJECTED", "Upload declaration is invalid", 422) from error
         except OssClientError as error:
-            raise ApiError("UPLOAD_OBJECT_REJECTED", "Uploaded object is invalid", 422) from error
+            raise ApiError("OSS_UNAVAILABLE", "Upload object verification is unavailable", 503) from error
 
         try:
             probe: MediaProbeResult = self.core_client.probe_media(
@@ -105,11 +103,6 @@ class UploadService:
             )
         except CoreClientError as error:
             raise ApiError("MEDIA_PROBE_UNAVAILABLE", "Media validation is unavailable", 503) from error
-        if probe.valid is None and probe.core_task_id:
-            try:
-                probe = self.core_client.get_probe_result(probe.core_task_id)
-            except CoreClientError as error:
-                raise ApiError("MEDIA_PROBE_UNAVAILABLE", "Media validation is unavailable", 503) from error
         if probe.valid is not None:
             with self.session_factory() as session:
                 persisted = session.get(Asset, asset.id)
@@ -119,14 +112,89 @@ class UploadService:
                 session.commit()
                 session.refresh(persisted)
                 return persisted
+        if probe.core_task_id:
+            with self.session_factory() as session:
+                persisted = session.get(Asset, asset.id)
+                if persisted is None:
+                    raise ApiError("ASSET_NOT_FOUND", "Asset not found", 404)
+                persisted.core_task_id = probe.core_task_id
+                session.commit()
+                session.refresh(persisted)
+                return persisted
         return asset
 
     def reserve(self, *, user_id: str, project_id: str, asset_type: str, filename: str, size_bytes: int, object_key: str, cdn_url: str) -> None:
-        """在签发 Policy 时先持久化唯一对象键，令 complete 只能消费该预留。"""
+        """用项目行锁、有限预留 TTL 原子保留可完成的单一对象键。"""
         with self.session_factory() as session:
-            project = self._owned_project(session, user_id=user_id, project_id=project_id)
-            session.add(Asset(id=new_asset_id(), user_id=user_id, project_id=project.id, asset_type=asset_type, status="validating", filename=filename, bucket=self.oss_bucket, object_key=object_key, cdn_url=cdn_url, size_bytes=size_bytes))
+            project = session.scalar(
+                project_for_update_statement(user_id=user_id, project_id=project_id)
+            )
+            if project is None:
+                raise ApiError("PROJECT_NOT_FOUND", "Project not found", 404)
+            now = datetime.now(timezone.utc)
+            session.execute(
+                delete(Asset).where(
+                    Asset.project_id == project_id,
+                    Asset.status == "validating",
+                    Asset.core_task_id.is_(None),
+                    Asset.reservation_expires_at.is_not(None),
+                    Asset.reservation_expires_at <= now,
+                )
+            )
+            existing_video_count = int(
+                session.scalar(
+                    select(func.count()).select_from(Asset).where(
+                        Asset.project_id == project_id,
+                        Asset.asset_type == "video",
+                        or_(
+                            Asset.reservation_expires_at.is_(None),
+                            Asset.reservation_expires_at > now,
+                        ),
+                    )
+                )
+                or 0
+            )
+            try:
+                validate_asset_declaration(
+                    asset_type=asset_type,
+                    filename=filename,
+                    size_bytes=size_bytes,
+                    existing_video_count=existing_video_count,
+                )
+            except AssetDeclarationError as error:
+                raise ApiError("UPLOAD_DECLARATION_REJECTED", "Upload declaration is invalid", 422) from error
+            session.add(Asset(id=new_asset_id(), user_id=user_id, project_id=project.id, asset_type=asset_type, status="validating", filename=filename, bucket=self.oss_bucket, object_key=object_key, cdn_url=cdn_url, size_bytes=size_bytes, reservation_expires_at=now + POLICY_RESERVATION_TTL))
             session.commit()
+
+    def get_owned_asset(self, *, user_id: str, asset_id: str) -> Asset:
+        """读取单个归属资产，并在后续请求中收敛异步 Core 探测终态。"""
+
+        with self.session_factory() as session:
+            asset = session.scalar(
+                select(Asset).where(Asset.id == asset_id, Asset.user_id == user_id)
+            )
+            if asset is None:
+                raise ApiError("ASSET_NOT_FOUND", "Asset not found", 404)
+            core_task_id = asset.core_task_id if asset.status == "validating" else None
+        if not core_task_id:
+            return asset
+        try:
+            probe: MediaProbeResult = self.core_client.get_probe_result(core_task_id)
+        except CoreClientError as error:
+            raise ApiError("MEDIA_PROBE_UNAVAILABLE", "Media validation is unavailable", 503) from error
+        if probe.valid is None:
+            return asset
+        with self.session_factory() as session:
+            persisted = session.scalar(
+                select(Asset).where(Asset.id == asset_id, Asset.user_id == user_id)
+            )
+            if persisted is None:
+                raise ApiError("ASSET_NOT_FOUND", "Asset not found", 404)
+            if persisted.status == "validating" and persisted.core_task_id == core_task_id:
+                persisted.status = "ready" if probe.valid else "invalid"
+                session.commit()
+                session.refresh(persisted)
+            return persisted
 
     @staticmethod
     def _owned_project(session: Session, *, user_id: str, project_id: str) -> Project:

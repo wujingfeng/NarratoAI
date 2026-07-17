@@ -46,6 +46,10 @@ class Asset(Base):
     object_key: Mapped[str] = mapped_column(String(1024), nullable=False)
     cdn_url: Mapped[str] = mapped_column(String(2048), nullable=False)
     size_bytes: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    core_task_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    reservation_expires_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=utc_now
     )

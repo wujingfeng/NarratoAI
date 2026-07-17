@@ -65,7 +65,7 @@ def create_upload_policy(
     try:
         policy = policy_service.create_policy(
         asset_type=body.asset_type, filename=body.filename, size_bytes=body.size_bytes, content_type=body.content_type,
-        existing_video_count=service.existing_video_count(user_id=user.id, project_id=project_id),
+        existing_video_count=0,
         )
     except AssetDeclarationError as error:
         raise ApiError("UPLOAD_DECLARATION_REJECTED", "Upload declaration is invalid", 422) from error
@@ -88,4 +88,20 @@ def complete_upload(
     asset = service.complete(user_id=user.id, project_id=project_id, asset_type=body.asset_type,
         filename=body.filename, size_bytes=body.size_bytes, content_type=body.content_type, object_key=body.object_key)
     return ApiResponse(code="UPLOAD_VALIDATION_STARTED", message="Upload validation started", request_id=request_id,
+        data=AssetData(id=asset.id, status=asset.status))
+
+
+@router.get("/assets/{asset_id}", response_model=ApiResponse[AssetData])
+def get_asset(
+    asset_id: str,
+    token: Annotated[str, Depends(bearer_token)],
+    auth: Annotated[AuthService, Depends(get_auth_service)],
+    service: Annotated[UploadService, Depends(get_upload_service)],
+    request_id: Annotated[str, Depends(get_request_id)],
+) -> ApiResponse[AssetData]:
+    """认证读取单个资产，并按需轮询 Core 以收敛其异步探测状态。"""
+
+    user = auth.resolve_user(token)
+    asset = service.get_owned_asset(user_id=user.id, asset_id=asset_id)
+    return ApiResponse(code="ASSET_RETRIEVED", message="Asset retrieved", request_id=request_id,
         data=AssetData(id=asset.id, status=asset.status))

@@ -7,6 +7,7 @@ from datetime import date
 import pytest
 
 from narrato_api.assets.constraints import AssetDeclarationError
+from narrato_api.assets.service import project_for_update_statement
 from narrato_api.integrations.oss_client import OssPostPolicyService
 
 
@@ -81,3 +82,11 @@ def test_policy_rejects_content_type_that_does_not_match_extension() -> None:
             content_type="video/quicktime",
             existing_video_count=0,
         )
+
+
+def test_video_reservation_uses_postgresql_project_row_lock() -> None:
+    from sqlalchemy.dialects import postgresql
+
+    statement = project_for_update_statement(user_id="usr_1", project_id="prj_1")
+
+    assert "FOR UPDATE" in str(statement.compile(dialect=postgresql.dialect()))
