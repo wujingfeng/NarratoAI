@@ -101,6 +101,7 @@ def test_openapi_only_exposes_get_post_and_typed_responses(tmp_path) -> None:
         "/api/v1/users/me",
         "/api/v1/projects/{project_id}/uploads/policy",
         "/api/v1/projects/{project_id}/uploads/complete",
+        "/api/v1/projects/{project_id}/result",
         "/api/v1/assets/{asset_id}",
     }
     assert {
