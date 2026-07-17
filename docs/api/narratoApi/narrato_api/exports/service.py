@@ -54,15 +54,20 @@ class JianyingManifestCoreClient(Protocol):
 
 
 _KIND_DESTINATIONS: dict[str, tuple[str, str]] = {
-    "audio": ("assets/voice", ".wav"),
-    "script": ("assets/timeline", ".json"),
+    "audio": ("audio", ".mp3"),
+    "script": ("script", ".json"),
+    "subtitle": ("subtitle", ".srt"),
+    "timeline": ("timeline", ".json"),
+    "video": ("video", ".mp4"),
+}
+_DEFAULT_DESTINATION = ("resource", ".bin")
+_CORE_KIND_ALIASES = {"audio": "voice", "script": "timeline"}
+_CORE_DESTINATIONS = {
     "subtitle": ("assets/subtitle", ".srt"),
     "timeline": ("assets/timeline", ".json"),
     "video": ("assets/video", ".mp4"),
     "voice": ("assets/voice", ".wav"),
 }
-_DEFAULT_DESTINATION = ("resource", ".bin")
-_CORE_KIND_ALIASES = {"audio": "voice", "script": "timeline"}
 
 
 def build_jianying_manifest(
@@ -125,10 +130,15 @@ def build_owned_completed_project_jianying_manifest(
     ):
         if not all(key in resource for key in ("size", "checksum", "content_type")):
             raise ValueError("registered artifact Core metadata is incomplete")
+        core_kind = _CORE_KIND_ALIASES.get(artifact.kind, artifact.kind)
+        core_directory, core_extension = _CORE_DESTINATIONS.get(
+            core_kind, ("resource", ".bin")
+        )
+        digest = sha256(artifact.id.encode("utf-8")).hexdigest()[:32]
         core_resources.append(
             CoreJianyingResource(
-                kind=_CORE_KIND_ALIASES.get(artifact.kind, artifact.kind),
-                zip_path=resource["zip_path"],
+                kind=core_kind,
+                zip_path=f"{core_directory}/{digest}{core_extension}",
                 url=resource["cdn_url"],
                 size=resource["size"],
                 checksum=resource["checksum"],
