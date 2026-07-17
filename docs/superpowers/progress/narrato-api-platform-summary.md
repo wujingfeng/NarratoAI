@@ -4,27 +4,28 @@
 
 - 分支：`codex/narrato-api-platform`
 - worktree：`/private/tmp/NarratoAI-narrato-api-platform`
-- Gate：**Phase 6 / Gate C pending**；Task 16 完成，Task 17-18 未完成。
+- Gate：**Phase 6 / Gate C pending**；Task 17 完成，Task 18 未完成。
 
 ## 已完成基线
 
 - Task 15：编辑永久等待/LWW/revision/render lock，项目结果与 Jianying manifest，Core 元数据及可恢复 OSS 删除；Gate B 已通过。
-- Task 16：统一 `/api/v1` API client、单一 Token storage、Bearer Header、401 清理并通过 `auth:expired` 交由 AuthProvider 跳转登录页；增加登录页和受保护的 dashboard 路由。
-- Task 16 实施提交：`9d80927 feat: connect web authentication api`。
+- Task 16：统一 `/api/v1` API client、Token storage、Bearer Header、401 登录跳转、LoginPage 和受保护 dashboard 路由。
+- Task 17：接入 OSS POST 上传、项目费用/ready-only 启动、资产轮询、可恢复 SSE reader，以及防抖编辑保存和 render 后只读锁。
 
-## Task 16 证据
+## Task 17 证据
 
-- RED：`node scripts/verify-api-auth.mjs` 在实现前因缺少 `authStorage.js` 按预期失败。
-- GREEN：同脚本使用 Mock 401，确认 Bearer Header、Token 清理与 `/login` 路由，结果 PASS。
+- 实施提交：`34d77dc feat: connect project workflow api`。
+- RED：`node scripts/verify-api-project-flow.mjs` 在实现前因目标模块不存在而按预期失败。
+- GREEN：同脚本 6 项 PASS，覆盖 300 MiB、OSS complete、ready-only/API 费用、SSE Last-Event-ID、防抖只读保存和 CreatePage 委托。
 - `npm run build`：Vite production build PASS；保留已有大 chunk advisory。
-- `git diff --check`：PASS（实施提交前）。
+- `git diff --check`：PASS。
 
 ## 风险与续接
 
-- 尚未进行真实 API/CORS 部署联调；Task 17 将接入上传、项目、SSE 和编辑保存。
-- 真实 PostgreSQL 并发、Core HTTP、OSS 删除和浏览器流式 ZIP 仍未联调；`retryable_failed` 删除 job 尚无调度策略。
+- `CreatePage` 尚未被当前 router 导入，且它既有的 `components/create` 与 `data/createData.js` 依赖缺失；模块级 verifier 已覆盖本任务的接入约束，但没有完整路由浏览器旅程。
+- 尚未真实联调 API/CORS、OSS 凭据及 SSE 重连；Vite 大 chunk advisory 仍存在。
 - 预存未提交内容仅 `.superpowers/` 与 `docs/web/docs/Oss.php`，不得触碰。
 
 ## 下一原子任务
 
-**Task 17**：只实现 OSS 上传、项目流程、SSE 和编辑保存；先写并运行 RED 的 `verify-api-project-flow.mjs`，通过验证和 Web build 后建立检查点并停止。
+**Task 18**：只实现结果页固定下载动作及浏览器流式剪映 ZIP；先写并运行 RED 的 `verify-jianying-export.mjs`，通过该验证和 Web build 后建立检查点并停止。

@@ -6,17 +6,17 @@
 
 1. 运行 `git status --short`、`git branch --show-current`、`git log --oneline --decorate -20`。
 2. 读取 `docs/superpowers/progress/narrato-api-platform-resume-state.yaml` 与 `narrato-api-platform-summary.md`。
-3. 若状态与 Git、实际文件或测试证据不一致，以实际证据重建状态；不得重复已提交且验证通过的功能，也不得丢弃未提交改动。
+3. 检查最近的 Task brief、report、提交和测试证据。若状态与 Git、实际文件或测试证据不一致，以实际证据重建状态；不得重复已提交且验证通过的功能，也不得丢弃未提交改动。
 
 ## 当前真实基线
 
-- Task 16 已完成：统一 API client、Token storage、Bearer Header、401 登录跳转、LoginPage 和受保护 dashboard 路由。
-- Task 16 实施提交：`9d80927 feat: connect web authentication api`。
-- 验证：Mock 401 verifier 和 `npm run build` 均通过；Vite 保留已有大 chunk advisory。
+- Task 17 已完成：OSS POST 上传后立即 complete、300 MiB 前置限制、费用估算、ready-only 项目启动、资产轮询、带 Bearer/Last-Event-ID 的 SSE reader，以及 render 后只读的防抖编辑保存。
+- Task 17 实施提交：`34d77dc feat: connect project workflow api`。
+- 验证：project-flow verifier 6 项 PASS 与 `npm run build` PASS；Vite 保留已有大 chunk advisory。
 
-## 本窗口唯一原子任务：Task 17
+## 本窗口唯一原子任务：Task 18
 
-只实现 OSS 上传、项目流程、SSE 与编辑保存接入。严格 TDD：先让 `scripts/verify-api-project-flow.mjs` 失败，再最小实现使其通过；运行该脚本和直接相关 Web build。不得实施 Task 18。
+只实现结果页固定下载动作和浏览器流式剪映 ZIP。严格 TDD：先让 `scripts/verify-jianying-export.mjs` 失败，再最小实现使其通过；运行该脚本和直接相关 Web build。不得实施任何后续任务。
 
 ## 不可删除的永久规则
 

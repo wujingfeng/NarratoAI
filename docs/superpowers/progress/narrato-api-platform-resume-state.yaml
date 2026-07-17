@@ -1,42 +1,43 @@
 protocol: SEGMENTED_GOAL_PROTOCOL_V2
 branch: codex/narrato-api-platform
 worktree: /private/tmp/NarratoAI-narrato-api-platform
-current_gate: "Phase 6 / Gate C pending; Task 16 completed, Tasks 17-18 remain"
+current_gate: "Phase 6 / Gate C pending; Task 17 completed, Task 18 remains"
 last_complete_task:
-  id: Task 16
+  id: Task 17
   commits:
-    - "4ad100d style(api): format project service for Task 15 Gate"
-    - "9d80927 feat: connect web authentication api"
+    - "34d77dc feat: connect project workflow api"
 current_task:
-  id: Task 16
+  id: Task 17
   status: completed
   completed_subtasks:
-    - "TDD: auth verifier observed RED before auth modules existed"
-    - "Unified API envelope client attaches Bearer token and turns 401 into auth:expired"
-    - "Token storage, AuthProvider, guarded dashboard, and LoginPage are wired"
+    - "TDD: project-flow verifier observed RED before the Task 17 modules existed"
+    - "OSS POST upload rejects files over 300 MiB and immediately completes a successful upload"
+    - "Project API exposes fee estimation, ready-only start, asset polling, and SSE event reading"
+    - "Editor save is debounced and render submission locks further writes"
 implementation_commits:
-  - "9d80927 feat: connect web authentication api"
+  - "34d77dc feat: connect project workflow api"
 tests:
-  task_16_red:
-    command: "cd docs/web/homepage-prototype && node scripts/verify-api-auth.mjs"
-    result: "Expected RED: ERR_MODULE_NOT_FOUND for src/features/auth/authStorage.js before implementation."
-  task_16_verification:
-    command: "cd docs/web/homepage-prototype && node scripts/verify-api-auth.mjs"
-    result: "Passed: mocked 401 retained the outgoing Bearer header, cleared token, and switched to /login."
-  task_16_build:
+  task_17_red:
+    command: "cd docs/web/homepage-prototype && node scripts/verify-api-project-flow.mjs"
+    result: "Expected RED: target Task 17 modules were absent before implementation."
+  task_17_verification:
+    command: "cd docs/web/homepage-prototype && node scripts/verify-api-project-flow.mjs"
+    result: "Passed: 6 checks cover 300 MiB rejection, OSS complete, ready-only/API fee, SSE resume, debounced read-only editor save, and CreatePage delegation."
+  task_17_build:
     command: "cd docs/web/homepage-prototype && npm run build"
     result: "Passed: Vite production build completed; existing chunk-size advisory remains."
-  task_16_quality:
+  task_17_quality:
     command: "git diff --check"
-    result: "Passed before implementation commit."
+    result: "Passed after the implementation commit and before checkpoint commit."
 key_decisions:
-  - "Web API base defaults to /api/v1 and can be overridden with VITE_NARRATO_API_BASE_URL."
-  - "The single localStorage key is read by the client and written/cleared only through authStorage."
-  - "401 clears storage before dispatching auth:expired; AuthProvider owns the redirect to /login."
-  - "Dashboard is guarded and LoginPage restores the attempted route after a successful login."
+  - "OSS upload uses a server-issued POST policy and calls asset complete only after the POST response succeeds."
+  - "The browser enforces a 300 MiB single-file limit before requesting an upload policy."
+  - "Project start is permitted only when all assets are ready; price data is supplied by the API."
+  - "SSE uses fetch with Bearer and Last-Event-ID headers so reconnecting clients can resume."
+  - "Editor persistence is debounced; render submission makes subsequent editor writes read-only."
 remaining_risks:
-  - "Task 17 still needs real upload, project, SSE, and editor-flow wiring."
-  - "Task 16 verified mocked client behavior and a production build, not live API/CORS deployment integration."
+  - "CreatePage is not currently imported by the existing router, and its pre-existing component/data dependencies are absent; Task 17 verifier covers the integration contract but not a routed browser journey."
+  - "Task 17 uses module-level mocked verification; live API/CORS, OSS credentials, and persistent SSE reconnect behavior remain untested."
   - "Vite reports an existing >500 kB output chunk advisory."
 workspace_status:
   clean: false
@@ -46,20 +47,18 @@ workspace_status:
     - path: docs/web/docs/Oss.php
       reason: pre-existing untracked workspace content; do not touch
 next_action:
-  id: Task 17
-  scope: "Implement OSS upload, project workflow, SSE reader, and editor-save integration only."
+  id: Task 18
+  scope: "Implement the result page download actions and browser-streamed Jianying ZIP export only."
   relevant_files:
     - docs/superpowers/plans/2026-07-16-narrato-api-platform.md
-    - docs/web/homepage-prototype/src/features/uploads/ossPostUpload.js
-    - docs/web/homepage-prototype/src/features/jobs/readJobEvents.js
-    - docs/web/homepage-prototype/src/features/projects/projectApi.js
-    - docs/web/homepage-prototype/src/pages/CreatePage.jsx
-    - docs/web/homepage-prototype/src/pages/NarrationSettingsPage.jsx
-    - docs/web/homepage-prototype/src/pages/NarrationAnalysisPage.jsx
-    - docs/web/homepage-prototype/src/pages/NarrationEditorPage.jsx
-    - docs/web/homepage-prototype/src/pages/ProjectsPage.jsx
-    - docs/web/homepage-prototype/scripts/verify-api-project-flow.mjs
+    - docs/web/homepage-prototype/src/features/exports/jianyingZip.js
+    - docs/web/homepage-prototype/package.json
+    - docs/web/homepage-prototype/package-lock.json
+    - docs/web/homepage-prototype/src/pages/ProjectResultPage.jsx
+    - docs/web/homepage-prototype/src/components/projects/ProjectResultDetails.jsx
+    - docs/web/homepage-prototype/scripts/verify-jianying-export.mjs
   acceptance_criteria:
-    - "Use TDD: project-flow verification fails before implementation and passes afterwards."
-    - "Enforce 300 MiB, immediate complete after OSS POST, ready-only start, API fee, debounced editor save, and read-only after render submission."
-    - "Run only project-flow verification and directly affected Web build; do not implement Task 18."
+    - "Use TDD: the export verifier fails before implementation and passes afterwards."
+    - "Failed projects expose no download action; completed projects expose fixed video and Jianying export actions."
+    - "Build the ZIP only in supported desktop Chrome/Edge with streamed CDN entries; do not create a server ZIP request or ZIP artifact."
+    - "Run only the export verifier and directly affected Web build; do not proceed beyond Task 18."
