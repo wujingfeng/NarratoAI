@@ -4,7 +4,10 @@ from collections.abc import Iterable
 from hashlib import sha256
 from typing import TypedDict
 
+from sqlalchemy.orm import Session
+
 from narrato_api.artifacts.models import RegisteredArtifact
+from narrato_api.projects.service import lookup_completed_project_result
 
 
 class JianyingResource(TypedDict):
@@ -50,3 +53,14 @@ def build_jianying_manifest(
         )
 
     return {"package_name": "jianying-export.zip", "resources": resources}
+
+
+def build_owned_completed_project_jianying_manifest(
+    session: Session, *, user_id: str, project_id: str
+) -> JianyingManifest:
+    """返回当前用户已完成项目的剪映资源清单。"""
+
+    result = lookup_completed_project_result(
+        session, user_id=user_id, project_id=project_id
+    )
+    return build_jianying_manifest(result.artifacts)
