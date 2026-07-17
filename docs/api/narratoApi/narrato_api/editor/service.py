@@ -25,6 +25,10 @@ class EditorDraftNotFoundError(LookupError):
     """提交渲染时没有可快照化草稿时抛出。"""
 
 
+class EditorProjectNotFoundError(LookupError):
+    """编辑器读取时项目不存在或不属于当前用户。"""
+
+
 def _new_id(prefix: str) -> str:
     """生成编辑器持久化记录 ID。"""
 
@@ -110,6 +114,23 @@ class EditorService:
                 )
                 return True
 
+    def get_draft(self, *, user_id: str, project_id: str) -> tuple[EditorDraft, bool]:
+        """读取当前用户项目草稿；提交渲染后仍可只读访问。"""
+
+        with self.session_factory() as session:
+            project = session.scalar(
+                select(Project).where(
+                    Project.id == project_id, Project.user_id == user_id
+                )
+            )
+            if project is None:
+                raise EditorProjectNotFoundError("project was not found")
+            draft = session.get(EditorDraft, project.id)
+            if draft is None:
+                raise EditorDraftNotFoundError("editor draft not found")
+            session.expunge(draft)
+            return draft, project.is_locked
+
     @staticmethod
     def _editable_project(
         session: Session, *, user_id: str, project_id: str
@@ -121,10 +142,8 @@ class EditorService:
             .where(Project.id == project_id, Project.user_id == user_id)
             .with_for_update()
         )
-        if (
-            project is None
-            or project.status != "waiting_for_edit"
-            or project.is_locked
-        ):
+        if project is None:
+            raise EditorProjectNotFoundError("project was not found")
+        if project.status != "waiting_for_edit" or project.is_locked:
             raise EditorLockedError("project editor is locked")
         return project

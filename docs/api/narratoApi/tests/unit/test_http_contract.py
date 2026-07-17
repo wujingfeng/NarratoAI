@@ -59,9 +59,15 @@ def _settings(tmp_path) -> Settings:
 def test_request_id_is_validated_and_matches_body(tmp_path) -> None:
     app = create_app(_settings(tmp_path))
     with TestClient(app) as client:
-        accepted = client.get("/api/v1/health/live", headers={"X-Request-ID": "trace.abc-123"})
-        rejected = client.get("/api/v1/health/live", headers={"X-Request-ID": "evil\nheader"})
-        oversized = client.get("/api/v1/health/live", headers={"X-Request-ID": "x" * 129})
+        accepted = client.get(
+            "/api/v1/health/live", headers={"X-Request-ID": "trace.abc-123"}
+        )
+        rejected = client.get(
+            "/api/v1/health/live", headers={"X-Request-ID": "evil\nheader"}
+        )
+        oversized = client.get(
+            "/api/v1/health/live", headers={"X-Request-ID": "x" * 129}
+        )
 
     assert accepted.json()["request_id"] == "trace.abc-123"
     for response in (rejected, oversized):
@@ -79,7 +85,10 @@ def test_404_405_and_422_use_stable_envelopes(tmp_path) -> None:
         invalid = client.get("/api/v1/health/ready?details=not-a-boolean")
 
     assert (missing.status_code, missing.json()["code"]) == (404, "NOT_FOUND")
-    assert (wrong_method.status_code, wrong_method.json()["code"]) == (405, "METHOD_NOT_ALLOWED")
+    assert (wrong_method.status_code, wrong_method.json()["code"]) == (
+        405,
+        "METHOD_NOT_ALLOWED",
+    )
     assert (invalid.status_code, invalid.json()["code"]) == (422, "VALIDATION_ERROR")
     for response in (missing, wrong_method, invalid):
         assert set(response.json()) == {"code", "message", "data", "request_id"}
@@ -101,16 +110,16 @@ def test_openapi_only_exposes_get_post_and_typed_responses(tmp_path) -> None:
         "/api/v1/users/me",
         "/api/v1/projects/{project_id}/uploads/policy",
         "/api/v1/projects/{project_id}/uploads/complete",
+        "/api/v1/projects/{project_id}/editor",
+        "/api/v1/projects/{project_id}/editor/save",
+        "/api/v1/projects/{project_id}/render/submit",
         "/api/v1/projects/{project_id}/deletion-requests",
         "/api/v1/projects/{project_id}/result",
         "/api/v1/projects/{project_id}/exports/jianying-manifest",
         "/api/v1/assets/{asset_id}",
     }
     assert {
-        method
-        for path in paths.values()
-        for method in path
-        if method != "parameters"
+        method for path in paths.values() for method in path if method != "parameters"
     } <= {"get", "post"}
     for path in paths.values():
         for method, operation in path.items():
@@ -119,7 +128,9 @@ def test_openapi_only_exposes_get_post_and_typed_responses(tmp_path) -> None:
             success_status = next(
                 code for code in ("200", "201", "202") if code in operation["responses"]
             )
-            response_schema = operation["responses"][success_status]["content"]["application/json"]["schema"]
+            response_schema = operation["responses"][success_status]["content"][
+                "application/json"
+            ]["schema"]
             assert "$ref" in response_schema
             model_name = response_schema["$ref"].rsplit("/", 1)[-1]
             model = schema["components"]["schemas"][model_name]
@@ -129,7 +140,9 @@ def test_openapi_only_exposes_get_post_and_typed_responses(tmp_path) -> None:
 
 def test_settings_reject_unknown_toml_and_hide_secrets(tmp_path) -> None:
     config = tmp_path / "narrato.toml"
-    config.write_text('database_url = "sqlite:///ok.db"\nunknown = "bad"\n', encoding="utf-8")
+    config.write_text(
+        'database_url = "sqlite:///ok.db"\nunknown = "bad"\n', encoding="utf-8"
+    )
     with pytest.raises(ValidationError):
         load_settings(config)
 
@@ -150,7 +163,10 @@ def test_celery_has_independent_prefix_and_no_result_backend(tmp_path) -> None:
     celery = create_celery_app(settings)
     assert celery.conf.result_backend is None
     assert celery.conf.task_default_queue == "narrato.business.test.default"
-    assert celery.conf.broker_transport_options["global_keyprefix"] == "narrato:business:test:celery:"
+    assert (
+        celery.conf.broker_transport_options["global_keyprefix"]
+        == "narrato:business:test:celery:"
+    )
 
 
 def test_clean_celery_worker_registers_auth_tasks(tmp_path) -> None:
@@ -162,7 +178,7 @@ def test_clean_celery_worker_registers_auth_tasks(tmp_path) -> None:
                 "from narrato_api.celery_app import celery_app; "
                 "names=set(celery_app.tasks); "
                 "assert 'narrato.auth.send_verification_email' in names; "
-                    "assert not any('cover' in name for name in names)"
+                "assert not any('cover' in name for name in names)"
             ),
         ],
         cwd=tmp_path,
@@ -173,7 +189,9 @@ def test_clean_celery_worker_registers_auth_tasks(tmp_path) -> None:
     assert probe.returncode == 0, probe.stderr
 
 
-def test_each_web_app_lifespan_owns_configured_celery_producer(tmp_path, monkeypatch) -> None:
+def test_each_web_app_lifespan_owns_configured_celery_producer(
+    tmp_path, monkeypatch
+) -> None:
     import narrato_api.main as main_module
 
     created: list[object] = []
@@ -229,9 +247,7 @@ def test_json_logging_redacts_every_structured_payload_field() -> None:
         "test", logging.INFO, __file__, 1, "safe-message", (), None
     )
     record.request_id = "req-secret"
-    payload = JsonFormatter(("INFO", "narratoApi", "req-secret", "2026")).format(
-        record
-    )
+    payload = JsonFormatter(("INFO", "narratoApi", "req-secret", "2026")).format(record)
     for secret in ("INFO", "narratoApi", "req-secret", "2026"):
         assert secret not in payload
 
@@ -345,7 +361,10 @@ def test_logging_configuration_unions_secrets_and_preserves_foreign_handlers(
                     executor.submit(client_a.get, "/api/v1/test-only-log-a"),
                     executor.submit(client_b.get, "/api/v1/test-only-log-b"),
                 )
-                assert [future.result().status_code for future in responses] == [200, 200]
+                assert [future.result().status_code for future in responses] == [
+                    200,
+                    200,
+                ]
 
     rendered = stream.getvalue()
     assert "first-request-secret" not in rendered
@@ -493,17 +512,26 @@ def test_active_lifespans_reference_count_log_levels(tmp_path) -> None:
     namespace.setLevel(logging.DEBUG)
     info_app = create_app(
         _settings(tmp_path).model_copy(
-            update={"database_url": f"sqlite:///{tmp_path / 'info.db'}", "log_level": "INFO"}
+            update={
+                "database_url": f"sqlite:///{tmp_path / 'info.db'}",
+                "log_level": "INFO",
+            }
         )
     )
     error_app = create_app(
         _settings(tmp_path).model_copy(
-            update={"database_url": f"sqlite:///{tmp_path / 'error.db'}", "log_level": "ERROR"}
+            update={
+                "database_url": f"sqlite:///{tmp_path / 'error.db'}",
+                "log_level": "ERROR",
+            }
         )
     )
     info_twin = create_app(
         _settings(tmp_path).model_copy(
-            update={"database_url": f"sqlite:///{tmp_path / 'info-twin.db'}", "log_level": "INFO"}
+            update={
+                "database_url": f"sqlite:///{tmp_path / 'info-twin.db'}",
+                "log_level": "INFO",
+            }
         )
     )
     assert namespace.level == logging.DEBUG
@@ -681,11 +709,17 @@ def test_business_service_does_not_import_core_or_legacy_services() -> None:
     package_root = Path(__file__).parents[2] / "narrato_api"
     forbidden = ("core_api", "app.services")
     for source_path in package_root.rglob("*.py"):
-        tree = ast.parse(source_path.read_text(encoding="utf-8"), filename=str(source_path))
+        tree = ast.parse(
+            source_path.read_text(encoding="utf-8"), filename=str(source_path)
+        )
         imports: list[str] = []
         for node in ast.walk(tree):
             if isinstance(node, ast.Import):
                 imports.extend(alias.name for alias in node.names)
             elif isinstance(node, ast.ImportFrom) and node.module:
                 imports.append(node.module)
-        assert not any(name == prefix or name.startswith(f"{prefix}.") for name in imports for prefix in forbidden)
+        assert not any(
+            name == prefix or name.startswith(f"{prefix}.")
+            for name in imports
+            for prefix in forbidden
+        )
