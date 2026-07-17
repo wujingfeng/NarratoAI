@@ -4,36 +4,27 @@
 
 - 分支：`codex/narrato-api-platform`
 - worktree：`/private/tmp/NarratoAI-narrato-api-platform`
-- Gate：**Task 15 的 Phase 5 / Gate B 已通过；Phase 6 pending**。
+- Gate：**Phase 6 / Gate C pending**；Task 16 完成，Task 17-18 未完成。
 
-## Task 15 已完成
+## 已完成基线
 
-1. 编辑：永久 `waiting_for_edit`、草稿 LWW、不可变 revision、一次渲染锁和认证的读取/保存/提交接口。
-2. 结果与导出：完成态/归属守卫、已登记产物持久化和读取、结果接口、纯 Jianying 映射及 Core-backed manifest 接口。
-3. Core 输入：持久化 size、checksum、content type、宽高、时长；仅在 Core 调用前衍生其 `assets/*` 路径，纯 mapper 路径不变。
-4. 删除：终态项目幂等删除请求、可恢复 Worker、OSS 404 幂等成功、失败审计；资产记录保留审计。
+- Task 15：编辑永久等待/LWW/revision/render lock，项目结果与 Jianying manifest，Core 元数据及可恢复 OSS 删除；Gate B 已通过。
+- Task 16：统一 `/api/v1` API client、单一 Token storage、Bearer Header、401 清理并通过 `auth:expired` 交由 AuthProvider 跳转登录页；增加登录页和受保护的 dashboard 路由。
+- Task 16 实施提交：`9d80927 feat: connect web authentication api`。
 
-Task 15 最后实施提交：
-- `8ad2e01`（15O 元数据）
-- `834aa45`（15P Core Manifest）
-- `1585b7a`（15Q 删除 Worker）
-- `889a445`（保持纯 Manifest 路径）
-- `c1a573f`（15R 编辑 HTTP）
-- `4ad100d`（Gate 格式修复）
+## Task 16 证据
 
-## Task 15 Gate 证据
-
-- 新鲜 SQLite `alembic upgrade head` 通过 `0013_project_deletion_worker`。
-- Task 15 直接单元/集成子集：**100 passed，1 个既有 Starlette TestClient 弃用警告**。
-- Ruff check、Ruff format check 和 `git diff --check` 通过。
+- RED：`node scripts/verify-api-auth.mjs` 在实现前因缺少 `authStorage.js` 按预期失败。
+- GREEN：同脚本使用 Mock 401，确认 Bearer Header、Token 清理与 `/login` 路由，结果 PASS。
+- `npm run build`：Vite production build PASS；保留已有大 chunk advisory。
+- `git diff --check`：PASS（实施提交前）。
 
 ## 风险与续接
 
-- 真实 PostgreSQL 并发、Core HTTP、OSS 删除和浏览器流式 ZIP 尚未真实联调。
-- `retryable_failed` 删除 Job 的调度重试策略仍待后续实现。
-- 项目仍有 6 个既有 assets mypy 错误；pytest 默认插件加载不稳定，继续使用 `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1`。
-- 预存未提交内容只能是 `.superpowers/` 与 `docs/web/docs/Oss.php`，不得触碰。
+- 尚未进行真实 API/CORS 部署联调；Task 17 将接入上传、项目、SSE 和编辑保存。
+- 真实 PostgreSQL 并发、Core HTTP、OSS 删除和浏览器流式 ZIP 仍未联调；`retryable_failed` 删除 job 尚无调度策略。
+- 预存未提交内容仅 `.superpowers/` 与 `docs/web/docs/Oss.php`，不得触碰。
 
 ## 下一原子任务
 
-**Task 16**：仅接入 Web 认证、统一 API Client、Token 存储与全局 401 清理；完成 checkpoint 后立即停止。
+**Task 17**：只实现 OSS 上传、项目流程、SSE 和编辑保存；先写并运行 RED 的 `verify-api-project-flow.mjs`，通过验证和 Web build 后建立检查点并停止。

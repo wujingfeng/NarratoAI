@@ -10,13 +10,13 @@
 
 ## 当前真实基线
 
-- Task 15 已完成并通过 Gate：新鲜 SQLite migration 到 `0013_project_deletion_worker`，Task 15 直接子集 `100 passed, 1 warning`。
-- 最新 Task 15 实施提交：`4ad100d style(api): format project service for Task 15 Gate`。
-- 后续从 Task 16 开始，Task 15 不得重新实现。
+- Task 16 已完成：统一 API client、Token storage、Bearer Header、401 登录跳转、LoginPage 和受保护 dashboard 路由。
+- Task 16 实施提交：`9d80927 feat: connect web authentication api`。
+- 验证：Mock 401 verifier 和 `npm run build` 均通过；Vite 保留已有大 chunk advisory。
 
-## 本窗口唯一原子任务：Task 16
+## 本窗口唯一原子任务：Task 17
 
-只实现 React Web 认证接入：统一 API client、Token 存储、Authorization Header、全局 401 清理、登录页与应用接线。严格 TDD：先让 `scripts/verify-api-auth.mjs` 失败，再最小实现使其通过；运行该脚本和直接相关的 Web build。不得实施 Task 17。
+只实现 OSS 上传、项目流程、SSE 与编辑保存接入。严格 TDD：先让 `scripts/verify-api-project-flow.mjs` 失败，再最小实现使其通过；运行该脚本和直接相关 Web build。不得实施 Task 18。
 
 ## 不可删除的永久规则
 
