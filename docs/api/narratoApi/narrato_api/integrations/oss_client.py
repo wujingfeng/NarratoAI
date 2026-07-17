@@ -11,7 +11,11 @@ from datetime import UTC, date, datetime, timedelta
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
-from narrato_api.assets.constraints import AssetDeclaration, AssetDeclarationError, validate_asset_declaration
+from narrato_api.assets.constraints import (
+    AssetDeclaration,
+    AssetDeclarationError,
+    validate_asset_declaration,
+)
 
 _CONTENT_TYPES = {
     ".mp4": "video/mp4",
@@ -74,7 +78,12 @@ class OssPostPolicyService:
     ) -> OssPostPolicy:
         """校验声明并签发仅可写入单个对象的十分钟表单。"""
 
-        if not self.endpoint or not self.bucket or not self.access_key_id or not self.access_key_secret:
+        if (
+            not self.endpoint
+            or not self.bucket
+            or not self.access_key_id
+            or not self.access_key_secret
+        ):
             raise OssClientError("OSS POST policy is not configured")
         declaration = validate_asset_declaration(
             asset_type=asset_type,
@@ -100,7 +109,9 @@ class OssPostPolicyService:
             json.dumps(document, separators=(",", ":")).encode("utf-8")
         ).decode("ascii")
         signature = base64.b64encode(
-            hmac.new(self.access_key_secret.encode(), encoded.encode(), hashlib.sha1).digest()
+            hmac.new(
+                self.access_key_secret.encode(), encoded.encode(), hashlib.sha1
+            ).digest()
         ).decode("ascii")
         return OssPostPolicy(
             url=self.endpoint,
@@ -143,6 +154,22 @@ class HttpOssClient:
         if raw_size is None or not raw_size.isdecimal() or not content_type:
             raise OssClientError("OSS object metadata is incomplete")
         return OssObject(size_bytes=int(raw_size), content_type=content_type)
+
+    def delete_object(self, bucket: str, object_key: str) -> None:
+        """删除明确登记的 OSS 对象；404 视为已达成删除终态。"""
+
+        if not self.endpoint or not bucket or not object_key:
+            raise OssClientError("OSS delete is not configured")
+        request = Request(f"{self.endpoint}/{bucket}/{object_key}", method="DELETE")
+        try:
+            with urlopen(request, timeout=10):
+                return
+        except HTTPError as error:
+            if error.code == 404:
+                return
+            raise OssClientError("OSS object could not be deleted") from error
+        except (URLError, TimeoutError) as error:
+            raise OssClientError("OSS object could not be deleted") from error
 
     def public_url(self, bucket: str, object_key: str) -> str:
         """返回部署配置对应的公开对象 URL。"""
