@@ -9,9 +9,11 @@ import { DashboardSidebar } from "../components/dashboard/DashboardSidebar.jsx";
 import { DashboardToast } from "../components/dashboard/DashboardToast.jsx";
 import { dashboardCredits, dashboardNavItems } from "../data/dashboardData.js";
 import { creationTypes, initialCreateVideos } from "../data/createData.js";
+import { uploadAsset } from "../features/uploads/ossPostUpload.js";
+import { canStartProject, createProject, estimateProjectCost, getAsset, startProject } from "../features/projects/projectApi.js";
 
 const VIDEO_EXTENSIONS = new Set(["mp4", "mov", "avi"]);
-const VIDEO_SIZE_LIMIT = 5 * 1024 * 1024 * 1024;
+const VIDEO_SIZE_LIMIT = 300 * 1024 * 1024;
 const SUBTITLE_SIZE_LIMIT = 50 * 1024 * 1024;
 
 function formatDuration(totalSeconds) {
@@ -54,6 +56,8 @@ export function CreatePage() {
   const [selectedType, setSelectedType] = useState("narration");
   const [videos, setVideos] = useState(initialCreateVideos);
   const [isDragging, setIsDragging] = useState(false);
+  const [projectId, setProjectId] = useState(null);
+  const [apiCredits, setApiCredits] = useState(null);
   const showUnavailable = useCallback((message) => {
     setToast(({ id }) => ({ id: id + 1, message }));
   }, []);
@@ -79,12 +83,12 @@ export function CreatePage() {
     setSelectedType(typeId);
   };
 
-  const handleVideoFiles = (files) => {
+  const handleVideoFiles = async (files) => {
     const validFiles = files.filter((file) => {
       const extension = file.name.split(".").pop()?.toLowerCase();
       return VIDEO_EXTENSIONS.has(extension) && file.size <= VIDEO_SIZE_LIMIT;
     });
-    if (validFiles.length !== files.length) showUnavailable("仅支持 5GB 以内的 MP4、MOV 或 AVI 文件");
+    if (validFiles.length !== files.length) showUnavailable("仅支持 300 MiB 以内的 MP4、MOV 或 AVI 文件");
     if (!validFiles.length) return;
     const availableCount = selectedCreationType.maxVideos - videos.length;
     if (availableCount <= 0) {
@@ -106,6 +110,29 @@ export function CreatePage() {
         thumbnail: null,
       }));
     setVideos((current) => [...current, ...newVideos]);
+    try {
+      const activeProjectId = projectId || (await createProject()).id;
+      setProjectId(activeProjectId);
+      const uploadedAssets = await Promise.all(acceptedFiles.map((file) => uploadAsset(activeProjectId, file, "video")));
+      setVideos((current) => current.map((video) => {
+        const assetIndex = newVideos.findIndex((item) => item.id === video.id);
+        const asset = uploadedAssets[assetIndex];
+        return asset ? { ...video, assetId: asset.id, assetStatus: asset.status } : video;
+      }));
+      uploadedAssets.forEach((asset) => {
+        if (asset.status === "ready" || asset.status === "invalid") return;
+        const poll = async () => {
+          const latest = await getAsset(asset.id);
+          setVideos((current) => current.map((video) => video.assetId === asset.id
+            ? { ...video, assetStatus: latest.status }
+            : video));
+          if (latest.status === "validating") window.setTimeout(poll, 2000);
+        };
+        window.setTimeout(poll, 2000);
+      });
+    } catch (error) {
+      showUnavailable(error.message || "上传失败，请稍后重试");
+    }
     newVideos.forEach((newVideo, index) => {
       readVideoDuration(acceptedFiles[index]).then((durationSeconds) => {
         if (durationSeconds === null) return;
@@ -116,12 +143,24 @@ export function CreatePage() {
     });
   };
 
-  const handleNext = () => {
+  const handleNext = async () => {
     if (videos.length > selectedCreationType.maxVideos) {
       showUnavailable(`${selectedCreationType.title}当前有 ${videos.length} 个视频，最多支持 ${selectedCreationType.maxVideos} 个`);
       return;
     }
-    showUnavailable("参数设置功能建设中");
+    const assets = videos.map((video) => ({ status: video.assetStatus }));
+    if (!projectId || !canStartProject(assets)) {
+      showUnavailable("请等待全部素材校验完成后再开始");
+      return;
+    }
+    try {
+      const estimate = await estimateProjectCost(projectId);
+      setApiCredits(estimate.credits);
+      await startProject(projectId, assets);
+      showUnavailable(`项目已开始，预计消耗 ${estimate.credits} 创作点`);
+    } catch (error) {
+      showUnavailable(error.message || "项目无法开始");
+    }
   };
 
   const handleVideoSubtitle = (videoId, file) => {
@@ -160,7 +199,7 @@ export function CreatePage() {
             </div>
             <CreationSummary
               durationLabel={summary.durationLabel}
-              estimatedCredits={summary.estimatedCredits}
+              estimatedCredits={apiCredits ?? summary.estimatedCredits}
               balance={dashboardCredits.balance}
               onNext={handleNext}
             />
