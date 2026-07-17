@@ -13,6 +13,7 @@ from narrato_api.workflows.models import (
     WorkflowNode,
     WorkflowNodeAttempt,
     WorkflowOutbox,
+    WorkflowReconciliationEvent,
     WorkflowTemplateSnapshot,
 )
 
@@ -37,6 +38,9 @@ def test_workflow_models_define_ownership_dependencies_and_lookup_constraints() 
         "workflows",
         "workflow_nodes",
     }
+    assert {item["referred_table"] for item in inspector.get_foreign_keys("workflow_reconciliation_events")} == {
+        "workflow_node_attempts"
+    }
     assert {item["name"] for item in inspector.get_unique_constraints("workflow_nodes")} >= {
         "uq_workflow_nodes_workflow_name"
     }
@@ -45,6 +49,10 @@ def test_workflow_models_define_ownership_dependencies_and_lookup_constraints() 
     }
     assert {item["name"] for item in inspector.get_unique_constraints("workflow_outbox")} >= {
         "uq_workflow_outbox_idempotency_key"
+    }
+    assert {item["name"] for item in inspector.get_unique_constraints("workflow_reconciliation_events")} >= {
+        "uq_workflow_reconciliation_events_attempt_event",
+        "uq_workflow_reconciliation_events_attempt_state_version",
     }
     assert {item["name"] for item in inspector.get_indexes("workflow_outbox")} >= {
         "ix_workflow_outbox_status_created"
@@ -104,6 +112,16 @@ def test_workflow_records_persist_versioned_dag_and_reject_duplicate_node_attemp
                 event_type="node.dispatch",
                 idempotency_key="dispatch:wfl_1:wnd_1:1",
                 payload={"attempt": 1},
+            )
+        )
+        session.add(
+            WorkflowReconciliationEvent(
+                id="wre_1",
+                workflow_node_attempt_id="wat_1",
+                event_id="evt_1",
+                state_version=1,
+                source="callback",
+                state="succeeded",
             )
         )
         session.commit()

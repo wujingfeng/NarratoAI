@@ -24,6 +24,7 @@ def test_workflows_migration_upgrades_task_13b_head_with_durable_workflow_tables
         "workflow_nodes",
         "workflow_node_attempts",
         "workflow_outbox",
+        "workflow_reconciliation_events",
     } <= set(inspector.get_table_names())
     assert {item["name"] for item in inspector.get_indexes("workflow_outbox")} >= {
         "ix_workflow_outbox_status_created"
