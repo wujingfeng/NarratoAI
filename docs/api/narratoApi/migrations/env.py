@@ -8,8 +8,10 @@ from sqlalchemy import engine_from_config, pool
 
 from narrato_api.database import Base
 from narrato_api.auth import models as _auth_models
+from narrato_api.billing import models as _billing_models
 
 assert _auth_models.User.__tablename__ == "users"
+assert _billing_models.CreditAccount.__tablename__ == "credit_accounts"
 
 config = context.config
 if config.config_file_name is not None:

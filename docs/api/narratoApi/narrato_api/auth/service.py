@@ -19,6 +19,7 @@ from sqlalchemy.orm import Session
 
 from narrato_api.api.errors import ApiError
 from narrato_api.auth.models import User
+from narrato_api.billing.service import grant_signup_bonus
 from narrato_api.integrations.mail_client import MailDispatcher
 
 CodePurpose = Literal["register", "password_reset"]
@@ -524,6 +525,7 @@ class AuthService:
         tokens: SingleSessionTokens,
         mail_dispatcher: MailDispatcher,
         account_locks: AccountLockRegistry | None = None,
+        signup_bonus_credits: int = 100,
     ) -> None:
         """注入可独立测试的数据库和外部依赖。"""
 
@@ -533,6 +535,9 @@ class AuthService:
         self.tokens = tokens
         self.mail_dispatcher = mail_dispatcher
         self.account_locks = account_locks or AccountLockRegistry()
+        if signup_bonus_credits <= 0:
+            raise ValueError("signup_bonus_credits must be positive")
+        self.signup_bonus_credits = signup_bonus_credits
 
     def _account_lock(self, normalized_email: str) -> threading.RLock:
         """返回进程内固定条带锁；跨进程一致性仍由数据库行锁保证。"""
@@ -598,11 +603,14 @@ class AuthService:
             status="active",
         )
         with self.session_factory() as session:
-            session.add(user)
             try:
-                session.commit()
+                with session.begin():
+                    session.add(user)
+                    session.flush()
+                    grant_signup_bonus(
+                        session, user.id, amount=self.signup_bonus_credits
+                    )
             except IntegrityError as error:
-                session.rollback()
                 raise ApiError(
                     "EMAIL_ALREADY_REGISTERED", "Email already registered", 409
                 ) from error
