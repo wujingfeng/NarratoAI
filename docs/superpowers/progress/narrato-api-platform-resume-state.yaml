@@ -1,42 +1,34 @@
 protocol: SEGMENTED_GOAL_PROTOCOL_V2
 branch: codex/narrato-api-platform
 worktree: /private/tmp/NarratoAI-narrato-api-platform
-current_gate: "Phase 6 implementation complete; Gate C pending independent verification"
+current_gate: "Gate C blocked after independent Phase 6 review"
 last_complete_task:
-  id: Task 18
-  commits:
-    - "6734fb5 feat: add client-side jianying export"
+  id: Gate C
+  commits: []
 current_task:
-  id: Task 18
-  status: completed
+  id: Gate C
+  status: blocked
   completed_subtasks:
-    - "TDD: Jianying export verifier observed RED before the export module and result components existed"
-    - "Desktop Chrome/Edge File System Access guard, streamed ZIP entries, and retry-safe abort handling"
-    - "Completed project result actions and failed-project download suppression"
+    - "Independent requirement and code review of Task 16-18"
+    - "Fresh auth, project-flow, and Jianying-export verifier runs plus Web build"
 implementation_commits:
+  - "9d80927 feat: connect web authentication api"
+  - "34d77dc feat: connect project workflow api"
   - "6734fb5 feat: add client-side jianying export"
 tests:
-  task_18_red:
-    command: "cd docs/web/homepage-prototype && node scripts/verify-jianying-export.mjs"
-    result: "Expected RED: export module and result components were absent before implementation."
-  task_18_verification:
-    command: "cd docs/web/homepage-prototype && node scripts/verify-jianying-export.mjs"
-    result: "Passed: 4 checks cover desktop capability, streaming Range GET without Blob, failure abort/retry, and fixed completed-result actions."
-  task_18_build:
-    command: "cd docs/web/homepage-prototype && npm run build"
-    result: "Passed: Vite production build completed; existing chunk-size advisory remains."
-  task_18_quality:
+  gate_c_verification:
+    command: "cd docs/web/homepage-prototype && node scripts/verify-api-auth.mjs && node scripts/verify-api-project-flow.mjs && node scripts/verify-jianying-export.mjs && npm run build"
+    result: "Passed: auth verifier, 6 project-flow checks, 4 export checks, and production build; existing Vite chunk-size advisory remains."
+  gate_c_quality:
     command: "git diff --check"
-    result: "Passed after the implementation commit and before checkpoint commit."
+    result: "Passed."
 key_decisions:
-  - "Jianying export is restricted to desktop Chrome/Edge with File System Access support."
-  - "Each manifest resource uses a Range GET and ReadableStream-to-ZIP pipeline; the client never assembles a complete Blob."
-  - "ZIP errors abort the writable so a user can retry; no server ZIP request or ZIP artifact is introduced."
-  - "Only completed results render the two fixed actions: export video and export to Jianying draft."
+  - "Gate C cannot pass from isolated module verifiers: Task 16-18 must be reachable through real UI routes and backed by real API contracts."
+  - "The missing project HTTP lifecycle is the first smallest recovery unit because the current Web client has no server contract for create, fee estimate, or start."
 remaining_risks:
-  - "Gate C remains pending: ProjectResultPage and CreatePage are not currently imported by the existing router, and their pre-existing dependent components/data are absent."
-  - "A real desktop Chrome/Edge save could not be exercised because showSaveFilePicker needs a user gesture and no result-page route is available; verifier uses a Mock CDN stream."
-  - "Task 17 live API/CORS, OSS credentials, and persistent SSE reconnect behavior remain untested."
+  - "P0: CreatePage and ProjectResultPage are absent from App routes; CreatePage has four missing local dependencies."
+  - "P0: project create, cost-estimate, and start routes called by projectApi.js are absent from the actual API routers."
+  - "P1: editor save/render lock helpers have no editor UI caller; real Chrome/Edge File System Access saving is unverified."
   - "Vite reports an existing >500 kB output chunk advisory."
 workspace_status:
   clean: false
@@ -46,18 +38,15 @@ workspace_status:
     - path: docs/web/docs/Oss.php
       reason: pre-existing untracked workspace content; do not touch
 next_action:
-  id: Gate C
-  scope: "Perform the planned Phase 6 independent requirement review, code review, and real Web-loop verification only; do not begin Task 19."
+  id: Task 17A
+  scope: "Restore only the authenticated project create, cost-estimate, and start HTTP lifecycle required by projectApi.js."
   relevant_files:
-    - docs/superpowers/plans/2026-07-16-narrato-api-platform.md
-    - docs/web/homepage-prototype/src/App.jsx
-    - docs/web/homepage-prototype/src/pages/CreatePage.jsx
-    - docs/web/homepage-prototype/src/pages/ProjectResultPage.jsx
-    - docs/web/homepage-prototype/src/features/exports/jianyingZip.js
-    - docs/web/homepage-prototype/scripts/verify-api-auth.mjs
-    - docs/web/homepage-prototype/scripts/verify-api-project-flow.mjs
-    - docs/web/homepage-prototype/scripts/verify-jianying-export.mjs
+    - docs/superpowers/progress/2026-07-17-gate-c-report.md
+    - docs/api/narratoApi/narrato_api/projects/router.py
+    - docs/api/narratoApi/narrato_api/projects/service.py
+    - docs/api/narratoApi/tests
+    - docs/web/homepage-prototype/src/features/projects/projectApi.js
   acceptance_criteria:
-    - "Review Tasks 16-18 against Gate C: real UI must not rely on Mock data and Chrome/Edge must be able to generate the Jianying ZIP."
-    - "Run only Gate C evidence and affected Web verification; record pass, actionable fixes, or a concrete blocker."
-    - "Do not implement Task 19 unless a later checkpoint records Gate C passed."
+    - "Use TDD: direct backend tests fail before each endpoint implementation and pass afterwards."
+    - "Expose authenticated project creation, API fee estimation, and ready-only project start with the existing response envelope and ownership rules."
+    - "Run only new/directly affected backend tests and static checks; do not modify Web routes/pages/editor UI or begin Task 19."

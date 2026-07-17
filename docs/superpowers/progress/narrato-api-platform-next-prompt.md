@@ -10,13 +10,13 @@
 
 ## 当前真实基线
 
-- Task 18 已完成：桌面 Chrome/Edge File System Access 守卫、Range 流式 CDN ZIP、错误 abort/retry，以及完成项目的两个固定导出动作。
-- Task 18 实施提交：`6734fb5 feat: add client-side jianying export`。
-- 验证：Jianying export verifier 4 项 PASS 与 `npm run build` PASS；Vite 保留已有大 chunk advisory。
+- Gate C 已执行且阻塞；详见 `docs/superpowers/progress/2026-07-17-gate-c-report.md`。
+- 阻塞根因之一是后端没有 projectApi.js 所调用的创建、费用估算与启动端点。
+- Gate C 验证脚本及 Web build 均通过，但它们是模块/Mock 证据，不能证明真实闭环。
 
-## 本窗口唯一原子任务：Gate C
+## 本窗口唯一原子任务：Task 17A
 
-只执行 Phase 6 的需求复核、独立代码审查和 Web 闭环验证。核对 Task 16-18 是否使真实 UI 不依赖 Mock 数据，并取得桌面 Chrome/Edge 生成剪映 ZIP 的证据；若不满足，记录最小、可独立验证的修复或阻塞。不得开始 Task 19。
+仅恢复认证后的项目创建、费用估算和 ready-only 启动 HTTP 生命周期。严格 TDD：先写直接后端失败测试，再实现最小端点并验证。不要修改 Web 路由、页面或编辑器 UI，不得开始 Task 19。
 
 ## 不可删除的永久规则
 
