@@ -2,7 +2,7 @@ branch: codex/narrato-api-platform
 worktree: /private/tmp/NarratoAI-narrato-api-platform
 current_gate: "Phase 5 / Gate B pending"
 last_complete_task:
-  id: Task 15F
+  id: Task 15G
   commits:
     - "6ea93bf feat: add workflow state machine template (Task 14A)"
     - "60de8c8 feat: add workflow persistence models (Task 14B)"
@@ -16,8 +16,9 @@ last_complete_task:
     - "a56de56 feat: guard failed project artifact visibility (Task 15D)"
     - "b146120 feat: guard completed project export eligibility (Task 15E)"
     - "20342aa feat: add registered artifact model (Task 15F)"
+    - "91549f3 feat(api): add transaction-safe artifact registration (Task 15G)"
 current_task:
-  id: Task 15F
+  id: Task 15G
   status: completed
   completed_subtasks:
     - Task 15A editor lock and permanent waiting boundary
@@ -26,8 +27,21 @@ current_task:
     - Task 15D failed-project artifact visibility guard
     - Task 15E completed-project export eligibility guard
     - Task 15F persistent registered-artifact data model and migration
-implementation_commit: "20342aa feat: add registered artifact model"
+    - Task 15G transaction-safe registered-artifact creation service
+implementation_commit: "91549f3 feat(api): add transaction-safe artifact registration"
 tests:
+  task_15g_red:
+    command: "cd docs/api/narratoApi && .venv/bin/python -m pytest tests/unit/test_artifact_registration.py -q"
+    result: "Expected RED: ModuleNotFoundError because narrato_api.artifacts.service was missing."
+  task_15g_green_and_direct:
+    command: "cd docs/api/narratoApi && PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv/bin/python -m pytest tests/unit/test_artifact_registration.py tests/unit/test_artifact_model.py -q"
+    result: "3 passed in 0.30s; registration remains pending until the caller commits and is then readable in a new session."
+  task_15g_ruff:
+    command: "cd docs/api/narratoApi && .venv/bin/ruff check narrato_api/artifacts/service.py tests/unit/test_artifact_registration.py"
+    result: pass
+  task_15g_diff_check:
+    command: "git diff --check"
+    result: pass
   task_15f_red:
     command: "cd docs/api/narratoApi && .venv/bin/python -m pytest tests/unit/test_artifact_model.py -q"
     result: "Expected RED: ModuleNotFoundError because narrato_api.artifacts was missing."
@@ -89,6 +103,8 @@ key_decisions:
   - "Task 15E deliberately does not create an artifact entity, generate an export/Jianying package, or provide router, Core, or downstream behavior."
   - "Task 15F defines RegisteredArtifact with only id, project_id, kind, cdn_url, and created_at; projects retain RESTRICT ownership and artifacts are indexed by project_id plus created_at."
   - "Task 15F does not register artifacts from Core, query visibility, expose results, generate exports/Jianying, or add a router."
+  - "Task 15G provides register_artifact(session, ...) only: it creates a RegisteredArtifact with session.add and leaves commit/rollback to the caller transaction."
+  - "Task 15G does not verify project ownership/existence, reconcile Core, query visibility, expose results, generate exports/Jianying, or add a router."
   - "Task 15C does not implement artifacts/results, export/Jianying, router, Core calls, downstream execution, or another Task 15 boundary."
 remaining_risks:
   - "SQLite tests cover persistence boundaries but real PostgreSQL multi-connection/row-lock behavior remains unverified."
@@ -98,6 +114,7 @@ remaining_risks:
   - "The visibility guard is a service boundary only; future real result/export read paths must use it when those task boundaries are implemented."
   - "The export eligibility guard is a service boundary only; future export entry points must call it when those task boundaries are implemented."
   - "RegisteredArtifact.kind is intentionally unconstrained so later product-approved artifact kinds can be added without prematurely fixing an enum."
+  - "Artifact registration callers must establish ownership and Core-result validity before calling the minimal registration boundary."
 workspace_status:
   clean: false
   expected_uncommitted:
@@ -106,15 +123,15 @@ workspace_status:
     - path: docs/web/docs/Oss.php
       reason: pre-existing untracked file
 next_atomic_task:
-  id: Task 15G
-  scope: "Implement only a minimal transaction-safe registered-artifact creation service as one independently verifiable Task 15 boundary; do not implement Core reconciliation, result/visibility queries, export/Jianying generation, router, or later tasks."
+  id: Task 15H
+  scope: "Implement only a minimal completed-project registered-artifact read service as one independently verifiable Task 15 boundary; do not implement routes, exports/Jianying, Core calls, result presentation, or later tasks."
   relevant_files:
     - docs/superpowers/plans/2026-07-16-narrato-api-platform.md
     - docs/superpowers/specs/2026-07-16-narrato-api-platform-design.md
     - docs/api/narratoApi/narrato_api/artifacts/models.py
     - docs/api/narratoApi/narrato_api/artifacts/service.py
-    - docs/api/narratoApi/tests/unit/test_artifact_registration.py
+    - docs/api/narratoApi/tests/unit/test_artifact_visibility_query.py
   acceptance_criteria:
-    - "Use TDD and create a RegisteredArtifact row only from explicit project-owned registration inputs within the caller transaction."
-    - "Verify the service does not commit, query visibility, invoke Core, or implement result/export/Jianying/router behavior."
+    - "Use TDD and query only registered artifacts for one explicit project; return them only when the supplied project is completed and otherwise return an empty sequence."
+    - "Verify the service does not add routes, generate exports/Jianying, invoke Core, or build a result presentation layer."
     - "Run new and directly affected tests, inspect diff, commit implementation, then update and commit a checkpoint before stopping."

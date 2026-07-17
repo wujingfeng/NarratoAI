@@ -5,7 +5,7 @@
 - 分支：`codex/narrato-api-platform`
 - worktree：`/private/tmp/NarratoAI-narrato-api-platform`
 - 项目 Gate：**Phase 5 / Gate B pending**；Task 15 仍有未完成子任务。
-- 最新 Implementation Commit：`20342aa feat: add registered artifact model`（Task 15F）。
+- 最新 Implementation Commit：`91549f3 feat(api): add transaction-safe artifact registration`（Task 15G）。
 
 ## 已完成
 
@@ -16,16 +16,17 @@
 5. **Task 15D**：仅完成产物可见性服务守卫；`completed` 保留已登记序列，`failed` 和所有非完成状态均不暴露产物。
 6. **Task 15E**：仅完成导出资格服务守卫；只有 `completed` 通过，`failed` 和所有非完成状态稳定返回 `PROJECT_NOT_COMPLETED`。
 7. **Task 15F**：仅完成已登记产物的持久化模型与迁移；模型字段为项目归属、种类、CDN URL 和创建时间。
+8. **Task 15G**：仅完成调用方事务内的产物登记服务；服务仅 `session.add()`，不自行提交或回滚。
 
 ## 新鲜验证证据
 
-- Task 15F RED：缺少 `narrato_api.artifacts` 包。
-- Task 15F 直接复验：`2 passed in 0.30s`（包含 SQLite ORM 持久化 roundtrip）。
-- Task 15F Alembic 基线至 `0010_registered_artifacts`、Ruff、`git diff --check` 通过。
+- Task 15G RED：缺少 `narrato_api.artifacts.service`。
+- Task 15G 直接复验：`3 passed in 0.30s`（调用方提交前后登记记录的事务边界）。
+- Task 15G Ruff、`git diff --check` 通过。
 
 ## 范围、风险与续接
 
-- Task 15F 未实现实际删除、产物登记服务/结果、可见性查询、导出/Jianying、router、Core 调用、下游或其他 Task 15 子任务。
+- Task 15G 未实现实际删除、产物可见性查询/结果、导出/Jianying、router、Core 调用、下游或其他 Task 15 子任务。
 - SQLite/PostgreSQL 并发差异、真实 OSS/Core 集成和 6 个既有 assets mypy 错误仍是风险。
 - 预期未提交内容仅 `/.superpowers/` 与 `docs/web/docs/Oss.php`，二者不得触碰。
-- 唯一下一原子任务：**Task 15G**，只实现事务内的产物登记服务；完成 checkpoint 后立即停止。
+- 唯一下一原子任务：**Task 15H**，只实现 completed 项目的已登记产物读取服务；完成 checkpoint 后立即停止。
