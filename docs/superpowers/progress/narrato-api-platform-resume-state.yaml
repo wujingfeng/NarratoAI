@@ -1,223 +1,59 @@
+protocol: SEGMENTED_GOAL_PROTOCOL_V2
 branch: codex/narrato-api-platform
 worktree: /private/tmp/NarratoAI-narrato-api-platform
 current_gate: "Phase 5 / Gate B pending"
 last_complete_task:
-  id: Task 15N
+  id: Task 15O
   commits:
-    - "6ea93bf feat: add workflow state machine template (Task 14A)"
-    - "60de8c8 feat: add workflow persistence models (Task 14B)"
-    - "369d4c3 feat: add transactional workflow service (Task 14C)"
-    - "322f2d5 feat: reconcile Core workflow results (Task 14D)"
-    - "b6da053 feat: dispatch workflow outbox events (Task 14E)"
-    - "ddd012d fix: preserve app logs during migrations (Task 14 Gate review fix)"
-    - "3d4085e feat: add editor render lock boundary (Task 15A)"
-    - "4ca8568 feat: add editor draft last-write-wins (Task 15B)"
-    - "9a0d304 feat: guard non-terminal project deletion (Task 15C)"
-    - "a56de56 feat: guard failed project artifact visibility (Task 15D)"
-    - "b146120 feat: guard completed project export eligibility (Task 15E)"
-    - "20342aa feat: add registered artifact model (Task 15F)"
-    - "91549f3 feat(api): add transaction-safe artifact registration (Task 15G)"
-    - "c2e1cca feat(api): query completed project artifacts (Task 15H)"
-    - "91d8503 feat(api): add completed project result lookup (Task 15I)"
-    - "d98394a feat: add pure jianying manifest resource mapping (Task 15J)"
-    - "b66a374 feat(api): build owned completed project jianying manifest (Task 15K)"
-    - "21c9a99 feat(api): add authenticated project result route (Task 15L)"
-    - "283dee8 feat(api): add authenticated jianying manifest route (Task 15M)"
     - "3b4ea19 feat(api): add terminal project deletion requests (Task 15N)"
+    - "8ad2e01 feat(api): persist Core Jianying metadata for Task 15O"
 current_task:
-  id: Task 15N
+  id: Task 15O
   status: completed
-  completed_subtasks:
-    - Task 15A editor lock and permanent waiting boundary
-    - Task 15B editor draft last-write-wins
-    - Task 15C terminal project deletion eligibility guard
-    - Task 15D failed-project artifact visibility guard
-    - Task 15E completed-project export eligibility guard
-    - Task 15F persistent registered-artifact data model and migration
-    - Task 15G transaction-safe registered-artifact creation service
-    - Task 15H completed-project registered-artifact read service
-    - Task 15I owned completed-project result lookup service
-    - Task 15J pure Jianying manifest resource-mapping builder
-    - Task 15K owned completed-project Jianying manifest service
-    - Task 15L authenticated project-result route
-    - Task 15M authenticated Jianying-manifest route
-    - Task 15N terminal project asynchronous deletion request boundary
-implementation_commit: "3b4ea19 feat(api): add terminal project deletion requests"
+  scope: "Persist explicit Core Jianying resource metadata for RegisteredArtifact only."
+implementation_commit: "8ad2e01 feat(api): persist Core Jianying metadata for Task 15O"
 tests:
-  task_15_l_to_n_gate:
-    command: "cd docs/api/narratoApi && PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv/bin/python -m pytest Task-15 unit/integration subset -q"
-    result: "90 passed, 1 existing Starlette TestClient deprecation warning; Ruff and git diff --check passed."
-  task_15n_migration:
-    command: "cd docs/api/narratoApi && NARRATO_API_DATABASE_URL=sqlite:////private/tmp/narrato-task15-gate-<pid>.db .venv/bin/alembic upgrade head"
-    result: "Passed through 0011_project_deletion_jobs; deletion_jobs table verified."
-  task_15k_red:
-    command: "cd docs/api/narratoApi && .venv/bin/python -m pytest tests/unit/test_project_jianying_manifest.py -q"
-    result: "Expected RED: five failures because the owned-project manifest service was missing."
-  task_15k_green_and_direct:
-    command: "cd docs/api/narratoApi && PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv/bin/python -m pytest tests/unit/test_project_jianying_manifest.py tests/unit/test_project_result_lookup.py tests/unit/test_jianying_manifest.py -q"
-    result: "14 passed in 0.37s."
-  task_15k_ruff:
-    command: "cd docs/api/narratoApi && .venv/bin/ruff check narrato_api/exports/service.py tests/unit/test_project_jianying_manifest.py"
-    result: pass
-  task_15k_diff_check:
-    command: "git diff --check"
-    result: pass
-  task_15j_red:
-    command: "cd docs/api/narratoApi && .venv/bin/python -m pytest tests/unit/test_jianying_manifest.py -q"
-    result: "Expected RED: three failures because narrato_api.exports was missing."
-  task_15j_green_and_direct:
-    command: "cd docs/api/narratoApi && PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv/bin/python -m pytest tests/unit/test_jianying_manifest.py -q"
-    result: "3 passed in 0.27s."
-  task_15j_ruff:
-    command: "cd docs/api/narratoApi && .venv/bin/ruff check narrato_api/exports/service.py tests/unit/test_jianying_manifest.py"
-    result: pass
-  task_15j_diff_check:
-    command: "git diff --check and git diff --no-index --check for new files"
-    result: pass
-  task_15i_red:
-    command: "cd docs/api/narratoApi && .venv/bin/python -m pytest tests/unit/test_project_result_lookup.py -q"
-    result: "Expected RED: six ImportErrors because result lookup and its error were missing."
-  task_15i_green_and_direct:
-    command: "cd docs/api/narratoApi && PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv/bin/python -m pytest tests/unit/test_project_result_lookup.py tests/unit/test_artifact_visibility.py tests/unit/test_artifact_visibility_query.py -q"
-    result: "12 passed in 0.32s."
-  task_15i_ruff:
-    command: "cd docs/api/narratoApi && .venv/bin/ruff check narrato_api/projects/service.py tests/unit/test_project_result_lookup.py"
-    result: pass
-  task_15i_diff_check:
-    command: "git diff --check"
-    result: pass
-  task_15h_red:
-    command: "cd docs/api/narratoApi && .venv/bin/python -m pytest tests/unit/test_artifact_visibility_query.py -q"
-    result: "Expected RED: ImportError because list_registered_artifacts was missing from narrato_api.artifacts.service."
-  task_15h_green_and_direct:
-    command: "cd docs/api/narratoApi && PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv/bin/python -m pytest tests/unit/test_artifact_model.py tests/unit/test_artifact_registration.py tests/unit/test_artifact_visibility.py tests/unit/test_artifact_visibility_query.py -q"
-    result: "9 passed in 0.34s."
-  task_15h_ruff:
-    command: "cd docs/api/narratoApi && .venv/bin/ruff check narrato_api/artifacts/service.py tests/unit/test_artifact_visibility_query.py"
-    result: pass
-  task_15h_diff_check:
-    command: "git diff --check"
-    result: pass
-  task_15g_red:
-    command: "cd docs/api/narratoApi && .venv/bin/python -m pytest tests/unit/test_artifact_registration.py -q"
-    result: "Expected RED: ModuleNotFoundError because narrato_api.artifacts.service was missing."
-  task_15g_green_and_direct:
-    command: "cd docs/api/narratoApi && PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv/bin/python -m pytest tests/unit/test_artifact_registration.py tests/unit/test_artifact_model.py -q"
-    result: "3 passed in 0.30s; registration remains pending until the caller commits and is then readable in a new session."
-  task_15g_ruff:
-    command: "cd docs/api/narratoApi && .venv/bin/ruff check narrato_api/artifacts/service.py tests/unit/test_artifact_registration.py"
-    result: pass
-  task_15g_diff_check:
-    command: "git diff --check"
-    result: pass
-  task_15f_red:
-    command: "cd docs/api/narratoApi && .venv/bin/python -m pytest tests/unit/test_artifact_model.py -q"
-    result: "Expected RED: ModuleNotFoundError because narrato_api.artifacts was missing."
-  task_15f_green_and_direct:
-    command: "cd docs/api/narratoApi && PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv/bin/python -m pytest tests/unit/test_artifact_model.py -q"
-    result: "2 passed in 0.30s, including a SQLite ORM persistence roundtrip."
-  task_15f_migration_chain:
-    command: "cd docs/api/narratoApi && NARRATO_API_DATABASE_URL=sqlite:////private/tmp/narrato-task15f-migration-<pid>.db .venv/bin/alembic upgrade head"
-    result: "Passed from base through 0010_registered_artifacts; artifacts table and ix_artifacts_project_created were inspected."
-  task_15f_ruff:
-    command: "cd docs/api/narratoApi && .venv/bin/ruff check narrato_api/artifacts/models.py migrations/env.py migrations/versions/0010_registered_artifacts.py tests/unit/test_artifact_model.py"
-    result: pass
-  task_15f_diff_check:
-    command: "git diff --check"
-    result: pass
-  task_15e_red:
-    command: "cd docs/api/narratoApi && .venv/bin/python -m pytest tests/unit/test_export_eligibility.py -q"
-    result: "Expected RED: 13 failures because ensure_project_exportable was missing from narrato_api.projects.service."
-  task_15e_green_and_direct:
-    command: "cd docs/api/narratoApi && PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv/bin/python -m pytest tests/unit/test_export_eligibility.py tests/unit/test_artifact_visibility.py tests/unit/test_project_deletion_rules.py -q"
-    result: "28 passed in 0.03s."
-  task_15e_ruff:
-    command: "cd docs/api/narratoApi && .venv/bin/ruff check narrato_api/projects/service.py tests/unit/test_export_eligibility.py"
-    result: pass
-  task_15e_diff_check:
-    command: "git diff --check"
-    result: pass
-  task_15d_red:
-    command: "cd docs/api/narratoApi && .venv/bin/python -m pytest tests/unit/test_artifact_visibility.py -q"
-    result: "Expected RED: ImportError because visible_artifacts was missing from narrato_api.projects.service."
-  task_15d_green_and_direct:
-    command: "cd docs/api/narratoApi && PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv/bin/python -m pytest tests/unit/test_artifact_visibility.py tests/unit/test_project_deletion_rules.py -q"
-    result: "15 passed in 0.02s."
-  task_15d_ruff:
-    command: "cd docs/api/narratoApi && .venv/bin/ruff check narrato_api/projects/service.py tests/unit/test_artifact_visibility.py"
-    result: pass
-  task_15d_diff_check:
-    command: "git diff --check"
-    result: pass
-  task_15c_red:
-    command: "cd docs/api/narratoApi && PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv/bin/python -m pytest tests/unit/test_project_deletion_rules.py -q"
-    result: "Expected RED: ModuleNotFoundError because narrato_api.projects.service was missing."
-  task_15c_green_and_direct:
-    command: "Task 15C direct project verification matrix"
-    result: "24 passed, 2 warnings on the final revalidation; an earlier agent direct set was 23 passed."
-  task_15c_ruff:
-    command: "cd docs/api/narratoApi && .venv/bin/python -m ruff check narrato_api/projects/service.py tests/unit/test_project_deletion_rules.py"
-    result: pass
-  task_15c_diff_check:
-    command: "git diff --check"
-    result: pass
+  task_15o_red:
+    command: "cd docs/api/narratoApi && PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv/bin/python -m pytest tests/unit/test_artifact_core_manifest_metadata.py -q"
+    result: "Expected RED: 2 failed because register_artifact lacked metadata parameters and RegisteredArtifact lacked fields."
+  task_15o_green:
+    command: "cd docs/api/narratoApi && PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv/bin/python -m pytest tests/unit/test_artifact_core_manifest_metadata.py tests/unit/test_artifact_model.py tests/unit/test_artifact_registration.py tests/unit/test_jianying_manifest.py -q"
+    result: "8 passed in 0.36s."
+  task_15o_quality:
+    command: "cd docs/api/narratoApi && .venv/bin/ruff check narrato_api/artifacts/models.py narrato_api/artifacts/service.py narrato_api/exports/service.py migrations/versions/0012_artifact_core_manifest_metadata.py tests/unit/test_artifact_core_manifest_metadata.py && .venv/bin/ruff format --check <same files> && git diff --check"
+    result: "Passed; five files already formatted."
+  task_15o_migration_note:
+    command: "cd docs/api/narratoApi && .venv/bin/alembic upgrade head --sql"
+    result: "Not a Task 15O pass: blocked at existing 0007_workflow_reconciliation SQLite batch-reflection limitation before 0012."
 key_decisions:
-  - "Task 15A provides permanent waiting, render locking, immutable revision snapshots, and one render-request Outbox boundary only."
-  - "Task 15B adds one EditorDraft per project; ordered saves overwrite its content under last-write-wins semantics."
-  - "Task 15C provides only a terminal deletion eligibility guard: completed/failed pass, all non-terminal states raise PROJECT_NOT_TERMINAL, and no deletion occurs."
-  - "Task 15D provides only a service-layer visibility guard: completed projects retain their registered artifact sequence; failed and all other statuses expose an empty list."
-  - "Task 15D deliberately creates no artifact entity, export endpoint, Jianying generation, router, Core call, or downstream behavior."
-  - "Task 15E provides only an export eligibility boundary: completed passes; failed and every non-completed state raise PROJECT_NOT_COMPLETED."
-  - "Task 15E deliberately does not create an artifact entity, generate an export/Jianying package, or provide router, Core, or downstream behavior."
-  - "Task 15F defines RegisteredArtifact with only id, project_id, kind, cdn_url, and created_at; projects retain RESTRICT ownership and artifacts are indexed by project_id plus created_at."
-  - "Task 15F does not register artifacts from Core, query visibility, expose results, generate exports/Jianying, or add a router."
-  - "Task 15G provides register_artifact(session, ...) only: it creates a RegisteredArtifact with session.add and leaves commit/rollback to the caller transaction."
-  - "Task 15G does not verify project ownership/existence, reconcile Core, query visibility, expose results, generate exports/Jianying, or add a router."
-  - "Task 15H lists only a supplied completed project's RegisteredArtifact rows, ordered by created_at then id; every other status returns an empty sequence before issuing an artifact query."
-  - "Task 15H accepts an already loaded Project and therefore intentionally does not implement ownership lookup, routes, result presentation, exports/Jianying, Core calls, or downstream behavior."
-  - "Task 15I looks up Project only by user_id plus project_id, returns an immutable minimal result record only when status is completed, and otherwise raises stable PROJECT_RESULT_NOT_FOUND or PROJECT_RESULT_NOT_COMPLETED errors."
-  - "Task 15I deliberately provides no HTTP route, result presentation, export/Jianying generation, Core call, or downstream behavior."
-  - "Task 15J deterministically maps explicit RegisteredArtifact values to package_name plus resource entries sorted by artifact id; zip paths use a static kind directory and SHA-256 artifact-id digest, never a URL path."
-  - "Task 15J deliberately creates no ZIP, route, HTTP/Core call, filesystem/OSS write, or downstream behavior."
-  - "Task 15K composes only owned completed-project lookup with the existing pure manifest mapper; inherited result lookup errors retain user/terminal-state boundaries."
-  - "Task 15K deliberately adds no HTTP route, Core base-file call, ZIP, filesystem/OSS write, or downstream behavior."
-  - "Task 15L and 15M expose only authenticated result and pure-manifest routes; both delegate to owned completed-project service boundaries."
-  - "Task 15N persists an idempotent pending deletion job and changes only owned terminal projects to deleting; no OSS, Worker, or Core deletion executes."
-  - "Task 15C does not implement artifacts/results, export/Jianying, router, Core calls, downstream execution, or another Task 15 boundary."
+  - "RegisteredArtifact now retains optional size, checksum, content_type, width, height, and duration; nullable fields keep prior registered artifacts compatible."
+  - "The pure Jianying manifest mapper includes only available metadata and remains free of HTTP, filesystem, OSS, and ZIP operations."
+  - "Task 15O does not alter ownership/result eligibility, routes, Core calls, or artifact registration transaction ownership."
 remaining_risks:
-  - "SQLite tests cover persistence boundaries but real PostgreSQL multi-connection/row-lock behavior remains unverified."
-  - "Real OSS/Core integration remains unverified."
-  - "Project-wide mypy still has 6 existing assets-module errors outside these tasks."
-  - "Focused pytest commands require PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 because default plugin loading is unreliable in this environment."
-  - "The visibility guard is a service boundary only; future real result/export read paths must use it when those task boundaries are implemented."
-  - "The export eligibility guard is a service boundary only; future export entry points must call it when those task boundaries are implemented."
-  - "RegisteredArtifact.kind is intentionally unconstrained so later product-approved artifact kinds can be added without prematurely fixing an enum."
-  - "Artifact registration callers must establish ownership and Core-result validity before calling the minimal registration boundary."
-  - "The completed-artifact read service must be wrapped by an owned-project lookup before exposure to an authenticated user."
-  - "The owned completed-project result lookup is the sole service-layer read boundary for future result routes."
-  - "The client-side streaming ZIP contract consumes only manifest metadata and CDN URLs; server-side ZIP creation remains prohibited."
-  - "Any eventual manifest route must call the owned-project manifest service rather than expose artifacts directly."
-  - "The existing Core Jianying contract requires immutable snapshot/timeline plus resource size, checksum, content type and video metadata, which the current minimal RegisteredArtifact model does not retain."
+  - "Real PostgreSQL migration behavior and multi-connection concurrency remain unverified."
+  - "The historical offline SQLite Alembic SQL path stops at migration 0007; a fresh online migration must be verified at a later Gate."
+  - "Core request/response contract, immutable editor snapshot/timeline input, real Core integration, and browser streaming ZIP remain unimplemented."
+  - "Project-wide mypy still has six existing assets-module errors outside Task 15O."
+  - "Focused pytest commands require PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 in this environment."
 workspace_status:
   clean: false
   expected_uncommitted:
     - path: /.superpowers/
-      reason: pre-existing untracked workspace content
+      reason: pre-existing untracked workspace content; do not touch
     - path: docs/web/docs/Oss.php
-      reason: pre-existing untracked file
-next_atomic_task:
-  id: Task 15O
-  scope: "Implement only persistence of the explicit Core-Jianying resource metadata needed to forward a registered artifact (size, checksum, content type and optional video metadata); do not call Core, create ZIPs, or alter routes."
+      reason: pre-existing untracked workspace content; do not touch
+next_action:
+  id: Task 15P
+  scope: "Implement only the typed Core Jianying manifest client boundary that forwards an owned completed project's persisted resources and immutable editor snapshot/timeline inputs; do not create ZIPs, write filesystem/OSS data, change browser UI, or implement real deletion work."
   relevant_files:
     - docs/superpowers/plans/2026-07-16-narrato-api-platform.md
     - docs/superpowers/specs/2026-07-16-narrato-api-platform-design.md
-    - docs/api/narratoApi/narrato_api/artifacts/models.py
-    - docs/api/narratoApi/narrato_api/artifacts/service.py
     - docs/api/narratoApi/narrato_api/exports/service.py
-    - docs/api/narratoApi/narrato_api/projects/service.py
-    - docs/api/narratoApi/narrato_api/artifacts/models.py
-    - docs/api/narratoApi/tests/unit/test_artifact_core_manifest_metadata.py
+    - docs/api/narratoApi/narrato_api/exports/router.py
+    - docs/api/narratoApi/narrato_api/core/
+    - docs/api/narratoApi/tests/unit/
   acceptance_criteria:
-    - "Use TDD and persist the minimum typed metadata needed by Core Jianying resource inputs without weakening project ownership or artifact visibility boundaries."
-    - "Do not implement Core HTTP forwarding, ZIP generation, filesystem/OSS writes, or any later Task 15 subtask."
-    - "Run new and directly affected tests, inspect diff, commit implementation, then update and commit a checkpoint before stopping."
+    - "Use TDD: observe a focused RED before minimal implementation."
+    - "Only completed owned projects may reach the client boundary; request data derives from persisted artifact metadata and immutable revision input."
+    - "No server ZIP, filesystem/OSS write, browser UI change, or later Task 15 work."
+    - "Run new and directly affected tests, inspect diff, commit implementation, update and commit checkpoint, then stop."
