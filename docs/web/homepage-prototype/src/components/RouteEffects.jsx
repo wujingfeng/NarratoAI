@@ -4,6 +4,7 @@ import { useLocation } from "react-router-dom";
 const titles = {
   "/": "影创工坊｜AI 出片工作台",
   "/dashboard": "工作台概览｜影创工坊",
+  "/login": "登录｜影创工坊",
 };
 
 export function RouteEffects() {
