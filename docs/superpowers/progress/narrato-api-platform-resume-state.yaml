@@ -1,0 +1,57 @@
+branch: codex/narrato-api-platform
+worktree: /private/tmp/NarratoAI-narrato-api-platform
+current_gate: "Phase 5 / Gate B pending"
+last_complete_task:
+  id: Task 12
+  commit: 52e973f
+current_task:
+  id: Task 13
+  status: in_progress
+  completed_subtask: Task 13A
+implementation_commit: 14952da
+tests:
+  red:
+    command: "cd docs/api/narratoApi && .venv/bin/python -m pytest tests/unit/test_project_asset_constraints.py tests/unit/test_project_asset_models.py tests/unit/test_projects_assets_migration.py -q"
+    result: "ModuleNotFoundError: narrato_api.assets"
+  green:
+    command: "cd docs/api/narratoApi && .venv/bin/python -m pytest tests/unit/test_project_asset_constraints.py tests/unit/test_project_asset_models.py tests/unit/test_projects_assets_migration.py -q"
+    result: "11 passed, 2 warnings"
+  migration:
+    command: "cd docs/api/narratoApi && .venv/bin/alembic upgrade head && .venv/bin/alembic check"
+    result: pass
+  lint:
+    command: "cd docs/api/narratoApi && .venv/bin/python -m ruff check narrato_api/projects narrato_api/assets migrations/env.py migrations/versions/0004_projects_assets.py tests/unit/test_project_asset_constraints.py tests/unit/test_project_asset_models.py tests/unit/test_projects_assets_migration.py"
+    result: pass
+key_decisions:
+  - "Task 13A only adds project/asset domain models, Alembic 0004, ownership constraints, indexes, and pure declaration constraints."
+  - "No router, OSS POST policy, upload completion, Core client, or media probe integration was implemented."
+remaining_risks:
+  - "Real OSS and Core integrations remain unverified."
+  - "PostgreSQL multi-connection behavior remains unverified; current model and migration coverage uses SQLite."
+  - "Pre-existing untracked /.superpowers/ and docs/web/docs/Oss.php were not modified or committed."
+workspace_status:
+  clean: false
+  expected_uncommitted:
+    - path: /.superpowers/
+      reason: pre-existing untracked workspace content
+    - path: docs/web/docs/Oss.php
+      reason: pre-existing untracked file
+next_atomic_task:
+  id: Task 13B
+  scope: "OSS POST policy, upload confirmation, and Core media-probe integration from the remaining Task 13 plan."
+  relevant_files:
+    - docs/api/narratoApi/narrato_api/projects/schemas.py
+    - docs/api/narratoApi/narrato_api/projects/service.py
+    - docs/api/narratoApi/narrato_api/projects/router.py
+    - docs/api/narratoApi/narrato_api/assets/schemas.py
+    - docs/api/narratoApi/narrato_api/assets/service.py
+    - docs/api/narratoApi/narrato_api/assets/router.py
+    - docs/api/narratoApi/narrato_api/integrations/oss_client.py
+    - docs/api/narratoApi/narrato_api/integrations/core_client.py
+    - docs/api/narratoApi/tests/unit/test_oss_post_policy.py
+    - docs/api/narratoApi/tests/integration/test_upload_complete.py
+  acceptance_criteria:
+    - "Authenticated users receive only prefix-, type-, and size-constrained POST policies."
+    - "Upload completion verifies the declared OSS object with HEAD before dispatching media validation."
+    - "Assets transition validating to ready or invalid from the Core media-probe result."
+    - "No workflow, Task 14, or Task 15 behavior is implemented."
