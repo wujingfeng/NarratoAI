@@ -591,6 +591,19 @@ def test_real_redis_lease_ignores_web_and_worker_clock_skew(monkeypatch) -> None
             "clock-owner",
             30,
         )
+        client.eval(
+            "local v=cjson.decode(redis.call('GET',KEYS[1])); "
+            "v['lease_until_ms']=0; redis.call('SET',KEYS[1],cjson.encode(v),'KEEPTTL')",
+            1,
+            store.key("register", issue.email_hash),
+        )
+        assert not store.mark_sent(
+            "register",
+            issue.email_hash,
+            issue.generation,
+            issue.digest,
+            "clock-owner",
+        )
     finally:
         for key in client.scan_iter(f"{store.prefix}*"):
             client.delete(key)
