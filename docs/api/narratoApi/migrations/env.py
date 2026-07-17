@@ -11,6 +11,7 @@ from narrato_api.auth import models as _auth_models
 from narrato_api.billing import models as _billing_models
 from narrato_api.projects import models as _project_models
 from narrato_api.assets import models as _asset_models
+from narrato_api.artifacts import models as _artifact_models
 from narrato_api.editor import models as _editor_models
 from narrato_api.workflows import models as _workflow_models
 
@@ -18,6 +19,7 @@ assert _auth_models.User.__tablename__ == "users"
 assert _billing_models.CreditAccount.__tablename__ == "credit_accounts"
 assert _project_models.Project.__tablename__ == "projects"
 assert _asset_models.Asset.__tablename__ == "assets"
+assert _artifact_models.RegisteredArtifact.__tablename__ == "artifacts"
 assert _editor_models.EditorDraft.__tablename__ == "editor_drafts"
 assert _editor_models.EditorRevision.__tablename__ == "editor_revisions"
 assert _workflow_models.Workflow.__tablename__ == "workflows"
