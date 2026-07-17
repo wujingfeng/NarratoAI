@@ -610,7 +610,7 @@
 
 ## Task 11：邮箱账户与 Redis 单点 Token
 
-- **状态：** R1 修复完成，等待独立复审。
+- **状态：** R4 已关闭；Task 11 实现完成，PostgreSQL 多连接/行锁验证留待 Gate B。
 - **基线：** Task 10 最终提交 `f016815`；Task 11 独立提交主题为 `feat: add email auth and single session tokens`。
 - **RED：** 先新增验证码、单点 Token 和注册登录 HTTP 集成测试；首次定向运行在收集阶段以 `ModuleNotFoundError: No module named 'narrato_api.auth'` 真实失败。覆盖用途隔离、重发替换、600 秒 TTL、一次消费与并发消费；30 天固定会话 TTL、不滑动、第二次登录撤销第一次、旧 Token 登出不误删新会话与并发登录最终单会话；注册/登录/登出/找回密码/`users/me`、统一 401、extra-forbid 和无 refresh 路由。
 - **实现：** 新增 `users` 迁移与规范化邮箱唯一索引、`active/disabled` CHECK、前缀时间有序用户 ID、UTC 时间及密码版本；密码使用参数明确的 Argon2id，并对不存在账户执行 dummy hash。验证码以 `purpose + email SHA-256` 命名，Redis 只保存 HMAC 摘要，Lua 原子比较删除；同目的重发用 `SET EX` 原子替换。登录 Token 使用 `secrets.token_urlsafe(48)`，Redis 只保存 SHA-256 摘要和用户 ID；双键 Lua 原子替换旧会话、解析不刷新 TTL、登出匹配当前映射、重置密码与禁用账户立即撤销会话。Redis 故障收敛为稳定 503，不回退数据库 Token。
@@ -659,4 +659,5 @@
 - **发送期 lease heartbeat：** 子进程运行期间父任务以 `lease/3` 周期调用 Redis-TIME renew，必须匹配 generation、digest、claim_id；renew 返回 false 或 Redis 异常立即终止 SMTP 子进程，绝不继续等待旧发送。成功退出后 `mark_sent` 也必须匹配 owner，false 不再忽略而是进入 retry/lease 恢复。Celery task 继续 bind、acks-late、reject-on-worker-lost，并设置高于 SMTP 总 deadline 的 soft/hard time limit 兜底。
 - **Deadline 配置证明：** 新增 `smtp_total_deadline_seconds`；Settings 与 readiness 同时强制 `socket timeout < total deadline`、`total deadline + 5s < lease < code TTL`，默认 `10s < 20s < 30s < 600s`。自动化阻塞子进程触发 heartbeat，验证 argv 无 SMTP password/code、stdout/stderr 零输出边界；renew owner 丢失会终止同一 child。旧 generation 无法在 heartbeat 存续时被 rotate，新 generation 只能在旧 owner 停止续租并被终止/lease 失效后创建。
 - **R4 GREEN：** narratoApi Python 3.12 全量 `81 passed, 7 skipped, 1 warning`；启用隔离真实 Redis 7.2 的 Task 11 专项 `41 passed, 1 warning`。Ruff、Mypy strict 23 files、pip check、compileall、`git diff --check` PASS；fresh SQLite upgrade/check 与 PostgreSQL offline DDL PASS。direct wheel 与 sdist→wheel 安装后均可导入独立 `smtp_sender`、Redis-TIME FSM 与配置化 Worker，两个环境 `pip check` PASS。Core `384 passed, 12 warnings`；legacy `130 passed, 1 skipped, 4 warnings`。真实 SMTP 供应商仍为无凭据可选 Smoke。
-- **R4 审查状态：** 2 个 Important 已完成实现与 clock-skew/heartbeat/进程治理测试，等待独立 R5 复审；SMTP 成功后 Redis mark 不确定性按 at-least-once 允许同 generation 重复，但旧 generation 不允许晚于新 generation 继续发送。
+- **R4 审查状态：** CLOSED。2 个 Important 已由 Redis TIME、发送期 lease heartbeat、SMTP 总 deadline/进程治理及 owner transition lease 校验关闭；SMTP 成功后 Redis mark 不确定性按 at-least-once 允许同 generation 重复，但旧 generation 不允许晚于新 generation 继续发送。
+- **R4 收尾新鲜证据：** `NARRATO_AUTH_TEST_REDIS_URL=redis://127.0.0.1:6398/15 .venv/bin/pytest -q`：`89 passed, 1 warning`；`alembic upgrade head`、`alembic check`、`pip check`、`compileall`、Ruff、Mypy、`git diff --check` 均 PASS。真实 SMTP 供应商 Smoke 仍为无凭据的可选未验证项；PostgreSQL 多连接/行锁保留 Gate B 验证。
