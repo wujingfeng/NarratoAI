@@ -69,6 +69,8 @@ def upload_fixture(tmp_path) -> Iterator[tuple[TestClient, sessionmaker, FakeOss
             database_url=f"sqlite:///{database_path}",
             oss_endpoint="https://cdn.example.test",
             oss_bucket="narrato",
+            oss_access_key_id="key",
+            oss_access_key_secret="secret",
             core_base_url="https://core.example.test",
             core_request_token="core-token",
         )
@@ -92,19 +94,27 @@ def _payload() -> dict[str, object]:
         "object_key": "narrato/api/2026/07/17/object.mp4",
     }
 
+def _issued_payload(client: TestClient) -> dict[str, object]:
+    payload = _payload()
+    response = client.post("/api/v1/projects/prj_1/uploads/policy", headers={"Authorization": "Bearer valid-token"}, json={key: payload[key] for key in ("asset_type", "filename", "size_bytes", "content_type")})
+    assert response.status_code == 200
+    payload["object_key"] = response.json()["data"]["key"]
+    return payload
+
 
 def test_upload_complete_heads_object_dispatches_probe_and_marks_asset_ready(upload_fixture) -> None:
     client, sessions, oss, core = upload_fixture
 
+    payload = _issued_payload(client)
     response = client.post(
         "/api/v1/projects/prj_1/uploads/complete",
         headers={"Authorization": "Bearer valid-token"},
-        json=_payload(),
+        json=payload,
     )
 
     assert response.status_code == 202
     assert response.json()["data"]["status"] == "ready"
-    assert oss.head_calls == [("narrato", "narrato/api/2026/07/17/object.mp4")]
+    assert oss.head_calls == [("narrato", payload["object_key"])]
     assert core.calls[0]["media_type"] == "video"
     with sessions() as session:
         asset = session.get(Asset, response.json()["data"]["id"])
@@ -118,7 +128,7 @@ def test_upload_complete_marks_asset_invalid_when_core_rejects_media(upload_fixt
     response = client.post(
         "/api/v1/projects/prj_1/uploads/complete",
         headers={"Authorization": "Bearer valid-token"},
-        json=_payload(),
+        json=_issued_payload(client),
     )
 
     assert response.status_code == 202
@@ -143,3 +153,16 @@ def test_upload_policy_requires_authenticated_user(upload_fixture) -> None:
 
     assert response.status_code == 401
     assert response.json()["code"] == "AUTHENTICATION_REQUIRED"
+
+
+def test_complete_rejects_unissued_or_other_project_object_key(upload_fixture) -> None:
+    client, _sessions, _oss, _core = upload_fixture
+
+    response = client.post(
+        "/api/v1/projects/prj_1/uploads/complete",
+        headers={"Authorization": "Bearer valid-token"},
+        json=_payload(),
+    )
+
+    assert response.status_code == 422
+    assert response.json()["code"] == "UPLOAD_OBJECT_REJECTED"

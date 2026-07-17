@@ -63,3 +63,21 @@ def test_policy_rejects_disallowed_extension_or_file_boundary(
             size_bytes=size_bytes,
             existing_video_count=0,
         )
+
+
+def test_policy_rejects_content_type_that_does_not_match_extension() -> None:
+    service = OssPostPolicyService(
+        endpoint="https://oss.example.test",
+        bucket="narrato",
+        access_key_id="access-key",
+        access_key_secret="access-secret",
+    )
+
+    with pytest.raises(AssetDeclarationError):
+        service.create_policy(
+            asset_type="video",
+            filename="episode.mp4",
+            size_bytes=1,
+            content_type="video/quicktime",
+            existing_video_count=0,
+        )

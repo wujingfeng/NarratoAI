@@ -11,7 +11,7 @@ from datetime import UTC, date, datetime, timedelta
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
-from narrato_api.assets.constraints import AssetDeclaration, validate_asset_declaration
+from narrato_api.assets.constraints import AssetDeclaration, AssetDeclarationError, validate_asset_declaration
 
 _CONTENT_TYPES = {
     ".mp4": "video/mp4",
@@ -70,6 +70,7 @@ class OssPostPolicyService:
         filename: str,
         size_bytes: int,
         existing_video_count: int,
+        content_type: str | None = None,
     ) -> OssPostPolicy:
         """校验声明并签发仅可写入单个对象的十分钟表单。"""
 
@@ -82,14 +83,16 @@ class OssPostPolicyService:
             existing_video_count=existing_video_count,
         )
         key = self._object_key(declaration)
-        content_type = _CONTENT_TYPES[declaration.extension]
+        expected_content_type = _CONTENT_TYPES[declaration.extension]
+        if content_type is not None and content_type != expected_content_type:
+            raise AssetDeclarationError("unsupported content type")
         expires_at = datetime.now(UTC) + timedelta(minutes=10)
         document = {
             "expiration": expires_at.strftime("%Y-%m-%dT%H:%M:%S.000Z"),
             "conditions": [
                 {"bucket": self.bucket},
                 ["eq", "$key", key],
-                ["eq", "$Content-Type", content_type],
+                ["eq", "$Content-Type", expected_content_type],
                 ["content-length-range", 0, declaration.max_size_bytes],
             ],
         }
@@ -108,7 +111,7 @@ class OssPostPolicyService:
                 "OSSAccessKeyId": self.access_key_id,
                 "policy": encoded,
                 "Signature": signature,
-                "Content-Type": content_type,
+                "Content-Type": expected_content_type,
             },
         )
 

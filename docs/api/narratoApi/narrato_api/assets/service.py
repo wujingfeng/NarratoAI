@@ -68,7 +68,10 @@ class UploadService:
             raise ApiError("UPLOAD_OBJECT_REJECTED", "Uploaded object is invalid", 422)
         try:
             with self.session_factory() as session:
-                project = self._owned_project(session, user_id=user_id, project_id=project_id)
+                self._owned_project(session, user_id=user_id, project_id=project_id)
+                asset = session.scalar(select(Asset).where(Asset.user_id == user_id, Asset.project_id == project_id, Asset.bucket == self.oss_bucket, Asset.object_key == object_key))
+                if asset is None or asset.filename != filename or asset.asset_type != asset_type or asset.size_bytes != size_bytes:
+                    raise ApiError("UPLOAD_OBJECT_REJECTED", "Uploaded object is invalid", 422)
                 existing_video_count = int(
                     session.scalar(
                         select(func.count()).select_from(Asset).where(
@@ -88,14 +91,6 @@ class UploadService:
                     raise ApiError("UPLOAD_CONTENT_TYPE_REJECTED", "Uploaded object is invalid", 422)
                 object_info = self.oss_client.head_object(self.oss_bucket, object_key)
                 self._validate_head(object_info, size_bytes, expected_content_type)
-                asset = Asset(
-                    id=new_asset_id(), user_id=user_id, project_id=project.id,
-                    asset_type=asset_type, status="validating", filename=filename,
-                    bucket=self.oss_bucket, object_key=object_key,
-                    cdn_url=self.oss_client.public_url(self.oss_bucket, object_key),
-                    size_bytes=size_bytes,
-                )
-                session.add(asset)
                 session.commit()
                 session.refresh(asset)
         except AssetDeclarationError as error:
@@ -110,6 +105,11 @@ class UploadService:
             )
         except CoreClientError as error:
             raise ApiError("MEDIA_PROBE_UNAVAILABLE", "Media validation is unavailable", 503) from error
+        if probe.valid is None and probe.core_task_id:
+            try:
+                probe = self.core_client.get_probe_result(probe.core_task_id)
+            except CoreClientError as error:
+                raise ApiError("MEDIA_PROBE_UNAVAILABLE", "Media validation is unavailable", 503) from error
         if probe.valid is not None:
             with self.session_factory() as session:
                 persisted = session.get(Asset, asset.id)
@@ -120,6 +120,13 @@ class UploadService:
                 session.refresh(persisted)
                 return persisted
         return asset
+
+    def reserve(self, *, user_id: str, project_id: str, asset_type: str, filename: str, size_bytes: int, object_key: str, cdn_url: str) -> None:
+        """在签发 Policy 时先持久化唯一对象键，令 complete 只能消费该预留。"""
+        with self.session_factory() as session:
+            project = self._owned_project(session, user_id=user_id, project_id=project_id)
+            session.add(Asset(id=new_asset_id(), user_id=user_id, project_id=project.id, asset_type=asset_type, status="validating", filename=filename, bucket=self.oss_bucket, object_key=object_key, cdn_url=cdn_url, size_bytes=size_bytes))
+            session.commit()
 
     @staticmethod
     def _owned_project(session: Session, *, user_id: str, project_id: str) -> Project:

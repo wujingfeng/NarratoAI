@@ -15,6 +15,7 @@ class MediaProbeResult:
     """Core 返回的媒体校验结论；None 表示异步结果尚未返回。"""
 
     valid: bool | None
+    core_task_id: str | None = None
 
 
 class HttpCoreClient:
@@ -56,9 +57,29 @@ class HttpCoreClient:
         except (HTTPError, URLError, TimeoutError, json.JSONDecodeError) as error:
             raise CoreClientError("Core media probe request failed") from error
         if status == 202:
-            return MediaProbeResult(valid=None)
+            data = payload.get("data", payload)
+            task_id = data.get("core_task_id") if isinstance(data, dict) else None
+            if not isinstance(task_id, str) or not task_id:
+                raise CoreClientError("Core media probe response is invalid")
+            return MediaProbeResult(valid=None, core_task_id=task_id)
         data = payload.get("data", payload)
         valid = data.get("valid") if isinstance(data, dict) else None
         if not isinstance(valid, bool):
             raise CoreClientError("Core media probe response is invalid")
         return MediaProbeResult(valid=valid)
+
+    def get_probe_result(self, core_task_id: str) -> MediaProbeResult:
+        """查询已提交 Core 原子任务的终态，不创建工作流。"""
+        request = Request(f"{self.base_url}/api/v1/tasks/{core_task_id}", headers={"Authorization": f"Bearer {self.request_token}"})
+        try:
+            with urlopen(request, timeout=10) as response:
+                payload = json.loads(response.read() or b"{}")
+        except (HTTPError, URLError, TimeoutError, json.JSONDecodeError) as error:
+            raise CoreClientError("Core media probe query failed") from error
+        data = payload.get("data", payload)
+        state = data.get("status") if isinstance(data, dict) else None
+        if state == "succeeded":
+            return MediaProbeResult(valid=True, core_task_id=core_task_id)
+        if state == "failed":
+            return MediaProbeResult(valid=False, core_task_id=core_task_id)
+        return MediaProbeResult(valid=None, core_task_id=core_task_id)

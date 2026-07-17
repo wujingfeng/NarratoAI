@@ -14,6 +14,8 @@ from narrato_api.auth.service import AuthService
 from narrato_api.config import Settings
 from narrato_api.integrations.core_client import HttpCoreClient
 from narrato_api.integrations.oss_client import HttpOssClient, OssPostPolicyService
+from narrato_api.assets.constraints import AssetDeclarationError
+from narrato_api.api.errors import ApiError
 
 router = APIRouter()
 
@@ -56,13 +58,18 @@ def create_upload_policy(
     """仅向已登录项目所有者签发受限 OSS 直传表单。"""
 
     user = auth.resolve_user(token)
-    policy = OssPostPolicyService(
+    policy_service = OssPostPolicyService(
         endpoint=settings.oss_endpoint, bucket=settings.oss_bucket,
         access_key_id=settings.oss_access_key_id, access_key_secret=settings.oss_access_key_secret,
-    ).create_policy(
-        asset_type=body.asset_type, filename=body.filename, size_bytes=body.size_bytes,
-        existing_video_count=service.existing_video_count(user_id=user.id, project_id=project_id),
     )
+    try:
+        policy = policy_service.create_policy(
+        asset_type=body.asset_type, filename=body.filename, size_bytes=body.size_bytes, content_type=body.content_type,
+        existing_video_count=service.existing_video_count(user_id=user.id, project_id=project_id),
+        )
+    except AssetDeclarationError as error:
+        raise ApiError("UPLOAD_DECLARATION_REJECTED", "Upload declaration is invalid", 422) from error
+    service.reserve(user_id=user.id, project_id=project_id, asset_type=body.asset_type, filename=body.filename, size_bytes=body.size_bytes, object_key=policy.key, cdn_url=f"{settings.oss_endpoint.rstrip('/')}/{settings.oss_bucket}/{policy.key}")
     return ApiResponse(code="UPLOAD_POLICY_CREATED", message="Upload policy created", request_id=request_id,
         data=UploadPolicyData(url=policy.url, key=policy.key, fields=policy.fields, max_size_bytes=policy.max_size_bytes))
 
