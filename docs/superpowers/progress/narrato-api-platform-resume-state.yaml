@@ -2,7 +2,7 @@ branch: codex/narrato-api-platform
 worktree: /private/tmp/NarratoAI-narrato-api-platform
 current_gate: "Phase 5 / Gate B pending"
 last_complete_task:
-  id: Task 15K
+  id: Task 15N
   commits:
     - "6ea93bf feat: add workflow state machine template (Task 14A)"
     - "60de8c8 feat: add workflow persistence models (Task 14B)"
@@ -21,8 +21,11 @@ last_complete_task:
     - "91d8503 feat(api): add completed project result lookup (Task 15I)"
     - "d98394a feat: add pure jianying manifest resource mapping (Task 15J)"
     - "b66a374 feat(api): build owned completed project jianying manifest (Task 15K)"
+    - "21c9a99 feat(api): add authenticated project result route (Task 15L)"
+    - "283dee8 feat(api): add authenticated jianying manifest route (Task 15M)"
+    - "3b4ea19 feat(api): add terminal project deletion requests (Task 15N)"
 current_task:
-  id: Task 15K
+  id: Task 15N
   status: completed
   completed_subtasks:
     - Task 15A editor lock and permanent waiting boundary
@@ -36,8 +39,17 @@ current_task:
     - Task 15I owned completed-project result lookup service
     - Task 15J pure Jianying manifest resource-mapping builder
     - Task 15K owned completed-project Jianying manifest service
-implementation_commit: "b66a374 feat(api): build owned completed project jianying manifest"
+    - Task 15L authenticated project-result route
+    - Task 15M authenticated Jianying-manifest route
+    - Task 15N terminal project asynchronous deletion request boundary
+implementation_commit: "3b4ea19 feat(api): add terminal project deletion requests"
 tests:
+  task_15_l_to_n_gate:
+    command: "cd docs/api/narratoApi && PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv/bin/python -m pytest Task-15 unit/integration subset -q"
+    result: "90 passed, 1 existing Starlette TestClient deprecation warning; Ruff and git diff --check passed."
+  task_15n_migration:
+    command: "cd docs/api/narratoApi && NARRATO_API_DATABASE_URL=sqlite:////private/tmp/narrato-task15-gate-<pid>.db .venv/bin/alembic upgrade head"
+    result: "Passed through 0011_project_deletion_jobs; deletion_jobs table verified."
   task_15k_red:
     command: "cd docs/api/narratoApi && .venv/bin/python -m pytest tests/unit/test_project_jianying_manifest.py -q"
     result: "Expected RED: five failures because the owned-project manifest service was missing."
@@ -169,6 +181,8 @@ key_decisions:
   - "Task 15J deliberately creates no ZIP, route, HTTP/Core call, filesystem/OSS write, or downstream behavior."
   - "Task 15K composes only owned completed-project lookup with the existing pure manifest mapper; inherited result lookup errors retain user/terminal-state boundaries."
   - "Task 15K deliberately adds no HTTP route, Core base-file call, ZIP, filesystem/OSS write, or downstream behavior."
+  - "Task 15L and 15M expose only authenticated result and pure-manifest routes; both delegate to owned completed-project service boundaries."
+  - "Task 15N persists an idempotent pending deletion job and changes only owned terminal projects to deleting; no OSS, Worker, or Core deletion executes."
   - "Task 15C does not implement artifacts/results, export/Jianying, router, Core calls, downstream execution, or another Task 15 boundary."
 remaining_risks:
   - "SQLite tests cover persistence boundaries but real PostgreSQL multi-connection/row-lock behavior remains unverified."
@@ -183,6 +197,7 @@ remaining_risks:
   - "The owned completed-project result lookup is the sole service-layer read boundary for future result routes."
   - "The client-side streaming ZIP contract consumes only manifest metadata and CDN URLs; server-side ZIP creation remains prohibited."
   - "Any eventual manifest route must call the owned-project manifest service rather than expose artifacts directly."
+  - "The existing Core Jianying contract requires immutable snapshot/timeline plus resource size, checksum, content type and video metadata, which the current minimal RegisteredArtifact model does not retain."
 workspace_status:
   clean: false
   expected_uncommitted:
@@ -191,8 +206,8 @@ workspace_status:
     - path: docs/web/docs/Oss.php
       reason: pre-existing untracked file
 next_atomic_task:
-  id: Task 15L
-  scope: "Implement only an authenticated GET project-result HTTP route that delegates to the owned completed-project result lookup service as one independently verifiable Task 15 boundary; do not implement exports/Jianying routes, Core calls, presentation, or later tasks."
+  id: Task 15O
+  scope: "Implement only persistence of the explicit Core-Jianying resource metadata needed to forward a registered artifact (size, checksum, content type and optional video metadata); do not call Core, create ZIPs, or alter routes."
   relevant_files:
     - docs/superpowers/plans/2026-07-16-narrato-api-platform.md
     - docs/superpowers/specs/2026-07-16-narrato-api-platform-design.md
@@ -200,9 +215,9 @@ next_atomic_task:
     - docs/api/narratoApi/narrato_api/artifacts/service.py
     - docs/api/narratoApi/narrato_api/exports/service.py
     - docs/api/narratoApi/narrato_api/projects/service.py
-    - docs/api/narratoApi/narrato_api/projects/router.py
-    - docs/api/narratoApi/tests/integration/test_project_result_route.py
+    - docs/api/narratoApi/narrato_api/artifacts/models.py
+    - docs/api/narratoApi/tests/unit/test_artifact_core_manifest_metadata.py
   acceptance_criteria:
-    - "Use TDD and route the authenticated current user plus project_id only through the existing owned completed-project result lookup boundary."
-    - "Verify no result is returned to foreign users or for non-completed projects, while avoiding export/Jianying routes, Core calls, or presentation behavior."
+    - "Use TDD and persist the minimum typed metadata needed by Core Jianying resource inputs without weakening project ownership or artifact visibility boundaries."
+    - "Do not implement Core HTTP forwarding, ZIP generation, filesystem/OSS writes, or any later Task 15 subtask."
     - "Run new and directly affected tests, inspect diff, commit implementation, then update and commit a checkpoint before stopping."

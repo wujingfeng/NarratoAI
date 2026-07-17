@@ -4,16 +4,15 @@
 
 ## 当前真实基线
 
-- 最近 Implementation Commit：`b66a374 feat(api): build owned completed project jianying manifest`。
-- Task 14A--14E、Gate review、Task 15A--15K 已完成。
-- Task 15K 只有 owned completed-project Manifest service：它组合已有 user-owned result lookup 与纯资源 mapping；无 HTTP、Core、ZIP 或 I/O 行为。
-- 验证：RED 为缺少 owned Manifest service；最终直接复验 `14 passed in 0.37s`；Ruff、`git diff --check` 通过。
-- 项目仍为 `Phase 5 / Gate B pending`；SQLite/PostgreSQL 并发、真实 OSS/Core 和 6 个既有 assets mypy 错误仍未关闭。
+- 最近 Implementation Commit：`3b4ea19 feat(api): add terminal project deletion requests`。
+- Task 15A--15N 已完成；结果路由、Manifest 路由和终态删除请求审计已具备。
+- Task 15 Gate 子集：`90 passed, 1 warning`；全新 SQLite Alembic 升级通过 `0011_project_deletion_jobs`。
+- Task 15 尚未完成真实 OSS/Worker 删除与 Core 剪映基础文件转发；Core 资源输入所需 size/checksum/content type/video 元数据尚未持久化。
 - 预期未提交内容仅为 `.superpowers/` 与 `docs/web/docs/Oss.php`。
 
-## 本窗口唯一原子任务：Task 15L
+## 本窗口唯一原子任务：Task 15O
 
-只实现 **authenticated GET project-result HTTP route**。严格 TDD：先写测试并观察预期 RED，再以最小代码使其 GREEN。验收必须证明路由从当前认证用户与项目 ID 调用既有 user-owned completed-project result lookup；外人、缺失项目和非完成项目无结果。不得实现导出/Jianying 路由、Core 调用、页面展示、下游行为或第二个 Task 15 子任务。完成 checkpoint 后立即停止。
+只实现 **Core Jianying resource metadata persistence**。严格 TDD：先写测试并观察预期 RED，再以最小代码使其 GREEN。只为 RegisteredArtifact 持久化 Core 资源所需 size、checksum、content type 与可选视频 metadata；不得调用 Core、创建 ZIP、写文件/OSS、修改路由或实施第二个 Task 15 子项。
 
 ## 不可删除的永久规则
 
@@ -25,18 +24,4 @@
 6. 最终回复必须再次提示新建窗口续接。
 7. 检查点完成后禁止继续下一个任务。
 
-## 本窗口开始操作
-
-1. 执行 `git status --short`、`git branch --show-current`、`git log --oneline --decorate -20`。
-2. 阅读 `docs/superpowers/progress/narrato-api-platform-resume-state.yaml`、`narrato-api-platform-summary.md` 和本文件；如有不一致，以 Git、实际文件和测试为准重建状态文件。
-3. 只读取 Task 15L 所需计划/设计章节和相关测试；不得无目的读取完整大文档或成功日志。
-4. 完成当前子任务后运行目标测试、检查 diff、提交业务代码和测试；随后更新并提交三个永久进度文件为独立 checkpoint。
-5. checkpoint 后检查 `git status --short`；任何预期未提交改动必须逐项记录在状态文件中。
-
-## 最终回复要求
-
-报告完成的 Task 15L 子任务、Implementation Commit、Checkpoint Commit、测试结果、当前 Gate、下一个原子任务和工作区状态。若仍有未完成任务，必须明确输出：
-
-> 请新建窗口，并再次使用 SEGMENTED_GOAL_PROTOCOL_V2 永久续接提示词。
-
-仍有任务时，结束前必须重新生成本 `next-prompt.md`，供下一窗口直接执行。检查点完成后禁止继续下一个任务。
+结束时必须报告 Task 15O 的 Implementation Commit、Checkpoint Commit、测试、Gate、下一任务和工作区状态；仍有任务时明确提示：请新建窗口，并再次使用 SEGMENTED_GOAL_PROTOCOL_V2 永久续接提示词。
