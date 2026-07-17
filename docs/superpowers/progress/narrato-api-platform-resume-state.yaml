@@ -2,7 +2,7 @@ branch: codex/narrato-api-platform
 worktree: /private/tmp/NarratoAI-narrato-api-platform
 current_gate: "Phase 5 / Gate B pending"
 last_complete_task:
-  id: Task 14 Gate review
+  id: Task 15A
   commits:
     - "6ea93bf feat: add workflow state machine template (Task 14A)"
     - "60de8c8 feat: add workflow persistence models (Task 14B)"
@@ -10,50 +10,41 @@ last_complete_task:
     - "322f2d5 feat: reconcile Core workflow results (Task 14D)"
     - "b6da053 feat: dispatch workflow outbox events (Task 14E)"
     - "ddd012d fix: preserve app logs during migrations (Task 14 Gate review fix)"
+    - "3d4085e feat: add editor render lock boundary (Task 15A)"
 current_task:
-  id: Task 14
-  status: completed_and_gate_reviewed
+  id: Task 15A
+  status: completed
   completed_subtasks:
-    - Task 14A
-    - Task 14B
-    - Task 14C
-    - Task 14D
-    - Task 14E
-    - Gate B requirements review and independent code review
-implementation_commit: "ddd012d fix: preserve app logs during migrations"
+    - Task 15A editor lock and permanent waiting boundary
+implementation_commit: "3d4085e feat: add editor render lock boundary"
 tests:
-  gate_b_red:
-    command: "cd docs/api/narratoApi && PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv/bin/python -m pytest tests/unit/test_workflows_migration.py::test_alembic_migration_does_not_disable_business_logger -q"
-    result: "Expected RED before the fix: namespace.disabled was True after Alembic migration loading."
-  gate_b_direct:
-    command: "Task 14 direct verification matrix recorded in 2026-07-17-task-14-gate-b-report.md"
-    result: "25 passed, 4 warnings"
-  gate_b_full_pytest:
-    command: "cd docs/api/narratoApi && PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv/bin/python -m pytest -q"
-    result: "135 passed, 7 skipped, 7 warnings"
-  gate_b_ruff:
-    command: "cd docs/api/narratoApi && .venv/bin/python -m ruff check ."
+  task_15a_red:
+    command: "cd docs/api/narratoApi && PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv/bin/python -m pytest tests/unit/test_editor_lock.py -q"
+    result: "Expected RED: collection failed with ModuleNotFoundError: No module named narrato_api.editor."
+  task_15a_green:
+    command: "cd docs/api/narratoApi && PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv/bin/python -m pytest tests/unit/test_editor_lock.py -q"
+    result: "2 passed"
+  task_15a_direct:
+    command: "cd docs/api/narratoApi && PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv/bin/python -m pytest tests/unit/test_editor_lock.py tests/unit/test_workflow_service.py tests/unit/test_workflow_models.py tests/unit/test_workflows_migration.py -q"
+    result: "8 passed, 3 warnings"
+  task_15a_ruff:
+    command: "cd docs/api/narratoApi && .venv/bin/python -m ruff check narrato_api/editor migrations/env.py migrations/versions/0008_editor_revisions.py tests/unit/test_editor_lock.py"
     result: pass
-  gate_b_alembic:
+  task_15a_alembic:
     command: "cd docs/api/narratoApi && .venv/bin/python -m alembic upgrade head && .venv/bin/python -m alembic check"
-    result: "pass; upgraded to 0007_workflow_reconciliation and reported no new upgrade operations"
-  gate_b_mypy:
-    command: "cd docs/api/narratoApi && .venv/bin/python -m mypy narrato_api"
-    result: "6 existing errors in assets/service.py and assets/router.py; outside Task 14 scope"
-  gate_b_diff_check:
+    result: "pass; upgrade applied 0008_editor_revisions and check found no new upgrade operations"
+  task_15a_diff_check:
     command: "git diff --check"
     result: pass
 key_decisions:
-  - "Task 14A provides the versioned short-drama DAG and pure state-machine guards only."
-  - "Task 14B persists immutable template snapshots, workflow records, nodes, attempts, reconciliation events, and Outbox records."
-  - "Task 14C persists workflow transitions and unique state-change Outbox events in one transaction."
-  - "Task 14D converges callback and polling terminal facts in one idempotent reconciliation transaction."
-  - "Task 14E conditionally claims exactly one due pending Outbox event and leaves downstream execution outside its scope."
-  - "Gate review fixed Alembic fileConfig logger disabling with a RED/GREEN regression test; OpenAPI keeps an exact, not weakened, route contract."
-  - "Task 14 does not implement Core HTTP, router, polling, SSE, database re-delivery scanning, Task 15, or downstream execution."
+  - "Task 14 remains limited to versioned workflow persistence, reconciliation, and outbox boundaries; it does not include Core HTTP, router, polling, SSE, scanner, or downstream execution."
+  - "Task 15A creates only immutable editor draft snapshots and the render-lock transaction; it does not implement LWW, result/artifact, deletion, export/Jianying, router, Core calls, or downstream behavior."
+  - "A waiting_for_edit project has no expiration path in EditorService; an old project remains editable until the render submission locks it."
+  - "Render submission atomically locks the project, changes project/workflow state to render_queued, and persists one pending workflow.render_requested Outbox event."
 remaining_risks:
-  - "Project-wide mypy remains red with 6 existing asset-module errors outside the Task 14 scope."
-  - "Real OSS/Core integration and PostgreSQL multi-connection behavior remain unverified."
+  - "SQLite tests cover transaction boundaries but real PostgreSQL multi-connection/row-lock behavior remains unverified."
+  - "Real OSS/Core integration remains unverified."
+  - "Project-wide mypy still has 6 existing assets-module errors outside these tasks."
   - "Focused pytest commands require PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 because default plugin loading is unreliable in this environment."
 workspace_status:
   clean: false
@@ -62,21 +53,15 @@ workspace_status:
       reason: pre-existing untracked workspace content
     - path: docs/web/docs/Oss.php
       reason: pre-existing untracked file
-    - path: docs/superpowers/progress/narrato-api-platform-resume-state.yaml
-      reason: current window progress checkpoint edit, intentionally not yet committed
-    - path: docs/superpowers/progress/narrato-api-platform-summary.md
-      reason: current window progress checkpoint edit, intentionally not yet committed
-    - path: docs/superpowers/progress/narrato-api-platform-next-prompt.md
-      reason: current window progress checkpoint edit, intentionally not yet committed
 next_atomic_task:
-  id: Task 15A
-  scope: "Start only one independently verifiable Task 15 subtask; do not proceed to a second Task 15 subtask or any later task after its checkpoint."
+  id: Task 15B
+  scope: "Choose only one independently verifiable editor subtask, with LWW draft saving preferred; do not begin another Task 15 subtask or later task after its checkpoint."
   relevant_files:
     - docs/superpowers/plans/2026-07-16-narrato-api-platform.md
     - docs/superpowers/specs/2026-07-16-narrato-api-platform-design.md
     - docs/api/narratoApi/narrato_api/editor/
-    - docs/api/narratoApi/tests/unit/test_editor_lock.py
+    - docs/api/narratoApi/tests/unit/test_editor_last_write_wins.py
   acceptance_criteria:
-    - "Use TDD and complete only the selected independently verifiable editor lock/permanent waiting boundary."
-    - "waiting_for_edit remains non-expiring, and submit render immediately locks editing when that behavior is selected."
-    - "Run only the added and directly affected Task 15A tests, inspect the diff, commit implementation, then write and commit a checkpoint before stopping."
+    - "Use TDD and implement only the selected LWW editor draft-save boundary."
+    - "Concurrent or ordered saves leave exactly the latest accepted draft current without changing the Task 15A render-lock boundary."
+    - "Run new and directly affected tests, inspect diff, commit implementation, then update and commit a checkpoint before stopping."

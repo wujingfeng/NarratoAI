@@ -4,28 +4,24 @@
 
 - 分支：`codex/narrato-api-platform`
 - worktree：`/private/tmp/NarratoAI-narrato-api-platform`
-- 项目 Gate：**Phase 5 / Gate B pending**（Task 15 尚未开始，不能宣称项目 Gate B 完成）。
-- Task 14A--14E 与集中 Gate review 已完成；最新 Gate 修复/Implementation Commit：`ddd012d fix: preserve app logs during migrations`。
+- 项目 Gate：**Phase 5 / Gate B pending**；Task 15 仍有未完成子任务。
+- 最新 Implementation Commit：`3d4085e feat: add editor render lock boundary`（Task 15A）。
 
-## Task 14 已完成部分
+## 已完成
 
-1. **14A**：固定版本的短剧解说 DAG 与状态机；拒绝用户取消/手动重试，`waiting_for_edit` 不自动超时。
-2. **14B**：模板快照、workflow、节点、attempt、Outbox 和迁移持久化。
-3. **14C**：从不可变快照事务化建立 workflow/节点；状态变更和唯一 Outbox 同时提交。
-4. **14D**：callback 与 polling 经同一幂等收口事务处理，不覆盖已确认终态。
-5. **14E**：条件领取 due pending Outbox；只唤醒注入 callable；失败回到 durable pending。
-6. **Gate review**：发现 Alembic `fileConfig()` 会禁用既有业务 logger；新增 RED/GREEN 回归测试并在 `ddd012d` 修复。OpenAPI 契约补齐既有上传/资产路由，仍为精确断言。
+1. **Task 14A--14E + Gate review**：版本化 DAG、工作流持久化/事务 Outbox、callback/polling 幂等收口和 Outbox wake-up 边界；Gate 修复 Alembic 禁用业务 logger 的问题（`ddd012d`）。
+2. **Task 15A**：新增不可变 `EditorRevision` 草稿快照与 `0008_editor_revisions`；`waiting_for_edit` 不设过期路径；提交渲染在同一事务中锁项目、切换 project/workflow 至 `render_queued` 并写 pending `workflow.render_requested` Outbox。锁定后拒绝保存。
 
 ## 新鲜验证证据
 
-- Gate 直接验证：`25 passed, 4 warnings`。
-- 全量：`PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv/bin/python -m pytest -q` 为 `135 passed, 7 skipped, 7 warnings`。
-- Ruff、Alembic `upgrade head`/`check`、`git diff --check` 通过。
-- Mypy 仍有 6 个既有 `assets/service.py`、`assets/router.py` 类型错误，未扩大 Task 14 范围修复。
+- Task 15A RED：缺失 `narrato_api.editor`，测试预期 collection error。
+- Task 15A GREEN：编辑器测试 `2 passed`；直接受影响测试 `8 passed, 3 warnings`。
+- Task 15A Ruff、Alembic `upgrade head`/`check` 和 `git diff --check` 通过。
+- Task 14 Gate 全量 pytest：`135 passed, 7 skipped, 7 warnings`；Mypy 仍有 6 个既有 assets 模块错误。
 
 ## 范围、风险与续接
 
-- 本分段没有实现 Core HTTP、router、polling、SSE、数据库重投扫描、Task 15 或下游执行；这些不得被误报为 Task 14 已完成能力。
-- 真实 OSS/Core 集成和 PostgreSQL 多连接语义仍未验证；pytest 使用 `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1`。
-- 预存未跟踪 `/.superpowers/`、`docs/web/docs/Oss.php` 不得触碰；本窗口三个永久进度文件待单独 checkpoint 提交。
-- 唯一下一原子任务：**Task 15A**。只启动一个可独立验证的编辑锁定/永久等待边界子任务；完成 checkpoint 后立即停止，不得开始下一个 Task 15 子任务。
+- Task 15A 未实现 LWW、结果/产物、删除、导出/Jianying、router、Core 调用或下游执行。
+- SQLite 覆盖事务边界；真实 PostgreSQL 行锁/多连接及真实 OSS/Core 集成仍未验证。
+- 预期未提交内容仅为 `/.superpowers/` 与 `docs/web/docs/Oss.php`，二者不得触碰。
+- 唯一下一原子任务：**Task 15B**，只选一个独立编辑器子任务，优先 LWW 草稿保存；完成 checkpoint 后立即停止。

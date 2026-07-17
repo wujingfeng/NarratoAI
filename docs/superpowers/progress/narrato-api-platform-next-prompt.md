@@ -4,18 +4,16 @@
 
 ## 当前真实基线
 
-- 最近 Gate 修复/Implementation Commit：`ddd012d fix: preserve app logs during migrations`。
-- Task 14A--14E 已完成，Task 14 Gate review 通过；Alembic logger disabling 缺陷已用 RED/GREEN 回归测试修复。
-- 项目仍为 `Phase 5 / Gate B pending`，因为 Task 15 未完成。
-- Gate 证据：直接验证 `25 passed, 4 warnings`；全量 pytest `135 passed, 7 skipped, 7 warnings`；Ruff、Alembic upgrade/check、`git diff --check` 通过。
-- 已知风险：`mypy narrato_api` 有 6 个既有 assets 模块错误，未在 Task 14 范围内修复；真实 OSS/Core 与 PostgreSQL 多连接未验证。
-- 预期未提交内容：`.superpowers/`、`docs/web/docs/Oss.php`，以及本窗口尚待提交的三个永久进度文件。
+- 最近 Implementation Commit：`3d4085e feat: add editor render lock boundary`。
+- Task 14A--14E 与 Gate review 已完成；Task 15A 已完成。
+- Task 15A 提供不可变草稿快照、无过期的 `waiting_for_edit` 保存边界，以及事务化 render lock + pending Outbox；没有实现 LWW 或任何后续 Task 15 能力。
+- 验证：Task 15A RED 是缺失 `narrato_api.editor`；GREEN `2 passed`，直接受影响 `8 passed, 3 warnings`；Ruff、Alembic upgrade/check、`git diff --check` 通过。
+- 项目仍为 `Phase 5 / Gate B pending`；风险为 SQLite 与真实 PostgreSQL 并发差异、真实 OSS/Core 未验证，以及 6 个既有 assets mypy 错误。
+- 预期未提交内容仅为 `.superpowers/` 与 `docs/web/docs/Oss.php`。
 
-## 本窗口唯一原子任务：Task 15A
+## 本窗口唯一原子任务：Task 15B
 
-只启动 **Task 15A** 的一个可独立验证子任务：优先建立 `waiting_for_edit` 永久等待和提交渲染立即锁定编辑器的测试/最小实现边界。严格 TDD：先写测试并观察预期 RED，再写最小实现并运行新增及直接受影响测试。不得提前实现结果、终态删除、剪映 Manifest、Task 15 的其他子任务或任何后续 Task。完成本子任务 checkpoint 后立即停止。
-
-验收标准：所选边界有真实自动化测试；`waiting_for_edit` 不自动过期，且如实现提交渲染边界则立即拒绝后续编辑保存；只修改必要文件；目标测试通过、实际 diff 已检查、业务代码和测试先提交，再更新并提交三个永久进度文件。
+只选择一个可独立验证的编辑器子任务，优先实现 **LWW 草稿保存**。严格 TDD：先写测试并观察预期 RED，再以最小代码使其 GREEN。验收必须证明有序或并发保存后，只有最后接受的草稿为当前版本，同时不破坏 Task 15A 的锁定边界。禁止提前实现结果/产物、删除、导出/Jianying、router、Core 调用、下游执行或任何第二个 Task 15 子任务。完成 checkpoint 后立即停止。
 
 ## 不可删除的永久规则
 
@@ -31,13 +29,13 @@
 
 1. 执行 `git status --short`、`git branch --show-current`、`git log --oneline --decorate -20`。
 2. 阅读 `docs/superpowers/progress/narrato-api-platform-resume-state.yaml`、`narrato-api-platform-summary.md` 和本文件；如有不一致，以 Git、实际文件和测试为准重建状态文件。
-3. 只读取 Task 15A 所需计划/设计章节、相关提交和测试；不得无目的读取完整大文档或成功日志。
+3. 只读取 Task 15B 所需计划/设计章节和当前 editor 代码、测试；不得无目的读取完整大文档或成功日志。
 4. 完成当前子任务后运行目标测试、检查 diff、提交业务代码和测试；随后更新并提交三个永久进度文件为独立 checkpoint。
 5. checkpoint 后检查 `git status --short`；任何预期未提交改动必须逐项记录在状态文件中。
 
 ## 最终回复要求
 
-报告完成的 Task 15A 子任务、Implementation Commit、Checkpoint Commit、测试结果、当前 Gate、下一个原子任务和工作区状态。若仍有未完成任务，必须明确输出：
+报告完成的 Task 15B 子任务、Implementation Commit、Checkpoint Commit、测试结果、当前 Gate、下一个原子任务和工作区状态。若仍有未完成任务，必须明确输出：
 
 > 请新建窗口，并再次使用 SEGMENTED_GOAL_PROTOCOL_V2 永久续接提示词。
 
