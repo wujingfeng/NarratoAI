@@ -2,11 +2,12 @@ branch: codex/narrato-api-platform
 worktree: /private/tmp/NarratoAI-narrato-api-platform
 current_gate: "Phase 5 / Gate B pending"
 last_complete_task:
-  id: Task 14C
+  id: Task 14D
   commits:
     - "6ea93bf feat: add workflow state machine template (Task 14A)"
     - "60de8c8 feat: add workflow persistence models (Task 14B)"
     - "369d4c3 feat: add transactional workflow service (Task 14C)"
+    - "322f2d5 feat: reconcile Core workflow results (Task 14D)"
 current_task:
   id: Task 14
   status: in_progress
@@ -14,8 +15,21 @@ current_task:
     - Task 14A
     - Task 14B
     - Task 14C
-implementation_commit: "369d4c3 feat: add transactional workflow service"
+    - Task 14D
+implementation_commit: "322f2d5d00798af880d55b95edbd8b139899d749 feat: reconcile Core workflow results"
 tests:
+  task_14d_red:
+    command: "cd docs/api/narratoApi && PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv/bin/python -m pytest tests/unit/test_reconciler.py -q"
+    result: "Expected RED: collection failed with ModuleNotFoundError: No module named narrato_api.workflows.reconciler; the reconciler module was intentionally absent."
+  task_14d_target_and_direct:
+    command: "cd docs/api/narratoApi && PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv/bin/python -m pytest tests/unit/test_reconciler.py tests/unit/test_workflow_models.py tests/unit/test_workflows_migration.py tests/unit/test_workflow_service.py tests/unit/test_workflow_state_machine.py tests/unit/test_short_drama_template_v1.py -q"
+    result: "14 passed, 2 warnings in 0.62s"
+  task_14d_lint:
+    command: "cd docs/api/narratoApi && PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv/bin/python -m ruff check narrato_api/workflows/models.py narrato_api/workflows/reconciler.py tests/unit/test_reconciler.py tests/unit/test_workflow_models.py tests/unit/test_workflows_migration.py"
+    result: pass
+  task_14d_diff_check:
+    command: "git diff --check"
+    result: pass
   task_14c_red:
     command: "cd docs/api/narratoApi && PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv/bin/python -m pytest tests/unit/test_workflow_service.py -q"
     result: "Expected RED: collection failed with ModuleNotFoundError: No module named narrato_api.workflows.service; the service module was intentionally absent."
@@ -37,9 +51,11 @@ key_decisions:
   - "Task 14C instantiates Workflow and WorkflowNode records from an immutable WorkflowTemplateSnapshot in one transaction."
   - "Task 14C applies only allowed workflow state transitions and appends one idempotent workflow.state_changed Outbox event in the same transaction."
   - "User cancellation and manual retry remain rejected; waiting_for_edit does not auto-timeout or auto-fail."
+  - "Task 14D persists Core terminal result event facts per node attempt and accepts callback and polling only through the same transaction."
+  - "A terminal event applies only when its state_version is newer than the attempt; duplicate event IDs and stale/equal versions leave node and workflow state unchanged."
+  - "Task 14D does not dispatch downstream work, perform refunds, add Celery, router, SSE, or Task 15 behavior."
 remaining_risks:
-  - "Task 14D still needs unified idempotent Core callback and polling reconciliation using event_id plus state_version."
-  - "Celery dispatch, database re-delivery scanning, router, SSE, and Task 15 remain unimplemented."
+  - "Task 14E still needs durable Outbox claim and dispatch wake-up behavior; database re-delivery scanning, router, SSE, and Task 15 remain unimplemented."
   - "Real OSS/Core integration and PostgreSQL multi-connection behavior remain unverified."
   - "Focused pytest commands require PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 because default plugin loading is not reliable in this environment."
 workspace_status:
@@ -50,14 +66,14 @@ workspace_status:
     - path: docs/web/docs/Oss.php
       reason: pre-existing untracked file
 next_atomic_task:
-  id: Task 14D
-  scope: "Only implement unified idempotent state reconciliation for Core callbacks and continuous polling, keyed by event_id plus state_version, with focused tests."
+  id: Task 14E
+  scope: "Only implement the smallest durable WorkflowOutbox claim-and-dispatch-wake-up service with focused tests; do not implement polling, callback routing, SSE, Task 15, or database re-delivery scanning."
   relevant_files:
-    - docs/api/narratoApi/narrato_api/workflows/reconciler.py
+    - docs/api/narratoApi/narrato_api/workflows/dispatcher.py
     - docs/api/narratoApi/narrato_api/workflows/models.py
-    - docs/api/narratoApi/tests/unit/test_reconciler.py
+    - docs/api/narratoApi/tests/unit/test_workflow_dispatcher.py
   acceptance_criteria:
-    - "A callback and a polling result for the same Core event converge through one transaction without duplicate node completion or downstream state advancement."
-    - "event_id and state_version make duplicate and stale terminal results idempotent."
-    - "Focused reconciler and directly affected workflow tests pass under PYTEST_DISABLE_PLUGIN_AUTOLOAD=1."
-    - "No Celery, dispatcher, router, SSE, Task 15, or other runtime delivery behavior is implemented."
+    - "One pending Outbox event is atomically claimed once and its stable idempotency key is supplied to a narrow injected wake-up callable."
+    - "A duplicate or already claimed event does not execute the wake-up callable again, and a wake-up failure returns the event to a retryable durable state without losing it."
+    - "Focused dispatcher and directly affected workflow tests pass under PYTEST_DISABLE_PLUGIN_AUTOLOAD=1."
+    - "No Core HTTP client, callback router, polling loop, SSE, database re-delivery scan, Task 15, or other runtime delivery behavior is implemented."

@@ -4,26 +4,26 @@
 
 ## 当前真实基线
 
-- 最近实施提交：`369d4c3 feat: add transactional workflow service`。
+- 最近实施提交：`322f2d5d00798af880d55b95edbd8b139899d749 feat: reconcile Core workflow results`。
 - Gate：`Phase 5 / Gate B pending`。
-- Task 14 为 `in_progress`，Task 14A、Task 14B、Task 14C 已完成。
-- Task 14C 已验证模板快照事务实例化、持久化状态转换和同事务幂等 Outbox。
+- Task 14 为 `in_progress`，Task 14A、Task 14B、Task 14C、Task 14D 已完成。
+- Task 14D 已验证 callback 与 polling 的统一终态收口，`event_id + state_version` 的持久化幂等，以及不覆盖已确认终态。
 - 预期未提交内容仅为 `.superpowers/` 与 `docs/web/docs/Oss.php`。
 
-## 本窗口唯一原子任务：Task 14D
+## 本窗口唯一原子任务：Task 14E
 
-只实现 **Core 回调与持续轮询** 进入同一数据库事务的幂等状态收口，使用 `event_id + state_version` 去重，并新增直接相关的聚焦测试。仅处理该收口所需的最小模型/服务关联；不得实现任何事件派发运行时。
+只实现 **WorkflowOutbox 的最小 durable claim-and-wake-up 服务**及其聚焦测试。一个 pending 事件只能由一个事务领取，领取后才调用一个窄的注入 wake-up callable 并传入稳定 idempotency key；wake-up 失败必须保留/恢复可重试的 durable 事件。不得实现实际 Celery、Core HTTP、数据库重投扫描或其他运行时。
 
 可涉及：
 
-- `docs/api/narratoApi/narrato_api/workflows/reconciler.py`
+- `docs/api/narratoApi/narrato_api/workflows/dispatcher.py`
 - `docs/api/narratoApi/narrato_api/workflows/models.py`
-- `docs/api/narratoApi/tests/unit/test_reconciler.py`
-- Task 14D 必须的最小迁移或 package 关联文件。
+- `docs/api/narratoApi/tests/unit/test_workflow_dispatcher.py`
+- Task 14E 必须的最小迁移或 package 关联文件。
 
-验收：相同 Core 事件的 callback 和 polling 结果经同一事务处理；重复或过期 `event_id + state_version` 不重复完成节点或推进下游状态；聚焦测试通过。严格 TDD：先新增测试并看到明确 RED，再最小实现 GREEN。
+验收：同一 Outbox 事件不会重复调用 wake-up callable；失败 wake-up 不丢失事件且保持 retryable；聚焦 dispatcher 和直接受影响 workflow 测试通过。严格 TDD：先新增测试并看到明确 RED，再最小实现 GREEN。
 
-严格禁止 Celery、dispatcher、router、SSE、Task 15、下游消息投递或任何其他运行时功能。完成本原子任务和检查点后，禁止继续下一个任务。
+严格禁止 Core HTTP client、callback router、polling loop、SSE、数据库 re-delivery scanner、Task 15、下游业务执行或任何其他运行时功能。完成本原子任务和检查点后，禁止继续下一个任务。
 
 ## 不可删除的永久规则
 
@@ -39,7 +39,7 @@
 
 1. 执行 `git status --short`、`git branch --show-current`、`git log --oneline --decorate -20`。
 2. 阅读 `docs/superpowers/progress/narrato-api-platform-resume-state.yaml`、`narrato-api-platform-summary.md` 和本文件；如有不一致，以 Git、实际文件和测试为准重建状态文件。
-3. 只读取 Task 14D 相关设计/计划章节；不得仅凭任务编号假设进度。
+3. 只读取 Task 14E 相关设计/计划章节；不得仅凭任务编号假设进度。
 4. 目标测试固定使用 `PYTEST_DISABLE_PLUGIN_AUTOLOAD=1`；先运行新增测试确认 RED，再运行目标与直接受影响模块测试。
 5. 完成后检查实际 diff 与修改范围，先提交业务代码/测试，再更新并提交三个进度文件为独立 checkpoint。
 6. checkpoint 后检查 `git status --short`；任何预期未提交改动必须逐项记录在状态文件中。
