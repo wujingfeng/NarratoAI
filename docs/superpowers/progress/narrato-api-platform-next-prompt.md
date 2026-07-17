@@ -10,13 +10,13 @@
 
 ## 当前真实基线
 
-- Gate C 已执行且阻塞；详见 `docs/superpowers/progress/2026-07-17-gate-c-report.md`。
-- 阻塞根因之一是后端没有 projectApi.js 所调用的创建、费用估算与启动端点。
-- Gate C 验证脚本及 Web build 均通过，但它们是模块/Mock 证据，不能证明真实闭环。
+- Task 17A 已完成：项目创建、费用估算和 ready-only 启动 API 已实现；提交为 `5852e3b feat: add project lifecycle api`。
+- 10 项直接后端测试、ruff 与 diff check 均通过；TestClient 的既有弃用 warning 保留。
+- Gate C 仍因 Create/Result 路由和真实浏览器验证而阻塞。
 
-## 本窗口唯一原子任务：Task 17A
+## 本窗口唯一原子任务：Task 17B
 
-仅恢复认证后的项目创建、费用估算和 ready-only 启动 HTTP 生命周期。严格 TDD：先写直接后端失败测试，再实现最小端点并验证。不要修改 Web 路由、页面或编辑器 UI，不得开始 Task 19。
+只恢复 CreatePage 缺失依赖并注册受保护 `/create` 路由。严格 TDD：先让 Create route/flow verifier 失败，再使其通过。渲染的开始控件必须展示 API 费用并在资产未 ready 时禁用。不得新增 Result 页、编辑器 UI、probe duration 回填或 Task 19。
 
 ## 不可删除的永久规则
 

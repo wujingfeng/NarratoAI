@@ -4,23 +4,23 @@
 
 - 分支：`codex/narrato-api-platform`
 - worktree：`/private/tmp/NarratoAI-narrato-api-platform`
-- Gate：**Gate C 阻塞**；Task 16-18 的模块实现已提交，但真实 Web 闭环不成立。
+- Gate：**Gate C 仍阻塞**；Task 17A 已恢复缺失项目 HTTP 生命周期。
 
-## Gate C 新证据
+## Task 17A 证据
 
-- `verify-api-auth.mjs` PASS；`verify-api-project-flow.mjs` 6 项 PASS；`verify-jianying-export.mjs` 4 项 PASS；`npm run build` PASS；`git diff --check` PASS。
-- 独立审查结论：这些是模块/Mock 证据，不能替代真实路由、真实项目 API 和 Chrome/Edge 保存。
-- 完整报告：`docs/superpowers/progress/2026-07-17-gate-c-report.md`。
+- 实施提交：`5852e3b feat: add project lifecycle api`。
+- RED：生命周期测试实现前观察到 `POST /api/v1/projects` 返回 404。
+- GREEN：`test_project_lifecycle_routes.py`、资产模型和定价测试共 10 项 PASS；ruff 与 `git diff --check` PASS。
+- 提供认证后的 `POST /projects`、`POST /projects/{id}/cost-estimate`、`POST /projects/{id}/start`；估价采用 ready 资产、真实时长和最新价格，启动在事务中复核并创建 workflow。
 
-## 阻塞项
+## 剩余 Gate C 风险
 
-- `CreatePage`、`ProjectResultPage` 未注册路由；CreatePage 还引用四个不存在的本地模块。
-- `projectApi.js` 调用的创建、费用估算、启动 API 在实际后端路由中不存在。
-- 编辑保存与 render 锁没有页面调用方；剪映 ZIP 只有 Mock 流验证，无真实浏览器保存。
-- Vite 保留已有大 chunk advisory。
+- 真实上传的 probe duration 尚未回填到新字段，估价会安全返回 `PROJECT_DURATION_UNAVAILABLE`。
+- `CreatePage`、`ProjectResultPage` 尚未路由；CreatePage 还缺少四个本地依赖。
+- 编辑器 UI 与真实 Chrome/Edge 保存证据仍缺失；Vite 保留大 chunk advisory。
 
 ## 下一原子任务
 
-**Task 17A**：只补齐认证后的项目创建、费用估算和 ready-only 启动 HTTP 生命周期及直接后端测试；不修复页面/路由，不进入 Task 19。
+**Task 17B**：只恢复 CreatePage 缺失依赖和受保护 `/create` 路由，令真实渲染的开始控件使用 API 费用并在资产未 ready 时禁用；不处理 Result/编辑器/时长回填/Task 19。
 
 预存未提交内容仅 `.superpowers/` 与 `docs/web/docs/Oss.php`，不得触碰。
