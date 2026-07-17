@@ -2,37 +2,37 @@ branch: codex/narrato-api-platform
 worktree: /private/tmp/NarratoAI-narrato-api-platform
 current_gate: "Phase 5 / Gate B pending"
 last_complete_task:
-  id: Task 13
+  id: Task 14B
   commits:
-    - "14952da feat: add project asset domain constraints (Task 13A)"
-    - "fc6fe20 feat: add oss upload validation (Task 13B)"
-    - "9bde894 fix: bind uploads to issued policies (Task 13B correction)"
-    - "7a1d06e fix: reconcile asynchronous upload probes (Task 13B correction)"
+    - "6ea93bf feat: add workflow state machine template (Task 14A)"
+    - "60de8c8 feat: add workflow persistence models (Task 14B)"
 current_task:
   id: Task 14
   status: in_progress
-  completed_subtask: Task 14A
-implementation_commit: "6ea93bf feat: add workflow state machine template"
+  completed_subtasks:
+    - Task 14A
+    - Task 14B
+implementation_commit: "60de8c8 feat: add workflow persistence models"
 tests:
-  task_14a:
-    command: "cd docs/api/narratoApi && PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv/bin/python -m pytest tests/unit/test_workflow_state_machine.py tests/unit/test_short_drama_template_v1.py -q"
-    result: "7 passed in 0.01s"
+  task_14b:
+    command: "cd docs/api/narratoApi && PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv/bin/python -m pytest tests/unit/test_workflow_models.py tests/unit/test_workflows_migration.py tests/unit/test_workflow_state_machine.py tests/unit/test_short_drama_template_v1.py -q"
+    result: "10 passed, 2 warnings"
   lint:
-    command: "cd docs/api/narratoApi && .venv/bin/python -m ruff check narrato_api/workflows tests/unit/test_workflow_state_machine.py tests/unit/test_short_drama_template_v1.py"
+    command: "cd docs/api/narratoApi && .venv/bin/python -m ruff check narrato_api/workflows/models.py migrations/versions/0006_workflows.py tests/unit/test_workflow_models.py tests/unit/test_workflows_migration.py migrations/env.py"
     result: pass
   commit_check:
-    command: "git show --check 6ea93bf"
+    command: "git show --check 60de8c8"
     result: pass
 key_decisions:
-  - "Task 13 is complete: Task 13A is 14952da; Task 13B is fc6fe20 with corrections 9bde894 and 7a1d06e."
   - "Task 14A contains only the versioned short-drama DAG template and pure state-machine rules."
-  - "The DAG order is media_probe, asr, video_analysis, script_generation, waiting_for_edit, tts, subtitle, video_render, publish_artifacts."
-  - "User cancellation and manual retry are rejected; waiting_for_edit does not auto-timeout or auto-fail; completed and failed are not recoverable."
-  - "Automatic retry is only a pure candidate predicate; it does not schedule work."
+  - "Task 14B stores template snapshots, workflow instances, nodes, node attempts, and Outbox records only; it does not implement workflow runtime behavior."
+  - "The workflows migration is 0006_workflows, not 0005_workflows, because 0005_asset_probe_reservations already exists; its down_revision is 0005_asset_probe_reservations."
+  - "User cancellation and manual retry remain rejected; waiting_for_edit does not auto-timeout or auto-fail."
 remaining_risks:
-  - "Workflow persistence, Alembic 0005, node attempts, Outbox, callback/poll reconciliation, Celery, router and SSE remain unimplemented."
-  - "The Task 14A focused tests require PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 in this environment because default pytest plugin loading is not reliable."
+  - "Task 14C still needs pure database-transaction DAG instantiation, persisted state transitions, and Outbox writes."
+  - "Core callback/poll reconciliation, Celery dispatch, router, SSE, and Task 15 remain unimplemented."
   - "Real OSS/Core integration and PostgreSQL multi-connection behavior remain unverified."
+  - "Focused pytest commands require PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 because default plugin loading is not reliable in this environment."
 workspace_status:
   clean: false
   expected_uncommitted:
@@ -41,14 +41,14 @@ workspace_status:
     - path: docs/web/docs/Oss.php
       reason: pre-existing untracked file
 next_atomic_task:
-  id: Task 14B
-  scope: "Only add durable workflow persistence models and Alembic 0005 database structures for versioned DAG snapshots, workflow nodes, node attempts, and Outbox records."
+  id: Task 14C
+  scope: "Only implement the workflow service layer for DAG instantiation, durable state transitions, and Outbox writes as pure database transactions, with focused tests."
   relevant_files:
+    - docs/api/narratoApi/narrato_api/workflows/service.py
     - docs/api/narratoApi/narrato_api/workflows/models.py
-    - docs/api/narratoApi/migrations/versions/0005_workflows.py
-    - docs/api/narratoApi/tests/unit/test_workflow_models.py
-    - docs/api/narratoApi/tests/unit/test_workflows_migration.py
+    - docs/api/narratoApi/tests/unit/test_workflow_service.py
   acceptance_criteria:
-    - "Versioned DAG/template snapshot, workflow instance, workflow node, node attempt, and Outbox database records are represented with ownership, state, dependency, uniqueness, and lookup constraints appropriate to the current models."
-    - "Alembic 0005 upgrades from the Task 13B head and passes focused migration/model tests."
-    - "No callback, polling, Celery dispatch, HTTP router, SSE, Task 15, or other workflow runtime behavior is implemented."
+    - "A versioned template snapshot can instantiate persisted workflow and node records in one database transaction."
+    - "Allowed state transitions update durable workflow/node state and append idempotent Outbox records in the same transaction."
+    - "Focused service/model tests pass under PYTEST_DISABLE_PLUGIN_AUTOLOAD=1."
+    - "No callback, polling, Celery, dispatcher, router, SSE, Task 15, or other runtime behavior is implemented."
