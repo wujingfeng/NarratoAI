@@ -1,38 +1,53 @@
-# NarratoAI API 平台：Task 13B 续接提示词
+# SEGMENTED_GOAL_PROTOCOL_V2：NarratoAI API 平台永久续接提示词
 
-在 worktree `/private/tmp/NarratoAI-narrato-api-platform`、分支 `codex/narrato-api-platform` 继续实施。不得创建新 worktree，不得 reset、restore、clean、删除或覆盖已有改动；尤其不得触碰预存未跟踪 `/.superpowers/` 与 `docs/web/docs/Oss.php`。
+在既有 worktree `/private/tmp/NarratoAI-narrato-api-platform`、分支 `codex/narrato-api-platform` 中继续开发。不得创建新 worktree，不得 `reset`、`restore`、`clean`、删除或覆盖已有改动；不得触碰预存未跟踪 `/.superpowers/` 与 `docs/web/docs/Oss.php`。
 
-## 先恢复事实状态
+## 当前真实基线
 
-只读执行：
+- HEAD 检查点：`chore(progress): checkpoint after Task 14A`；其父实施提交为 `6ea93bf feat: add workflow state machine template`。
+- Task 13 已完成：Task 13A `14952da`；Task 13B `fc6fe20`，修正 `9bde894`、`7a1d06e`。
+- Gate：`Phase 5 / Gate B pending`。
+- Task 14 为 `in_progress`，已完成 Task 14A。
+- 预期未提交内容仅为 `.superpowers/` 与 `docs/web/docs/Oss.php`。
 
-1. `git status --short`
-2. `git branch --show-current`
-3. `git log --oneline --decorate -10`
-4. 阅读 `docs/superpowers/progress/narrato-api-platform-resume-state.yaml`、`summary.md` 和本文件。
-5. 按标题/行号读取 `docs/superpowers/plans/2026-07-16-narrato-api-platform.md:893-959` 及设计中 OSS 上传和状态机相关段落。
+## 本窗口唯一原子任务：Task 14B
 
-以 Git、测试和真实文件为准。当前事实：Task 12 完整完成于 `52e973f`；Task 13A 完成于 `14952da`；Task 13 仍为 `in_progress`；Gate 为 `Phase 5 / Gate B pending`。
-
-## 本窗口唯一原子任务：Task 13B
-
-只实现 Task 13 剩余上传链路：
-
-- 认证用户的 OSS POST Policy；
-- 前缀、扩展名/Content-Type、视频 300 MiB、SRT 5 MiB 限制；
-- 上传完成后的 OSS HEAD 校验；
-- 调用 Core 媒体探测，并将资产从 `validating` 更新为 `ready` 或 `invalid`。
+只实现工作流持久化模型与 `0005_workflows` Alembic 迁移：版本化 DAG/模板快照、workflow instance、workflow node、node attempt、Outbox 等数据库数据结构，以及直接模型和迁移测试。
 
 可涉及：
 
-- `docs/api/narratoApi/narrato_api/projects/{schemas,service,router}.py`
-- `docs/api/narratoApi/narrato_api/assets/{schemas,service,router}.py`
-- `docs/api/narratoApi/narrato_api/integrations/{oss_client,core_client}.py`
-- Task 13A 模型的必要共享接口调整
-- `tests/unit/test_oss_post_policy.py`、`tests/integration/test_upload_complete.py` 与直接受影响测试。
+- `docs/api/narratoApi/narrato_api/workflows/models.py`
+- `docs/api/narratoApi/migrations/versions/0005_workflows.py`
+- `docs/api/narratoApi/tests/unit/test_workflow_models.py`
+- `docs/api/narratoApi/tests/unit/test_workflows_migration.py`
+- 必要的最小 package/database 关联文件。
 
-禁止实施工作流、Task 14/15、任务路由之外的功能。
+验收：模型能持久化上述实体并提供适当的归属、状态、依赖、唯一性和查询约束；迁移可从 Task 13B 迁移头升级；新增与直接受影响的模型/迁移测试通过。严格 TDD：先测试并看到明确 RED，再最小实现 GREEN。
 
-## 执行与验证
+禁止实现 Core 回调、持续轮询、Celery 派发、router、SSE、Task 15 或任何工作流运行时行为。完成本原子任务和检查点后，禁止继续下一个任务。
 
-严格 TDD：先新增测试并记录明确 RED，再做最小 GREEN。先运行新增和直接受影响测试；Gate 前不要扩大为全量测试。至少验证：未登录不签发 policy、对象键前缀和文件边界、HEAD 成功后触发 probe、状态 `validating -> ready/invalid`。完成后检查 diff 范围、提交业务代码与测试，并按当前协议创建新的检查点文件和单独 checkpoint 提交。
+## 不可删除的永久规则
+
+1. 协议标识必须为 **SEGMENTED_GOAL_PROTOCOL_V2**。
+2. 每个窗口只执行一个原子任务。
+3. 开始时必须校验 Git 和 `resume-state.yaml`。
+4. 结束时必须更新并提交检查点。
+5. 仍有任务时必须再次生成 `next-prompt.md`。
+6. 最终回复必须再次提示新建窗口续接。
+7. 检查点完成后禁止继续下一个任务。
+
+## 本窗口开始操作
+
+1. 执行 `git status --short`、`git branch --show-current`、`git log --oneline --decorate -20`。
+2. 阅读 `docs/superpowers/progress/narrato-api-platform-resume-state.yaml`、`narrato-api-platform-summary.md` 和本文件；如有不一致，以 Git、实际文件和测试为准并重建状态文件。
+3. 只读取 Task 14B 相关设计/计划章节；不得仅凭任务编号假设进度。
+4. 完成后运行目标测试，检查实际 diff 与修改范围，先提交业务代码/测试，再更新并提交三个进度文件为独立 checkpoint。
+5. checkpoint 后检查 `git status --short`；任何预期未提交改动必须逐项记录在状态文件中。
+
+## 最终回复要求
+
+报告完成原子任务、Implementation Commit、Checkpoint Commit、测试结果、当前 Gate、下一个原子任务和工作区状态。若仍有未完成任务，必须明确输出：
+
+> 请新建窗口，并再次使用 SEGMENTED_GOAL_PROTOCOL_V2 永久续接提示词。
+
+仍有任务时，结束前必须重新生成本 `next-prompt.md`，供下一窗口直接执行。

@@ -2,33 +2,37 @@ branch: codex/narrato-api-platform
 worktree: /private/tmp/NarratoAI-narrato-api-platform
 current_gate: "Phase 5 / Gate B pending"
 last_complete_task:
-  id: Task 12
-  commit: 52e973f
-current_task:
   id: Task 13
+  commits:
+    - "14952da feat: add project asset domain constraints (Task 13A)"
+    - "fc6fe20 feat: add oss upload validation (Task 13B)"
+    - "9bde894 fix: bind uploads to issued policies (Task 13B correction)"
+    - "7a1d06e fix: reconcile asynchronous upload probes (Task 13B correction)"
+current_task:
+  id: Task 14
   status: in_progress
-  completed_subtask: Task 13A
-implementation_commit: 14952da
+  completed_subtask: Task 14A
+implementation_commit: "6ea93bf feat: add workflow state machine template"
 tests:
-  red:
-    command: "cd docs/api/narratoApi && .venv/bin/python -m pytest tests/unit/test_project_asset_constraints.py tests/unit/test_project_asset_models.py tests/unit/test_projects_assets_migration.py -q"
-    result: "ModuleNotFoundError: narrato_api.assets"
-  green:
-    command: "cd docs/api/narratoApi && .venv/bin/python -m pytest tests/unit/test_project_asset_constraints.py tests/unit/test_project_asset_models.py tests/unit/test_projects_assets_migration.py -q"
-    result: "11 passed, 2 warnings"
-  migration:
-    command: "cd docs/api/narratoApi && .venv/bin/alembic upgrade head && .venv/bin/alembic check"
-    result: pass
+  task_14a:
+    command: "cd docs/api/narratoApi && PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv/bin/python -m pytest tests/unit/test_workflow_state_machine.py tests/unit/test_short_drama_template_v1.py -q"
+    result: "7 passed in 0.01s"
   lint:
-    command: "cd docs/api/narratoApi && .venv/bin/python -m ruff check narrato_api/projects narrato_api/assets migrations/env.py migrations/versions/0004_projects_assets.py tests/unit/test_project_asset_constraints.py tests/unit/test_project_asset_models.py tests/unit/test_projects_assets_migration.py"
+    command: "cd docs/api/narratoApi && .venv/bin/python -m ruff check narrato_api/workflows tests/unit/test_workflow_state_machine.py tests/unit/test_short_drama_template_v1.py"
+    result: pass
+  commit_check:
+    command: "git show --check 6ea93bf"
     result: pass
 key_decisions:
-  - "Task 13A only adds project/asset domain models, Alembic 0004, ownership constraints, indexes, and pure declaration constraints."
-  - "No router, OSS POST policy, upload completion, Core client, or media probe integration was implemented."
+  - "Task 13 is complete: Task 13A is 14952da; Task 13B is fc6fe20 with corrections 9bde894 and 7a1d06e."
+  - "Task 14A contains only the versioned short-drama DAG template and pure state-machine rules."
+  - "The DAG order is media_probe, asr, video_analysis, script_generation, waiting_for_edit, tts, subtitle, video_render, publish_artifacts."
+  - "User cancellation and manual retry are rejected; waiting_for_edit does not auto-timeout or auto-fail; completed and failed are not recoverable."
+  - "Automatic retry is only a pure candidate predicate; it does not schedule work."
 remaining_risks:
-  - "Real OSS and Core integrations remain unverified."
-  - "PostgreSQL multi-connection behavior remains unverified; current model and migration coverage uses SQLite."
-  - "Pre-existing untracked /.superpowers/ and docs/web/docs/Oss.php were not modified or committed."
+  - "Workflow persistence, Alembic 0005, node attempts, Outbox, callback/poll reconciliation, Celery, router and SSE remain unimplemented."
+  - "The Task 14A focused tests require PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 in this environment because default pytest plugin loading is not reliable."
+  - "Real OSS/Core integration and PostgreSQL multi-connection behavior remain unverified."
 workspace_status:
   clean: false
   expected_uncommitted:
@@ -37,21 +41,14 @@ workspace_status:
     - path: docs/web/docs/Oss.php
       reason: pre-existing untracked file
 next_atomic_task:
-  id: Task 13B
-  scope: "OSS POST policy, upload confirmation, and Core media-probe integration from the remaining Task 13 plan."
+  id: Task 14B
+  scope: "Only add durable workflow persistence models and Alembic 0005 database structures for versioned DAG snapshots, workflow nodes, node attempts, and Outbox records."
   relevant_files:
-    - docs/api/narratoApi/narrato_api/projects/schemas.py
-    - docs/api/narratoApi/narrato_api/projects/service.py
-    - docs/api/narratoApi/narrato_api/projects/router.py
-    - docs/api/narratoApi/narrato_api/assets/schemas.py
-    - docs/api/narratoApi/narrato_api/assets/service.py
-    - docs/api/narratoApi/narrato_api/assets/router.py
-    - docs/api/narratoApi/narrato_api/integrations/oss_client.py
-    - docs/api/narratoApi/narrato_api/integrations/core_client.py
-    - docs/api/narratoApi/tests/unit/test_oss_post_policy.py
-    - docs/api/narratoApi/tests/integration/test_upload_complete.py
+    - docs/api/narratoApi/narrato_api/workflows/models.py
+    - docs/api/narratoApi/migrations/versions/0005_workflows.py
+    - docs/api/narratoApi/tests/unit/test_workflow_models.py
+    - docs/api/narratoApi/tests/unit/test_workflows_migration.py
   acceptance_criteria:
-    - "Authenticated users receive only prefix-, type-, and size-constrained POST policies."
-    - "Upload completion verifies the declared OSS object with HEAD before dispatching media validation."
-    - "Assets transition validating to ready or invalid from the Core media-probe result."
-    - "No workflow, Task 14, or Task 15 behavior is implemented."
+    - "Versioned DAG/template snapshot, workflow instance, workflow node, node attempt, and Outbox database records are represented with ownership, state, dependency, uniqueness, and lookup constraints appropriate to the current models."
+    - "Alembic 0005 upgrades from the Task 13B head and passes focused migration/model tests."
+    - "No callback, polling, Celery dispatch, HTTP router, SSE, Task 15, or other workflow runtime behavior is implemented."
