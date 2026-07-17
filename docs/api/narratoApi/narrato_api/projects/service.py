@@ -1,5 +1,11 @@
 from __future__ import annotations
 
+from collections.abc import Iterable
+from typing import TypeVar
+
+
+Artifact = TypeVar("Artifact")
+
 
 class ProjectStateConflict(ValueError):
     """项目状态不满足当前操作前置条件时抛出。"""
@@ -8,6 +14,7 @@ class ProjectStateConflict(ValueError):
 
 
 _DELETABLE_PROJECT_STATES = frozenset({"completed", "failed"})
+_ARTIFACT_VISIBLE_PROJECT_STATES = frozenset({"completed"})
 
 
 def ensure_project_deletable(status: str) -> None:
@@ -15,3 +22,12 @@ def ensure_project_deletable(status: str) -> None:
 
     if status not in _DELETABLE_PROJECT_STATES:
         raise ProjectStateConflict("project must be completed or failed before deletion")
+
+
+def visible_artifacts(status: str, artifacts: Iterable[Artifact]) -> list[Artifact]:
+    """仅让已完成项目展示已登记的可导出产物。"""
+
+    # 失败项目可能遗留中间文件，但不能向用户暴露任何产物。
+    if status not in _ARTIFACT_VISIBLE_PROJECT_STATES:
+        return []
+    return list(artifacts)
