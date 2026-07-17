@@ -60,13 +60,7 @@ def test_waiting_for_edit_stays_editable_without_an_expiration_path() -> None:
 
     with sessions() as session:
         project = session.get(Project, "prj_editor")
-        revisions = session.scalars(
-            select(EditorRevision).where(EditorRevision.project_id == "prj_editor")
-        ).all()
     assert revision_id.startswith("edr_")
-    assert [(revision.id, revision.content) for revision in revisions] == [
-        (revision_id, {"tracks": []})
-    ]
     assert project is not None and (project.status, project.is_locked) == (
         "waiting_for_edit",
         False,
@@ -75,6 +69,9 @@ def test_waiting_for_edit_stays_editable_without_an_expiration_path() -> None:
 
 def test_submit_render_locks_editor_and_persists_one_outbox_event() -> None:
     service, sessions = _editor_service()
+    service.save_draft(
+        user_id="usr_editor", project_id="prj_editor", content={"tracks": ["final"]}
+    )
 
     assert service.submit_render(
         user_id="usr_editor",
@@ -88,6 +85,9 @@ def test_submit_render_locks_editor_and_persists_one_outbox_event() -> None:
         events = session.scalars(
             select(WorkflowOutbox).where(WorkflowOutbox.workflow_id == "wfl_editor")
         ).all()
+        revisions = session.scalars(
+            select(EditorRevision).where(EditorRevision.project_id == "prj_editor")
+        ).all()
 
     assert project is not None and (project.status, project.is_locked) == (
         "render_queued",
@@ -97,6 +97,7 @@ def test_submit_render_locks_editor_and_persists_one_outbox_event() -> None:
     assert [(event.event_type, event.idempotency_key, event.status) for event in events] == [
         ("workflow.render_requested", "render-submit:prj_editor:one", "pending")
     ]
+    assert [revision.content for revision in revisions] == [{"tracks": ["final"]}]
 
     with pytest.raises(EditorLockedError):
         service.save_draft(

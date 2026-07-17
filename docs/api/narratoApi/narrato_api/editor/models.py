@@ -28,3 +28,20 @@ class EditorRevision(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=utc_now
     )
+
+
+class EditorDraft(Base):
+    """项目当前可变的编辑草稿，服务端以最后一次保存覆盖。"""
+
+    __tablename__ = "editor_drafts"
+
+    project_id: Mapped[str] = mapped_column(
+        String(64),
+        ForeignKey("projects.id", ondelete="RESTRICT"),
+        primary_key=True,
+    )
+    id: Mapped[str] = mapped_column(String(64), nullable=False, unique=True)
+    content: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=utc_now, onupdate=utc_now
+    )

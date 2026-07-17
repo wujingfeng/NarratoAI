@@ -18,6 +18,7 @@ assert _auth_models.User.__tablename__ == "users"
 assert _billing_models.CreditAccount.__tablename__ == "credit_accounts"
 assert _project_models.Project.__tablename__ == "projects"
 assert _asset_models.Asset.__tablename__ == "assets"
+assert _editor_models.EditorDraft.__tablename__ == "editor_drafts"
 assert _editor_models.EditorRevision.__tablename__ == "editor_revisions"
 assert _workflow_models.Workflow.__tablename__ == "workflows"
 

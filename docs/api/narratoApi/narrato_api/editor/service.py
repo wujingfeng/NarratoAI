@@ -8,7 +8,7 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from narrato_api.editor.models import EditorRevision
+from narrato_api.editor.models import EditorDraft, EditorRevision
 from narrato_api.projects.models import Project
 from narrato_api.workflows.models import Workflow, WorkflowOutbox
 
@@ -19,6 +19,10 @@ class EditorLockedError(ValueError):
 
 class EditorWorkflowNotFoundError(LookupError):
     """提交渲染时缺少项目工作流时抛出。"""
+
+
+class EditorDraftNotFoundError(LookupError):
+    """提交渲染时没有可快照化草稿时抛出。"""
 
 
 def _new_id(prefix: str) -> str:
@@ -36,18 +40,22 @@ class EditorService:
     def save_draft(
         self, *, user_id: str, project_id: str, content: dict[str, Any]
     ) -> str:
-        """仅允许未锁定的 waiting_for_edit 项目追加一份草稿快照。"""
+        """仅允许未锁定的 waiting_for_edit 项目覆盖当前可变草稿。"""
 
         with self.session_factory() as session:
             with session.begin():
                 project = self._editable_project(
                     session, user_id=user_id, project_id=project_id
                 )
-                revision = EditorRevision(
-                    id=_new_id("edr"), project_id=project.id, content=content
-                )
-                session.add(revision)
-                return revision.id
+                draft = session.get(EditorDraft, project.id)
+                if draft is None:
+                    draft = EditorDraft(
+                        id=_new_id("edr"), project_id=project.id, content=content
+                    )
+                    session.add(draft)
+                else:
+                    draft.content = content
+                return draft.id
 
     def submit_render(
         self, *, user_id: str, project_id: str, idempotency_key: str
@@ -75,10 +83,20 @@ class EditorService:
                 )
                 if workflow is None:
                     raise EditorWorkflowNotFoundError("workflow not found")
+                draft = session.get(EditorDraft, project.id)
+                if draft is None:
+                    raise EditorDraftNotFoundError("editor draft not found")
                 project.is_locked = True
                 project.status = "render_queued"
                 workflow.state = "render_queued"
                 workflow.state_version += 1
+                session.add(
+                    EditorRevision(
+                        id=_new_id("erv"),
+                        project_id=project.id,
+                        content=draft.content,
+                    )
+                )
                 session.add(
                     WorkflowOutbox(
                         id=_new_id("obx"),
