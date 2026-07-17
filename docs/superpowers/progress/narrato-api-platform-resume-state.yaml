@@ -2,7 +2,7 @@ branch: codex/narrato-api-platform
 worktree: /private/tmp/NarratoAI-narrato-api-platform
 current_gate: "Phase 5 / Gate B pending"
 last_complete_task:
-  id: Task 15J
+  id: Task 15K
   commits:
     - "6ea93bf feat: add workflow state machine template (Task 14A)"
     - "60de8c8 feat: add workflow persistence models (Task 14B)"
@@ -20,8 +20,9 @@ last_complete_task:
     - "c2e1cca feat(api): query completed project artifacts (Task 15H)"
     - "91d8503 feat(api): add completed project result lookup (Task 15I)"
     - "d98394a feat: add pure jianying manifest resource mapping (Task 15J)"
+    - "b66a374 feat(api): build owned completed project jianying manifest (Task 15K)"
 current_task:
-  id: Task 15J
+  id: Task 15K
   status: completed
   completed_subtasks:
     - Task 15A editor lock and permanent waiting boundary
@@ -34,8 +35,21 @@ current_task:
     - Task 15H completed-project registered-artifact read service
     - Task 15I owned completed-project result lookup service
     - Task 15J pure Jianying manifest resource-mapping builder
-implementation_commit: "d98394a feat: add pure jianying manifest resource mapping"
+    - Task 15K owned completed-project Jianying manifest service
+implementation_commit: "b66a374 feat(api): build owned completed project jianying manifest"
 tests:
+  task_15k_red:
+    command: "cd docs/api/narratoApi && .venv/bin/python -m pytest tests/unit/test_project_jianying_manifest.py -q"
+    result: "Expected RED: five failures because the owned-project manifest service was missing."
+  task_15k_green_and_direct:
+    command: "cd docs/api/narratoApi && PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv/bin/python -m pytest tests/unit/test_project_jianying_manifest.py tests/unit/test_project_result_lookup.py tests/unit/test_jianying_manifest.py -q"
+    result: "14 passed in 0.37s."
+  task_15k_ruff:
+    command: "cd docs/api/narratoApi && .venv/bin/ruff check narrato_api/exports/service.py tests/unit/test_project_jianying_manifest.py"
+    result: pass
+  task_15k_diff_check:
+    command: "git diff --check"
+    result: pass
   task_15j_red:
     command: "cd docs/api/narratoApi && .venv/bin/python -m pytest tests/unit/test_jianying_manifest.py -q"
     result: "Expected RED: three failures because narrato_api.exports was missing."
@@ -153,6 +167,8 @@ key_decisions:
   - "Task 15I deliberately provides no HTTP route, result presentation, export/Jianying generation, Core call, or downstream behavior."
   - "Task 15J deterministically maps explicit RegisteredArtifact values to package_name plus resource entries sorted by artifact id; zip paths use a static kind directory and SHA-256 artifact-id digest, never a URL path."
   - "Task 15J deliberately creates no ZIP, route, HTTP/Core call, filesystem/OSS write, or downstream behavior."
+  - "Task 15K composes only owned completed-project lookup with the existing pure manifest mapper; inherited result lookup errors retain user/terminal-state boundaries."
+  - "Task 15K deliberately adds no HTTP route, Core base-file call, ZIP, filesystem/OSS write, or downstream behavior."
   - "Task 15C does not implement artifacts/results, export/Jianying, router, Core calls, downstream execution, or another Task 15 boundary."
 remaining_risks:
   - "SQLite tests cover persistence boundaries but real PostgreSQL multi-connection/row-lock behavior remains unverified."
@@ -166,6 +182,7 @@ remaining_risks:
   - "The completed-artifact read service must be wrapped by an owned-project lookup before exposure to an authenticated user."
   - "The owned completed-project result lookup is the sole service-layer read boundary for future result routes."
   - "The client-side streaming ZIP contract consumes only manifest metadata and CDN URLs; server-side ZIP creation remains prohibited."
+  - "Any eventual manifest route must call the owned-project manifest service rather than expose artifacts directly."
 workspace_status:
   clean: false
   expected_uncommitted:
@@ -174,8 +191,8 @@ workspace_status:
     - path: docs/web/docs/Oss.php
       reason: pre-existing untracked file
 next_atomic_task:
-  id: Task 15K
-  scope: "Implement only an owned completed-project Jianying manifest service that composes existing result lookup and pure mapping as one independently verifiable Task 15 boundary; do not add HTTP routes, Core base-file calls, ZIP generation, filesystem/OSS writes, or later tasks."
+  id: Task 15L
+  scope: "Implement only an authenticated GET project-result HTTP route that delegates to the owned completed-project result lookup service as one independently verifiable Task 15 boundary; do not implement exports/Jianying routes, Core calls, presentation, or later tasks."
   relevant_files:
     - docs/superpowers/plans/2026-07-16-narrato-api-platform.md
     - docs/superpowers/specs/2026-07-16-narrato-api-platform-design.md
@@ -183,9 +200,9 @@ next_atomic_task:
     - docs/api/narratoApi/narrato_api/artifacts/service.py
     - docs/api/narratoApi/narrato_api/exports/service.py
     - docs/api/narratoApi/narrato_api/projects/service.py
-    - docs/api/narratoApi/tests/unit/test_jianying_manifest.py
-    - docs/api/narratoApi/tests/unit/test_project_jianying_manifest.py
+    - docs/api/narratoApi/narrato_api/projects/router.py
+    - docs/api/narratoApi/tests/integration/test_project_result_route.py
   acceptance_criteria:
-    - "Use TDD and require an owned completed project before returning the existing pure resource manifest."
-    - "Verify foreign users, missing projects, and non-completed projects are rejected, with no HTTP/Core/ZIP/filesystem/OSS behavior."
+    - "Use TDD and route the authenticated current user plus project_id only through the existing owned completed-project result lookup boundary."
+    - "Verify no result is returned to foreign users or for non-completed projects, while avoiding export/Jianying routes, Core calls, or presentation behavior."
     - "Run new and directly affected tests, inspect diff, commit implementation, then update and commit a checkpoint before stopping."

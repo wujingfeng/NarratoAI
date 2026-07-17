@@ -5,7 +5,7 @@
 - 分支：`codex/narrato-api-platform`
 - worktree：`/private/tmp/NarratoAI-narrato-api-platform`
 - 项目 Gate：**Phase 5 / Gate B pending**；Task 15 仍有未完成子任务。
-- 最新 Implementation Commit：`d98394a feat: add pure jianying manifest resource mapping`（Task 15J）。
+- 最新 Implementation Commit：`b66a374 feat(api): build owned completed project jianying manifest`（Task 15K）。
 
 ## 已完成
 
@@ -20,16 +20,17 @@
 9. **Task 15H**：仅完成 completed 项目的已登记产物读取服务；按 `created_at/id` 稳定排序，其他状态均为空。
 10. **Task 15I**：仅完成用户归属的 completed 项目结果查询；仅 `user_id + project_id` 命中且完成时返回最小结果记录。
 11. **Task 15J**：仅完成纯剪映 Manifest 资源映射；固定包名、按产物 ID 排序，路径不依赖 URL。
+12. **Task 15K**：仅完成用户归属 completed 项目的 Manifest 服务，组合既有结果查询和纯映射。
 
 ## 新鲜验证证据
 
-- Task 15J RED：缺少 `narrato_api.exports`（3 个预期失败）。
-- Task 15J 直接复验：`3 passed in 0.27s`（路径安全、确定性和无 I/O 依赖）。
-- Task 15J Ruff、`git diff --check` 通过。
+- Task 15K RED：缺少 owned-project Manifest service（5 个预期失败）。
+- Task 15K 直接复验：`14 passed in 0.37s`（所有权、终态和纯 Manifest 边界）。
+- Task 15K Ruff、`git diff --check` 通过。
 
 ## 范围、风险与续接
 
-- Task 15J 未实现实际删除、受用户归属的 Manifest 服务、HTTP/结果呈现、Core 基础文件、router、下游或其他 Task 15 子任务。
+- Task 15K 未实现实际删除、HTTP 结果/Manifest 路由、Core 基础文件、router、下游或其他 Task 15 子任务。
 - SQLite/PostgreSQL 并发差异、真实 OSS/Core 集成和 6 个既有 assets mypy 错误仍是风险。
 - 预期未提交内容仅 `/.superpowers/` 与 `docs/web/docs/Oss.php`，二者不得触碰。
-- 唯一下一原子任务：**Task 15K**，只实现用户归属 completed 项目的剪映 Manifest 服务；完成 checkpoint 后立即停止。
+- 唯一下一原子任务：**Task 15L**，只实现认证项目结果 GET 路由；完成 checkpoint 后立即停止。
