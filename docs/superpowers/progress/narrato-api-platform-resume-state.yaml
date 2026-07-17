@@ -2,35 +2,44 @@ branch: codex/narrato-api-platform
 worktree: /private/tmp/NarratoAI-narrato-api-platform
 current_gate: "Phase 5 / Gate B pending"
 last_complete_task:
-  id: Task 14B
+  id: Task 14C
   commits:
     - "6ea93bf feat: add workflow state machine template (Task 14A)"
     - "60de8c8 feat: add workflow persistence models (Task 14B)"
+    - "369d4c3 feat: add transactional workflow service (Task 14C)"
 current_task:
   id: Task 14
   status: in_progress
   completed_subtasks:
     - Task 14A
     - Task 14B
-implementation_commit: "60de8c8 feat: add workflow persistence models"
+    - Task 14C
+implementation_commit: "369d4c3 feat: add transactional workflow service"
 tests:
-  task_14b:
-    command: "cd docs/api/narratoApi && PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv/bin/python -m pytest tests/unit/test_workflow_models.py tests/unit/test_workflows_migration.py tests/unit/test_workflow_state_machine.py tests/unit/test_short_drama_template_v1.py -q"
-    result: "10 passed, 2 warnings"
-  lint:
-    command: "cd docs/api/narratoApi && .venv/bin/python -m ruff check narrato_api/workflows/models.py migrations/versions/0006_workflows.py tests/unit/test_workflow_models.py tests/unit/test_workflows_migration.py migrations/env.py"
+  task_14c_red:
+    command: "cd docs/api/narratoApi && PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv/bin/python -m pytest tests/unit/test_workflow_service.py -q"
+    result: "Expected RED: collection failed with ModuleNotFoundError: No module named narrato_api.workflows.service; the service module was intentionally absent."
+  task_14c_target:
+    command: "cd docs/api/narratoApi && PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv/bin/python -m pytest tests/unit/test_workflow_service.py -q"
+    result: "2 passed in 0.29s"
+  task_14c_direct:
+    command: "cd docs/api/narratoApi && PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv/bin/python -m pytest tests/unit/test_workflow_service.py tests/unit/test_workflow_models.py tests/unit/test_workflow_state_machine.py tests/unit/test_short_drama_template_v1.py -q"
+    result: "11 passed in 0.30s"
+  task_14c_lint:
+    command: "cd docs/api/narratoApi && .venv/bin/python -m ruff check narrato_api/workflows/service.py tests/unit/test_workflow_service.py"
     result: pass
-  commit_check:
-    command: "git show --check 60de8c8"
+  task_14c_diff_check:
+    command: "git diff --check"
     result: pass
 key_decisions:
   - "Task 14A contains only the versioned short-drama DAG template and pure state-machine rules."
   - "Task 14B stores template snapshots, workflow instances, nodes, node attempts, and Outbox records only; it does not implement workflow runtime behavior."
-  - "The workflows migration is 0006_workflows, not 0005_workflows, because 0005_asset_probe_reservations already exists; its down_revision is 0005_asset_probe_reservations."
+  - "Task 14C instantiates Workflow and WorkflowNode records from an immutable WorkflowTemplateSnapshot in one transaction."
+  - "Task 14C applies only allowed workflow state transitions and appends one idempotent workflow.state_changed Outbox event in the same transaction."
   - "User cancellation and manual retry remain rejected; waiting_for_edit does not auto-timeout or auto-fail."
 remaining_risks:
-  - "Task 14C still needs pure database-transaction DAG instantiation, persisted state transitions, and Outbox writes."
-  - "Core callback/poll reconciliation, Celery dispatch, router, SSE, and Task 15 remain unimplemented."
+  - "Task 14D still needs unified idempotent Core callback and polling reconciliation using event_id plus state_version."
+  - "Celery dispatch, database re-delivery scanning, router, SSE, and Task 15 remain unimplemented."
   - "Real OSS/Core integration and PostgreSQL multi-connection behavior remain unverified."
   - "Focused pytest commands require PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 because default plugin loading is not reliable in this environment."
 workspace_status:
@@ -41,14 +50,14 @@ workspace_status:
     - path: docs/web/docs/Oss.php
       reason: pre-existing untracked file
 next_atomic_task:
-  id: Task 14C
-  scope: "Only implement the workflow service layer for DAG instantiation, durable state transitions, and Outbox writes as pure database transactions, with focused tests."
+  id: Task 14D
+  scope: "Only implement unified idempotent state reconciliation for Core callbacks and continuous polling, keyed by event_id plus state_version, with focused tests."
   relevant_files:
-    - docs/api/narratoApi/narrato_api/workflows/service.py
+    - docs/api/narratoApi/narrato_api/workflows/reconciler.py
     - docs/api/narratoApi/narrato_api/workflows/models.py
-    - docs/api/narratoApi/tests/unit/test_workflow_service.py
+    - docs/api/narratoApi/tests/unit/test_reconciler.py
   acceptance_criteria:
-    - "A versioned template snapshot can instantiate persisted workflow and node records in one database transaction."
-    - "Allowed state transitions update durable workflow/node state and append idempotent Outbox records in the same transaction."
-    - "Focused service/model tests pass under PYTEST_DISABLE_PLUGIN_AUTOLOAD=1."
-    - "No callback, polling, Celery, dispatcher, router, SSE, Task 15, or other runtime behavior is implemented."
+    - "A callback and a polling result for the same Core event converge through one transaction without duplicate node completion or downstream state advancement."
+    - "event_id and state_version make duplicate and stale terminal results idempotent."
+    - "Focused reconciler and directly affected workflow tests pass under PYTEST_DISABLE_PLUGIN_AUTOLOAD=1."
+    - "No Celery, dispatcher, router, SSE, Task 15, or other runtime delivery behavior is implemented."
