@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from sqlalchemy import BigInteger, CheckConstraint, DateTime, ForeignKey, Index, String, UniqueConstraint
+from sqlalchemy import BigInteger, CheckConstraint, DateTime, Float, ForeignKey, Index, String, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from narrato_api.database import Base
@@ -46,6 +46,7 @@ class Asset(Base):
     object_key: Mapped[str] = mapped_column(String(1024), nullable=False)
     cdn_url: Mapped[str] = mapped_column(String(2048), nullable=False)
     size_bytes: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    duration_seconds: Mapped[float | None] = mapped_column(Float, nullable=True)
     core_task_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
     reservation_expires_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True

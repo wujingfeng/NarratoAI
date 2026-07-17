@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Request, status
 from sqlalchemy.orm import Session
 
 from narrato_api.api.dependencies import get_request_id, get_settings
@@ -18,9 +18,13 @@ from narrato_api.exports.service import (
 from narrato_api.integrations.core_client import CoreClientError, HttpCoreClient
 from narrato_api.projects.service import (
     ProjectNotFoundError,
+    ProjectLifecycleConflict,
     ProjectResultLookupError,
+    create_project,
+    estimate_project_cost,
     lookup_completed_project_result,
     request_project_deletion,
+    start_project,
     ProjectStateConflict,
 )
 
@@ -43,6 +47,69 @@ class ProjectResultArtifactData(StrictModel):
     id: str
     kind: str
     cdn_url: str
+
+
+class ProjectCreateRequest(StrictModel):
+    product: str
+
+
+class ProjectData(StrictModel):
+    id: str
+    status: str
+
+
+class ProjectCostData(StrictModel):
+    credits: int
+    total_seconds: int
+    credits_per_minute: int
+
+
+class ProjectStartData(StrictModel):
+    workflow_id: str
+
+
+def _lifecycle_error(error: Exception) -> ApiError:
+    if isinstance(error, ProjectNotFoundError):
+        return ApiError("PROJECT_NOT_FOUND", "Project not found", 404)
+    if isinstance(error, ProjectLifecycleConflict):
+        return ApiError(error.code, str(error), 409)
+    raise error
+
+
+@router.post("/projects", status_code=status.HTTP_201_CREATED, response_model=ApiResponse[ProjectData])
+def create_owned_project(body: ProjectCreateRequest, request: Request, token: Annotated[str, Depends(bearer_token)], auth: Annotated[AuthService, Depends(get_auth_service)], request_id: Annotated[str, Depends(get_request_id)]) -> ApiResponse[ProjectData]:
+    user = auth.resolve_user(token)
+    with Session(request.app.state.database_engine) as session:
+        with session.begin():
+            try:
+                project = create_project(session, user_id=user.id, product=body.product)
+                data = ProjectData(id=project.id, status=project.status)
+            except ProjectLifecycleConflict as error:
+                raise _lifecycle_error(error) from error
+    return ApiResponse(code="PROJECT_CREATED", message="Project created", data=data, request_id=request_id)
+
+
+@router.post("/projects/{project_id}/cost-estimate", response_model=ApiResponse[ProjectCostData])
+def estimate_owned_project(project_id: str, request: Request, token: Annotated[str, Depends(bearer_token)], auth: Annotated[AuthService, Depends(get_auth_service)], request_id: Annotated[str, Depends(get_request_id)]) -> ApiResponse[ProjectCostData]:
+    user = auth.resolve_user(token)
+    with Session(request.app.state.database_engine) as session:
+        try:
+            credits, total_seconds, credits_per_minute = estimate_project_cost(session, user_id=user.id, project_id=project_id)
+        except (ProjectNotFoundError, ProjectLifecycleConflict) as error:
+            raise _lifecycle_error(error) from error
+    return ApiResponse(code="PROJECT_COST_ESTIMATED", message="Project cost estimated", data=ProjectCostData(credits=credits, total_seconds=total_seconds, credits_per_minute=credits_per_minute), request_id=request_id)
+
+
+@router.post("/projects/{project_id}/start", status_code=status.HTTP_202_ACCEPTED, response_model=ApiResponse[ProjectStartData])
+def start_owned_project(project_id: str, request: Request, token: Annotated[str, Depends(bearer_token)], auth: Annotated[AuthService, Depends(get_auth_service)], request_id: Annotated[str, Depends(get_request_id)]) -> ApiResponse[ProjectStartData]:
+    user = auth.resolve_user(token)
+    with Session(request.app.state.database_engine) as session:
+        try:
+            with session.begin():
+                workflow_id = start_project(session, user_id=user.id, project_id=project_id)
+        except (ProjectNotFoundError, ProjectLifecycleConflict) as error:
+            raise _lifecycle_error(error) from error
+    return ApiResponse(code="PROJECT_STARTED", message="Project started", data=ProjectStartData(workflow_id=workflow_id), request_id=request_id)
 
 
 class ProjectResultData(StrictModel):
