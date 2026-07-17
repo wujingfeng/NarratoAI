@@ -6,7 +6,7 @@ from narrato_api.config import Settings, get_cached_settings
 
 
 def create_celery_app(settings: Settings | None = None) -> Celery:
-    """创建使用业务专属 Broker 命名空间且无结果后端的 Celery。"""
+    """创建绑定给定 Settings 的 Celery producer/worker app。"""
 
     current = settings or get_cached_settings()
     app = Celery("narrato_business", broker=current.celery_broker_url)
@@ -21,7 +21,12 @@ def create_celery_app(settings: Settings | None = None) -> Celery:
         task_reject_on_worker_lost=True,
         worker_prefetch_multiplier=1,
     )
+    from narrato_api.auth.tasks import register_auth_tasks
+
+    register_auth_tasks(app, current)
+    app.finalize(auto=True)
     return app
 
 
+# Worker deployment entrypoint; Web apps create their own instance in lifespan.
 celery_app = create_celery_app()

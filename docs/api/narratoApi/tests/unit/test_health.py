@@ -24,6 +24,11 @@ def _settings(tmp_path) -> Settings:
         core_base_url="https://core.example.test",
         core_request_token="request-secret",
         core_callback_token="callback-secret",
+        verification_code_hmac_secret="test-hmac-secret-with-at-least-32-bytes",
+        smtp_host="smtp.example.test",
+        smtp_username="smtp-user",
+        smtp_password="smtp-password",
+        smtp_sender="noreply@example.test",
     )
 
 
@@ -76,6 +81,136 @@ def test_ready_returns_503_when_redis_fails(tmp_path) -> None:
     assert response.status_code == 503
     assert response.json()["message"] == "Service dependencies are unavailable"
     assert "password" not in response.text
+
+
+@pytest.mark.parametrize(
+    "updates",
+    [
+        {"verification_code_hmac_secret": ""},
+        {"verification_code_hmac_secret": "short"},
+        {"smtp_host": ""},
+        {"smtp_sender": ""},
+        {"smtp_use_starttls": False},
+        {"smtp_username": ""},
+        {"smtp_password": ""},
+        {"verification_code_send_lease_seconds": 10, "smtp_timeout_seconds": 10},
+        {"verification_code_send_lease_seconds": 600},
+    ],
+)
+def test_readiness_rejects_incomplete_auth_and_mail_configuration(
+    tmp_path, updates
+) -> None:
+    from narrato_api.api.dependencies import required_configuration_is_present
+
+    assert required_configuration_is_present(_settings(tmp_path).model_copy(update=updates)) is False
+
+
+def test_ready_endpoint_fails_closed_for_missing_auth_secret(tmp_path) -> None:
+    settings = _settings(tmp_path).model_copy(
+        update={"verification_code_hmac_secret": ""}
+    )
+    app = create_app(settings)
+    with TestClient(app, raise_server_exceptions=False) as client:
+        response = client.get("/api/v1/health/ready")
+    assert response.status_code == 503
+    assert response.json()["code"] == "SERVICE_UNAVAILABLE"
+
+
+def test_readiness_fails_when_independent_celery_broker_is_down(
+    tmp_path, monkeypatch
+) -> None:
+    import narrato_api.api.dependencies as dependencies_module
+
+    class FakeRedis:
+        async def ping(self) -> bool:
+            return True
+
+        async def aclose(self) -> None:
+            return None
+
+    monkeypatch.setattr(
+        dependencies_module, "create_redis_client", lambda _settings: FakeRedis()
+    )
+    monkeypatch.setattr(dependencies_module, "check_database", lambda _settings: None)
+
+    def broker_down(_settings) -> None:
+        raise ConnectionError("broker unavailable")
+
+    monkeypatch.setattr(dependencies_module, "check_celery_broker", broker_down)
+    app = create_app(_settings(tmp_path))
+    with TestClient(app, raise_server_exceptions=False) as client:
+        response = client.get("/api/v1/health/ready")
+    assert response.status_code == 503
+    assert response.json()["code"] == "SERVICE_UNAVAILABLE"
+
+
+def test_broker_probe_cleanup_closes_app_when_connection_close_fails(
+    tmp_path, monkeypatch
+) -> None:
+    import narrato_api.api.dependencies as dependencies_module
+
+    events: list[str] = []
+    close_error = RuntimeError("connection close failed")
+
+    class Channel:
+        def close(self) -> None:
+            events.append("channel.close")
+
+    class Connection:
+        def ensure_connection(self, **kwargs) -> None:
+            del kwargs
+
+        def channel(self):
+            return Channel()
+
+        def close(self) -> None:
+            events.append("connection.close")
+            raise close_error
+
+    class App:
+        def connection_for_write(self):
+            return Connection()
+
+        def close(self) -> None:
+            events.append("app.close")
+
+    monkeypatch.setattr(dependencies_module, "create_celery_app", lambda _settings: App())
+    with pytest.raises(RuntimeError) as caught:
+        dependencies_module.check_celery_broker(_settings(tmp_path))
+    assert caught.value is close_error
+    assert events == ["channel.close", "connection.close", "app.close"]
+
+
+def test_broker_probe_preserves_original_error_while_all_cleanup_runs(
+    tmp_path, monkeypatch
+) -> None:
+    import narrato_api.api.dependencies as dependencies_module
+
+    events: list[str] = []
+    original = KeyboardInterrupt()
+
+    class Connection:
+        def ensure_connection(self, **kwargs) -> None:
+            del kwargs
+            raise original
+
+        def close(self) -> None:
+            events.append("connection.close")
+            raise RuntimeError("secondary connection cleanup")
+
+    class App:
+        def connection_for_write(self):
+            return Connection()
+
+        def close(self) -> None:
+            events.append("app.close")
+            raise RuntimeError("secondary app cleanup")
+
+    monkeypatch.setattr(dependencies_module, "create_celery_app", lambda _settings: App())
+    with pytest.raises(KeyboardInterrupt) as caught:
+        dependencies_module.check_celery_broker(_settings(tmp_path))
+    assert caught.value is original
+    assert events == ["connection.close", "app.close"]
 
 
 def test_bounded_executor_times_out_without_unbounded_submission() -> None:
@@ -198,6 +333,7 @@ def test_lifespan_disposes_database_pool_and_checker_rejects_after_shutdown(
     monkeypatch.setattr(
         dependencies_module, "create_redis_client", lambda _settings: FakeRedis()
     )
+    monkeypatch.setattr(dependencies_module, "check_celery_broker", lambda _settings: None)
     app = create_app(settings)
     with TestClient(app) as client:
         assert client.get("/api/v1/health/ready").status_code == 200
@@ -229,6 +365,7 @@ def test_nested_apps_only_release_their_owned_database_engine(
     monkeypatch.setattr(
         dependencies_module, "create_redis_client", lambda _settings: FakeRedis()
     )
+    monkeypatch.setattr(dependencies_module, "check_celery_broker", lambda _settings: None)
     settings_a = _settings(tmp_path).model_copy(
         update={"database_url": f"sqlite:///{tmp_path / 'a.db'}"}
     )
@@ -266,6 +403,7 @@ def test_nested_apps_with_same_settings_reference_count_shared_engine(
     monkeypatch.setattr(
         dependencies_module, "create_redis_client", lambda _settings: FakeRedis()
     )
+    monkeypatch.setattr(dependencies_module, "check_celery_broker", lambda _settings: None)
     settings = _settings(tmp_path).model_copy(
         update={"database_url": f"sqlite:///{tmp_path / 'shared.db'}"}
     )

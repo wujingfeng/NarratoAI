@@ -6,6 +6,8 @@ from concurrent.futures import ThreadPoolExecutor
 import io
 import json
 import logging
+import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -46,6 +48,11 @@ def _settings(tmp_path) -> Settings:
         core_base_url="https://core.example.test",
         core_request_token="request-secret",
         core_callback_token="callback-secret",
+        verification_code_hmac_secret="test-hmac-secret-with-at-least-32-bytes",
+        smtp_host="smtp.example.test",
+        smtp_username="smtp-user",
+        smtp_password="smtp-password",
+        smtp_sender="noreply@example.test",
     )
 
 
@@ -82,7 +89,17 @@ def test_404_405_and_422_use_stable_envelopes(tmp_path) -> None:
 def test_openapi_only_exposes_get_post_and_typed_responses(tmp_path) -> None:
     schema = create_app(_settings(tmp_path)).openapi()
     paths = schema["paths"]
-    assert set(paths) == {"/api/v1/health/live", "/api/v1/health/ready"}
+    assert set(paths) == {
+        "/api/v1/health/live",
+        "/api/v1/health/ready",
+        "/api/v1/auth/register-code/send",
+        "/api/v1/auth/register",
+        "/api/v1/auth/login",
+        "/api/v1/auth/logout",
+        "/api/v1/auth/password-code/send",
+        "/api/v1/auth/password/reset",
+        "/api/v1/users/me",
+    }
     assert {
         method
         for path in paths.values()
@@ -93,7 +110,10 @@ def test_openapi_only_exposes_get_post_and_typed_responses(tmp_path) -> None:
         for method, operation in path.items():
             if method == "parameters":
                 continue
-            response_schema = operation["responses"]["200"]["content"]["application/json"]["schema"]
+            success_status = next(
+                code for code in ("200", "201", "202") if code in operation["responses"]
+            )
+            response_schema = operation["responses"][success_status]["content"]["application/json"]["schema"]
             assert "$ref" in response_schema
             model_name = response_schema["$ref"].rsplit("/", 1)[-1]
             model = schema["components"]["schemas"][model_name]
@@ -111,6 +131,8 @@ def test_settings_reject_unknown_toml_and_hide_secrets(tmp_path) -> None:
     rendered = repr(settings)
     assert "request-secret" not in rendered
     assert "callback-secret" not in rendered
+    assert "test-hmac-secret-with-at-least-32-bytes" not in rendered
+    assert "smtp-password" not in rendered
     assert str(tmp_path / "business.db") not in rendered
 
     with pytest.raises(ValidationError):
@@ -123,6 +145,63 @@ def test_celery_has_independent_prefix_and_no_result_backend(tmp_path) -> None:
     assert celery.conf.result_backend is None
     assert celery.conf.task_default_queue == "narrato.business.test.default"
     assert celery.conf.broker_transport_options["global_keyprefix"] == "narrato:business:test:celery:"
+
+
+def test_clean_celery_worker_registers_auth_tasks(tmp_path) -> None:
+    probe = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            (
+                "from narrato_api.celery_app import celery_app; "
+                "names=set(celery_app.tasks); "
+                "assert 'narrato.auth.send_verification_email' in names; "
+                    "assert not any('cover' in name for name in names)"
+            ),
+        ],
+        cwd=tmp_path,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert probe.returncode == 0, probe.stderr
+
+
+def test_each_web_app_lifespan_owns_configured_celery_producer(tmp_path, monkeypatch) -> None:
+    import narrato_api.main as main_module
+
+    created: list[object] = []
+
+    class Producer:
+        def __init__(self, broker: str) -> None:
+            self.broker = broker
+            self.closed = False
+
+        def send_task(self, *args, **kwargs):
+            return None
+
+        def close(self) -> None:
+            self.closed = True
+
+    def factory(settings):
+        producer = Producer(settings.celery_broker_url)
+        created.append(producer)
+        return producer
+
+    monkeypatch.setattr(main_module, "create_celery_app", factory)
+    first_settings = _settings(tmp_path).model_copy(
+        update={"celery_broker_url": "redis://127.0.0.1:6381/11"}
+    )
+    second_settings = _settings(tmp_path).model_copy(
+        update={"celery_broker_url": "redis://127.0.0.1:6382/12"}
+    )
+    with TestClient(create_app(first_settings)):
+        assert getattr(created[-1], "broker") == first_settings.celery_broker_url
+    assert getattr(created[-1], "closed") is True
+    with TestClient(create_app(second_settings)):
+        assert getattr(created[-1], "broker") == second_settings.celery_broker_url
+    assert getattr(created[-1], "closed") is True
+    assert len(created) == 2
 
 
 def test_json_logging_redacts_configured_secrets() -> None:

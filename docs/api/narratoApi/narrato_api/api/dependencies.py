@@ -13,6 +13,7 @@ from narrato_api.api.errors import ServiceUnavailableError
 from narrato_api.config import Settings, get_cached_settings
 from narrato_api.database import get_engine
 from narrato_api.redis_client import create_redis_client
+from narrato_api.celery_app import create_celery_app
 
 
 class SyncProbe(Protocol):
@@ -105,6 +106,43 @@ def check_database(settings: Settings) -> None:
         connection.execute(text("SELECT 1"))
 
 
+def check_celery_broker(settings: Settings) -> None:
+    """通过与 Web producer 相同的 Celery 配置建立独立有界 Broker 连接。"""
+
+    app = create_celery_app(settings)
+    connection = None
+    channel = None
+    body_error: BaseException | None = None
+    cleanup_errors: list[BaseException] = []
+    try:
+        connection = app.connection_for_write()
+        connection.ensure_connection(
+            max_retries=0, timeout=settings.auth_redis_timeout_seconds
+        )
+        channel = connection.channel()
+    except BaseException as error:
+        body_error = error
+    finally:
+        try:
+            if channel is not None:
+                channel.close()
+        except BaseException as error:
+            cleanup_errors.append(error)
+        try:
+            if connection is not None:
+                connection.close()
+        except BaseException as error:
+            cleanup_errors.append(error)
+        try:
+            app.close()
+        except BaseException as error:
+            cleanup_errors.append(error)
+    if body_error is not None:
+        raise body_error
+    if cleanup_errors:
+        raise cleanup_errors[0]
+
+
 class DefaultReadinessChecker:
     """使用独立超时并行检查 PostgreSQL 与 Redis。"""
 
@@ -138,6 +176,11 @@ class DefaultReadinessChecker:
                         )
                     )
                     group.create_task(self._check_redis())
+                    group.create_task(
+                        self.executor.run(
+                            lambda: check_celery_broker(self.settings), timeout=timeout
+                        )
+                    )
         except ExceptionGroup as error:
             raise ServiceUnavailableError() from error
         except Exception as error:
@@ -145,7 +188,13 @@ class DefaultReadinessChecker:
 
 
 def required_configuration_is_present(settings: Settings) -> bool:
-    """确认 Core 双向凭据和业务命名空间均独立且非空。"""
+    """确认 Core、认证和 TLS SMTP 的生产必要配置完整可用。"""
+
+    from narrato_api.celery_app import celery_app
+
+    secret = settings.verification_code_hmac_secret
+    sender = settings.smtp_sender
+    auth_tasks = {"narrato.auth.send_verification_email"}
 
     return bool(
         settings.core_request_token
@@ -153,6 +202,29 @@ def required_configuration_is_present(settings: Settings) -> bool:
         and settings.core_request_token != settings.core_callback_token
         and settings.redis_key_prefix
         and settings.celery_queue_prefix
+        and len(secret) >= 32
+        and len(set(secret)) >= 12
+        and "replace-with" not in secret.lower()
+        and settings.smtp_host
+        and "\r" not in settings.smtp_host
+        and "\n" not in settings.smtp_host
+        and settings.smtp_username
+        and settings.smtp_password
+        and settings.smtp_use_starttls
+        and settings.smtp_timeout_seconds
+        < settings.verification_code_send_lease_seconds
+        and settings.smtp_timeout_seconds < settings.smtp_total_deadline_seconds
+        and settings.smtp_total_deadline_seconds + 5
+        < settings.verification_code_send_lease_seconds
+        and settings.auth_redis_timeout_seconds
+        < settings.verification_code_send_lease_seconds
+        and settings.verification_code_send_lease_seconds
+        < settings.verification_code_ttl_seconds
+        and sender
+        and "@" in sender
+        and "\r" not in sender
+        and "\n" not in sender
+        and auth_tasks <= set(celery_app.tasks)
     )
 
 

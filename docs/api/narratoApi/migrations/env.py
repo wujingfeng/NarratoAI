@@ -7,6 +7,9 @@ from alembic import context
 from sqlalchemy import engine_from_config, pool
 
 from narrato_api.database import Base
+from narrato_api.auth import models as _auth_models
+
+assert _auth_models.User.__tablename__ == "users"
 
 config = context.config
 if config.config_file_name is not None:

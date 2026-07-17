@@ -20,6 +20,9 @@ from narrato_api.api.responses import envelope
 from narrato_api.api.router import api_router
 from narrato_api.config import Settings, load_settings
 from narrato_api.database import acquire_database_engine, release_database_engine
+from narrato_api.auth.service import AccountLockRegistry
+from narrato_api.celery_app import create_celery_app
+from narrato_api.integrations.mail_client import CeleryMailDispatcher
 from narrato_api.logging import (
     acquire_logging,
     bind_request_id,
@@ -70,7 +73,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     current = settings or load_settings()
     configure_logging(current)
-    executor = BoundedReadinessExecutor(max_workers=2)
+    executor = BoundedReadinessExecutor(max_workers=3)
 
     @asynccontextmanager
     async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
@@ -78,10 +81,17 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
         logging_lease = acquire_logging(current)
         database_owned = False
+        dispatcher_owned = False
         body_error: BaseException | None = None
         try:
             _app.state.database_engine = acquire_database_engine(current)
             database_owned = True
+            _app.state.auth_account_locks = AccountLockRegistry()
+            _app.state.mail_dispatcher = CeleryMailDispatcher(
+                celery=create_celery_app(current),
+                sealing_secret=current.verification_code_hmac_secret,
+            )
+            dispatcher_owned = True
             yield
         except BaseException as error:
             body_error = error
@@ -106,6 +116,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 await executor.aclose(timeout=current.readiness_timeout_seconds)
             except BaseException as error:
                 remember_cleanup_error(error, "EXECUTOR_CLEANUP_FAILED")
+            try:
+                if dispatcher_owned:
+                    _app.state.mail_dispatcher.close()
+            except BaseException as error:
+                remember_cleanup_error(error, "CELERY_PRODUCER_CLEANUP_FAILED")
             try:
                 if database_owned:
                     release_database_engine(current)
