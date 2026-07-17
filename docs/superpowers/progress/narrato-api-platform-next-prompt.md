@@ -10,13 +10,13 @@
 
 ## 当前真实基线
 
-- Task 17 已完成：OSS POST 上传后立即 complete、300 MiB 前置限制、费用估算、ready-only 项目启动、资产轮询、带 Bearer/Last-Event-ID 的 SSE reader，以及 render 后只读的防抖编辑保存。
-- Task 17 实施提交：`34d77dc feat: connect project workflow api`。
-- 验证：project-flow verifier 6 项 PASS 与 `npm run build` PASS；Vite 保留已有大 chunk advisory。
+- Task 18 已完成：桌面 Chrome/Edge File System Access 守卫、Range 流式 CDN ZIP、错误 abort/retry，以及完成项目的两个固定导出动作。
+- Task 18 实施提交：`6734fb5 feat: add client-side jianying export`。
+- 验证：Jianying export verifier 4 项 PASS 与 `npm run build` PASS；Vite 保留已有大 chunk advisory。
 
-## 本窗口唯一原子任务：Task 18
+## 本窗口唯一原子任务：Gate C
 
-只实现结果页固定下载动作和浏览器流式剪映 ZIP。严格 TDD：先让 `scripts/verify-jianying-export.mjs` 失败，再最小实现使其通过；运行该脚本和直接相关 Web build。不得实施任何后续任务。
+只执行 Phase 6 的需求复核、独立代码审查和 Web 闭环验证。核对 Task 16-18 是否使真实 UI 不依赖 Mock 数据，并取得桌面 Chrome/Edge 生成剪映 ZIP 的证据；若不满足，记录最小、可独立验证的修复或阻塞。不得开始 Task 19。
 
 ## 不可删除的永久规则
 
