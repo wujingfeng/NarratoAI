@@ -5,7 +5,7 @@
 - 分支：`codex/narrato-api-platform`
 - worktree：`/private/tmp/NarratoAI-narrato-api-platform`
 - 项目 Gate：**Phase 5 / Gate B pending**；Task 15 仍有未完成子任务。
-- 最新 Implementation Commit：`c2e1cca feat(api): query completed project artifacts`（Task 15H）。
+- 最新 Implementation Commit：`91d8503 feat(api): add completed project result lookup`（Task 15I）。
 
 ## 已完成
 
@@ -18,16 +18,17 @@
 7. **Task 15F**：仅完成已登记产物的持久化模型与迁移；模型字段为项目归属、种类、CDN URL 和创建时间。
 8. **Task 15G**：仅完成调用方事务内的产物登记服务；服务仅 `session.add()`，不自行提交或回滚。
 9. **Task 15H**：仅完成 completed 项目的已登记产物读取服务；按 `created_at/id` 稳定排序，其他状态均为空。
+10. **Task 15I**：仅完成用户归属的 completed 项目结果查询；仅 `user_id + project_id` 命中且完成时返回最小结果记录。
 
 ## 新鲜验证证据
 
-- Task 15H RED：缺少 `list_registered_artifacts`。
-- Task 15H 直接复验：`9 passed in 0.34s`（已登记产物模型、登记、状态可见性和查询）。
-- Task 15H Ruff、`git diff --check` 通过。
+- Task 15I RED：缺少结果查询与异常（6 个预期 ImportError）。
+- Task 15I 直接复验：`12 passed in 0.32s`（结果归属、终态边界和产物读取）。
+- Task 15I Ruff、`git diff --check` 通过。
 
 ## 范围、风险与续接
 
-- Task 15H 未实现实际删除、用户归属结果查询、HTTP/结果呈现、导出/Jianying、router、Core 调用、下游或其他 Task 15 子任务。
+- Task 15I 未实现实际删除、HTTP/结果呈现、导出/Jianying、router、Core 调用、下游或其他 Task 15 子任务。
 - SQLite/PostgreSQL 并发差异、真实 OSS/Core 集成和 6 个既有 assets mypy 错误仍是风险。
 - 预期未提交内容仅 `/.superpowers/` 与 `docs/web/docs/Oss.php`，二者不得触碰。
-- 唯一下一原子任务：**Task 15I**，只实现用户归属的 completed 项目结果查询服务；完成 checkpoint 后立即停止。
+- 唯一下一原子任务：**Task 15J**，只实现纯剪映 Manifest 资源映射构建器；完成 checkpoint 后立即停止。

@@ -2,7 +2,7 @@ branch: codex/narrato-api-platform
 worktree: /private/tmp/NarratoAI-narrato-api-platform
 current_gate: "Phase 5 / Gate B pending"
 last_complete_task:
-  id: Task 15H
+  id: Task 15I
   commits:
     - "6ea93bf feat: add workflow state machine template (Task 14A)"
     - "60de8c8 feat: add workflow persistence models (Task 14B)"
@@ -18,8 +18,9 @@ last_complete_task:
     - "20342aa feat: add registered artifact model (Task 15F)"
     - "91549f3 feat(api): add transaction-safe artifact registration (Task 15G)"
     - "c2e1cca feat(api): query completed project artifacts (Task 15H)"
+    - "91d8503 feat(api): add completed project result lookup (Task 15I)"
 current_task:
-  id: Task 15H
+  id: Task 15I
   status: completed
   completed_subtasks:
     - Task 15A editor lock and permanent waiting boundary
@@ -30,8 +31,21 @@ current_task:
     - Task 15F persistent registered-artifact data model and migration
     - Task 15G transaction-safe registered-artifact creation service
     - Task 15H completed-project registered-artifact read service
-implementation_commit: "c2e1cca feat(api): query completed project artifacts"
+    - Task 15I owned completed-project result lookup service
+implementation_commit: "91d8503 feat(api): add completed project result lookup"
 tests:
+  task_15i_red:
+    command: "cd docs/api/narratoApi && .venv/bin/python -m pytest tests/unit/test_project_result_lookup.py -q"
+    result: "Expected RED: six ImportErrors because result lookup and its error were missing."
+  task_15i_green_and_direct:
+    command: "cd docs/api/narratoApi && PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 .venv/bin/python -m pytest tests/unit/test_project_result_lookup.py tests/unit/test_artifact_visibility.py tests/unit/test_artifact_visibility_query.py -q"
+    result: "12 passed in 0.32s."
+  task_15i_ruff:
+    command: "cd docs/api/narratoApi && .venv/bin/ruff check narrato_api/projects/service.py tests/unit/test_project_result_lookup.py"
+    result: pass
+  task_15i_diff_check:
+    command: "git diff --check"
+    result: pass
   task_15h_red:
     command: "cd docs/api/narratoApi && .venv/bin/python -m pytest tests/unit/test_artifact_visibility_query.py -q"
     result: "Expected RED: ImportError because list_registered_artifacts was missing from narrato_api.artifacts.service."
@@ -121,6 +135,8 @@ key_decisions:
   - "Task 15G does not verify project ownership/existence, reconcile Core, query visibility, expose results, generate exports/Jianying, or add a router."
   - "Task 15H lists only a supplied completed project's RegisteredArtifact rows, ordered by created_at then id; every other status returns an empty sequence before issuing an artifact query."
   - "Task 15H accepts an already loaded Project and therefore intentionally does not implement ownership lookup, routes, result presentation, exports/Jianying, Core calls, or downstream behavior."
+  - "Task 15I looks up Project only by user_id plus project_id, returns an immutable minimal result record only when status is completed, and otherwise raises stable PROJECT_RESULT_NOT_FOUND or PROJECT_RESULT_NOT_COMPLETED errors."
+  - "Task 15I deliberately provides no HTTP route, result presentation, export/Jianying generation, Core call, or downstream behavior."
   - "Task 15C does not implement artifacts/results, export/Jianying, router, Core calls, downstream execution, or another Task 15 boundary."
 remaining_risks:
   - "SQLite tests cover persistence boundaries but real PostgreSQL multi-connection/row-lock behavior remains unverified."
@@ -132,6 +148,7 @@ remaining_risks:
   - "RegisteredArtifact.kind is intentionally unconstrained so later product-approved artifact kinds can be added without prematurely fixing an enum."
   - "Artifact registration callers must establish ownership and Core-result validity before calling the minimal registration boundary."
   - "The completed-artifact read service must be wrapped by an owned-project lookup before exposure to an authenticated user."
+  - "The owned completed-project result lookup is the sole service-layer read boundary for future result routes."
 workspace_status:
   clean: false
   expected_uncommitted:
@@ -140,16 +157,16 @@ workspace_status:
     - path: docs/web/docs/Oss.php
       reason: pre-existing untracked file
 next_atomic_task:
-  id: Task 15I
-  scope: "Implement only a minimal owned completed-project result lookup service as one independently verifiable Task 15 boundary; do not implement HTTP routes, export/Jianying generation, Core calls, result presentation, or later tasks."
+  id: Task 15J
+  scope: "Implement only a pure Jianying manifest resource-mapping builder as one independently verifiable Task 15 boundary; do not implement ZIP generation, HTTP routes, Core calls, filesystem/OSS writes, or later tasks."
   relevant_files:
     - docs/superpowers/plans/2026-07-16-narrato-api-platform.md
     - docs/superpowers/specs/2026-07-16-narrato-api-platform-design.md
     - docs/api/narratoApi/narrato_api/artifacts/models.py
     - docs/api/narratoApi/narrato_api/artifacts/service.py
-    - docs/api/narratoApi/narrato_api/projects/service.py
-    - docs/api/narratoApi/tests/unit/test_project_result_lookup.py
+    - docs/api/narratoApi/narrato_api/exports/service.py
+    - docs/api/narratoApi/tests/unit/test_jianying_manifest.py
   acceptance_criteria:
-    - "Use TDD and locate a project only by both user_id and project_id; only completed projects return a minimal result record with registered artifacts."
-    - "Verify other users, missing projects, and all non-completed states cannot retrieve a result while avoiding HTTP routes, export/Jianying generation, Core calls, or presentation behavior."
+    - "Use TDD and map explicit registered artifact identifiers and CDN URLs to deterministic manifest resource entries and zip paths."
+    - "Verify the builder creates no ZIP, makes no HTTP/Core call, and performs no filesystem or OSS write."
     - "Run new and directly affected tests, inspect diff, commit implementation, then update and commit a checkpoint before stopping."
