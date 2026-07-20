@@ -4,7 +4,7 @@
 
 - 分支：`codex/narrato-api-platform`
 - worktree：`/private/tmp/NarratoAI-narrato-api-platform`
-- Gate：**Gate C 仍阻塞**；Task 17B 已恢复受保护的 Create 流程。
+- Gate：**Task 17 恢复已完成**；Gate C 待浏览器级重新验收。
 
 ## Task 17A 基线
 
@@ -21,14 +21,20 @@
 - 新增受保护 `/create` 路由及工作台入口；补齐可编辑的创建数据和三个 UI 组件。
 - “开始创作”只在全部素材 ready 且 API 费用已成功返回后启用，显示的费用无本地估算回退。
 
+## Task 17C–17D 证据
+
+- `697387b feat(web): expose protected project result`：受保护 `/projects/:projectId/result` 读取 completion-gated API；未完成、失败或拒绝时不显示导出入口。3 项直接验证 PASS。
+- `91a428b feat(web): wire project editor save flow`：受保护 `/projects/:projectId/editor` 提供轻量内容草稿调用者；内容保存防抖，渲染提交前取消待写入并立即只读。3 项直接验证 PASS。
+- Task 17 全量直接验证：API 项目流 6 项、Create 路由 1 项、结果路由 3 项、编辑器路由 3 项均 PASS；Vite production build PASS。
+
 ## 剩余 Gate C 风险
 
 - 真实上传的 probe duration 尚未回填到新字段，估价会安全返回 `PROJECT_DURATION_UNAVAILABLE`。
-- `ProjectResultPage` 仍未路由，因此完成结果尚不可从真实 UI 到达。
-- 编辑器 UI 与真实 Chrome/Edge 保存证据仍缺失；Vite 保留大 chunk advisory。
+- 尚无真实认证浏览器会话、Chrome/Edge 用户手势 File System Access 导出证据；须在 Gate C 重新验收中确认。
+- Vite 保留 >500 kB chunk advisory。
 
 ## 下一原子任务
 
-**Task 17C**：只恢复加载完成项目结果的受保护结果路由，并复用既有导出控件；不处理 Create、编辑器、时长回填或 Task 19。
+**Gate C 重新验收**：集中复核 Task 16–18 的真实 UI 路由、结果导出与 Chrome/Edge 保存证据；Gate 通过前不得开始 Task 19。
 
 预存未提交内容仅 `.superpowers/` 与 `docs/web/docs/Oss.php`，不得触碰。

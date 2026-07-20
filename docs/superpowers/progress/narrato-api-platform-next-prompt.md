@@ -10,14 +10,13 @@
 
 ## 当前真实基线
 
-- Task 17A 已完成：认证项目创建、费用估算和 ready-only 启动 API，提交 `5852e3b`。
-- Task 17B 已完成：受保护 `/create` 路由、缺失 Create 依赖和 API 费用/ready 门禁，提交 `7b85c63`。
-- Create route/flow verifier、API project-flow verifier 和 Vite build 已通过；Vite 的 >500 kB chunk advisory 保留。
-- Gate C 仍因 ProjectResultPage 不可达以及编辑器真实 UI/浏览器保存验证而阻塞。
+- Task 17 已完整恢复：项目生命周期 API（`5852e3b`）、Create flow（`7b85c63`）、项目结果路由（`697387b`）及编辑器保存/渲染锁定 UI（`91a428b`）。
+- Task 17 的 13 项直接验证均通过，Vite production build 通过；保留既有 >500 kB chunk advisory。
+- 当前为 Gate C 重新验收，必须先完成 Task 16–18 的集中复核及浏览器证据，不能提前进入 Task 19。
 
-## 本窗口唯一原子任务：Task 17C
+## 本窗口唯一原子任务：Gate C re-evaluation
 
-只恢复一个受保护的项目结果路由：由既有 API 加载完成项目的结果，并复用既有的完成态下载/剪映导出控件。严格 TDD：先让直接 result-route/data-flow verifier 失败，再实现并验证通过。不得修改 Create flow、添加编辑器 UI、probe duration 回填或 Task 19。
+运行 Task 16–18 的直接验证和 production build，检查受保护 Create、结果、编辑器路由与完成态导出控制。使用真实浏览器会话验证或准确记录 Chrome/Edge 用户手势 File System Access 保存证据缺口。输出 Gate C 报告并决定通过或继续阻塞；没有 Gate C 通过结论不得开始 Task 19。
 
 ## 不可删除的永久规则
 

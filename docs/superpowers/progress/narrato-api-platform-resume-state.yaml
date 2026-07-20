@@ -1,21 +1,27 @@
 protocol: SEGMENTED_GOAL_PROTOCOL_V2
 branch: codex/narrato-api-platform
 worktree: /private/tmp/NarratoAI-narrato-api-platform
-current_gate: "Gate C remains blocked; Task 17B protected Create flow recovery completed"
+current_gate: "Task 17 recovery complete; Gate C requires browser-level re-evaluation"
 last_complete_task:
-  id: Task 17B
+  id: Task 17
   commits:
+    - "5852e3b feat: add project lifecycle api"
     - "7b85c63 feat(web): restore protected create flow"
+    - "697387b feat(web): expose protected project result"
+    - "91a428b feat(web): wire project editor save flow"
 current_task:
-  id: Task 17B
+  id: Task 17
   status: completed
   completed_subtasks:
-    - "TDD: Create route flow verifier first failed because the missing CreationSummary dependency could not be loaded."
-    - "Restored editable CreatePage dependencies, added protected /create route, and linked dashboard creation entries."
-    - "Start control is disabled until every asset is ready and the API cost estimate has been received; the displayed fee is API-provided."
+    - "Task 17A: restored authenticated project creation, cost estimate, and ready-only start API."
+    - "Task 17B: restored editable CreatePage dependencies, protected /create route, dashboard entries, API fee display, and ready gate."
+    - "Task 17C: exposed protected completed-project result route and API-backed result loading."
+    - "Task 17D: added a protected content-draft editor caller with debounced save cancellation and immediate render-submit read-only UI state."
 implementation_commits:
   - "5852e3b feat: add project lifecycle api"
   - "7b85c63 feat(web): restore protected create flow"
+  - "697387b feat(web): expose protected project result"
+  - "91a428b feat(web): wire project editor save flow"
 tests:
   task_17b_red:
     command: "cd docs/web/homepage-prototype && node scripts/verify-create-route-flow.mjs"
@@ -23,14 +29,23 @@ tests:
   task_17b_verification:
     command: "cd docs/web/homepage-prototype && node scripts/verify-create-route-flow.mjs && node scripts/verify-api-project-flow.mjs && npm run build && git diff --check"
     result: "Passed: route/flow verifier passed; API project-flow verifier passed 6 checks; Vite build passed. Existing >500 kB output chunk advisory remains."
+  task_17c_verification:
+    command: "cd docs/web/homepage-prototype && node scripts/verify-project-result-route.mjs && npm run build && git diff --check"
+    result: "Passed: protected result route/API flow verifier passed 3 checks; Vite build passed."
+  task_17d_verification:
+    command: "cd docs/web/homepage-prototype && node scripts/verify-project-editor-route.mjs && node scripts/verify-api-project-flow.mjs && npm run build && git diff --check"
+    result: "Passed: editor route/save-lock verifier passed 3 checks; Task 17 API verifier passed 6 checks; Vite build passed."
+  task_17_phase_verification:
+    command: "cd docs/web/homepage-prototype && node scripts/verify-api-project-flow.mjs && node scripts/verify-create-route-flow.mjs && node scripts/verify-project-result-route.mjs && node scripts/verify-project-editor-route.mjs && npm run build && git diff --check"
+    result: "Passed: all direct Task 17 verifiers passed (6 + 1 + 3 + 3 checks); production build passed. Existing >500 kB chunk advisory remains."
 key_decisions:
   - "CreatePage only exposes the existing recovered project lifecycle API; it does not synthesize a local fee fallback."
   - "The Create start control remains disabled for non-ready assets and while cost estimation is pending or rejected."
-  - "ProjectResultPage remains deliberately unregistered in this atomic unit."
+  - "Completed result data is only rendered after the completion-gated result API succeeds; rejected result requests render no export controls."
+  - "The Task 17 editor UI is intentionally a content-draft page rather than a custom media editor, avoiding unsupported timeline/media behavior until real duration and track data exist."
 remaining_risks:
   - "Asset completion does not yet persist probe duration, so real uploads without duration fail safely with PROJECT_DURATION_UNAVAILABLE rather than being charged or started."
-  - "P0: ProjectResultPage remains absent from App routes, so completed results are not yet reachable in the real UI."
-  - "P1: editor save/render lock helpers have no editor UI caller; real Chrome/Edge File System Access saving is unverified."
+  - "Real authenticated browser/API session validation is not yet evidenced; Gate C needs Chrome/Edge flow validation including user-gesture File System Access export."
   - "Vite reports an existing >500 kB output chunk advisory."
 workspace_status:
   clean: false
@@ -40,15 +55,17 @@ workspace_status:
     - path: docs/web/docs/Oss.php
       reason: pre-existing untracked workspace content; do not touch
 next_action:
-  id: Task 17C
-  scope: "Make the existing ProjectResultPage reachable through one protected result route that loads the completed-project result from the existing API; do not implement editor UI, duration backfill, or Task 19."
+  id: Gate C re-evaluation
+  scope: "Perform the Gate C requirement review and browser-level UI/export acceptance against the restored Task 17 routes and existing Task 18 export path; do not start Task 19 unless Gate C passes."
   relevant_files:
     - docs/superpowers/progress/2026-07-17-gate-c-report.md
     - docs/web/homepage-prototype/src/App.jsx
-    - docs/web/homepage-prototype/src/pages/ProjectResultPage.jsx
-    - docs/web/homepage-prototype/src/components/projects/ProjectResultDetails.jsx
-    - docs/web/homepage-prototype/src/features/projects/projectApi.js
+    - docs/web/homepage-prototype/scripts/verify-api-project-flow.mjs
+    - docs/web/homepage-prototype/scripts/verify-create-route-flow.mjs
+    - docs/web/homepage-prototype/scripts/verify-project-result-route.mjs
+    - docs/web/homepage-prototype/scripts/verify-project-editor-route.mjs
+    - docs/web/homepage-prototype/scripts/verify-jianying-export.mjs
   acceptance_criteria:
-    - "Use TDD: a direct protected result-route verifier fails before route/data wiring is restored."
-    - "A completed project result is loaded from the existing API and exposes only the existing completed-project export controls; incomplete or failed states do not expose downloads."
-    - "Do not change Create flow, add editor UI, asset-duration backfill, or Task 19 in this unit."
+    - "Re-run all Task 16-18 direct verifiers and production build; inspect actual route reachability and completion-state export controls."
+    - "Obtain or document the absence of real Chrome/Edge user-gesture File System Access export evidence; report Gate C pass/fail with precise blockers."
+    - "Do not begin Task 19 unless Gate C is explicitly passed."
