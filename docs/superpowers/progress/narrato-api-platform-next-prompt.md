@@ -6,16 +6,16 @@
 
 1. 运行 `git status --short`、`git branch --show-current`、`git log --oneline --decorate -20`。
 2. 读取 `docs/superpowers/progress/narrato-api-platform-resume-state.yaml` 与 `narrato-api-platform-summary.md`。
-3. 检查最近的 Gate report、提交和测试证据。若状态与 Git、实际文件或测试证据不一致，以实际证据重建状态；不得重复已提交且验证通过的功能，也不得丢弃未提交改动。
+3. 检查最近的 Task brief、提交和测试证据。若状态与 Git、实际文件或测试证据不一致，以实际证据重建状态；不得重复已提交且验证通过的功能，也不得丢弃未提交改动。
 
 ## 当前真实基线
 
-- Gate C 已通过：用户明确接受真实隔离 FastAPI、认证浏览器、完成态 manifest、File System Access 调用及流式 ZIP 证据；原生 macOS picker 可见选址未自动捕获，作为上线后人工复核项保留。
-- Task 19 尚未开始；按小原子单元先执行 Task 19A。
+- Gate C 已通过（用户接受原生 picker 证据例外）；Gate D 待开始。
+- Task 19A 已完成：Business API web/worker/scheduler Supervisor 配置和纯静态 configparser verifier，提交 `e776d9e`。
 
-## 本窗口唯一原子任务：Task 19A
+## 本窗口唯一原子任务：Task 19B
 
-仅创建 Business API 的 web、worker、scheduler Supervisor 定义及静态 `verify-supervisor-config.py`。严格 TDD：先让 verifier 因配置缺失失败，再实现使其验证命令、目录、自动启动/重启、进程组停止、优雅超时和独立日志路径。不得创建 Core Supervisor、Nginx、README 大幅改写或 Task 20 内容。
+仅创建 Core API 的 web、analysis、ASR、TTS、render 五个 Supervisor 定义，并扩展既有静态 verifier。严格 TDD：先让 Core 配置缺失导致 verifier 失败，再验证 venv、根 PYTHONPATH、角色队列、自动启停、进程组停止、超时和独立日志。不得创建 Nginx、改写 README 或开始 Task 20。
 
 ## 不可删除的永久规则
 

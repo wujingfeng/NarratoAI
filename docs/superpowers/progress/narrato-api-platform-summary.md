@@ -34,8 +34,14 @@
 - 原生 macOS 保存选择器未向自动化暴露；用户已明确接受现有真实 API/浏览器/FSA/流式 ZIP 证据作为 Gate C 通过依据，保留为上线后人工复核项。
 - Vite 保留 >500 kB chunk advisory。
 
+## Task 19A 证据
+
+- 实施提交：`e776d9e docs: add business api supervisor configuration`。
+- RED：Supervisor 静态验证器在配置不存在时以 exit 1 失败。
+- GREEN：`verify-supervisor-config.py` 验证 web、worker、scheduler 三个 Business API Program 的 venv、TOML、自动启停、进程组停止、超时和独立日志；`py_compile`、ruff、diff check 均通过。
+
 ## 下一原子任务
 
-**Task 19A**：只新增 Business API Supervisor 配置与其静态 verifier；不新增 Core、Nginx 或 Task 20 内容。
+**Task 19B**：只新增 Core API 的 web 与四类 worker Supervisor 配置，并扩展静态 verifier；不新增 Nginx、README 或 Task 20 内容。
 
 预存未提交内容仅 `.superpowers/` 与 `docs/web/docs/Oss.php`，不得触碰。
