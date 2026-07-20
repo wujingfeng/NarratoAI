@@ -51,3 +51,5 @@ The controlled writable proves the application call path and streamed completion
 ## Gate decision
 
 Gate C remains blocked only pending visible native-picker selection evidence. A final headed-Playwright retry could not surface an automatable macOS dialog: the available Playwright Chrome process remained headless and no separate native dialog was exposed to Computer Use. Task 19 must not start.
+
+A direct Computer Use retry also found the temporary local Vite/proxy endpoint unavailable (`ERR_CONNECTION_REFUSED`), so it could not repeat the authenticated UI flow in the user-facing Chrome window.

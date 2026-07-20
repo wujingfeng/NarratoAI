@@ -43,7 +43,7 @@ tests:
     result: "All 18 direct checks and production build passed. Isolated SQLite + real Redis FastAPI stack passed readiness and login; desktop Chrome completed authenticated Create/result flow and real manifest API POST. User click reached native File System Access call with a controlled writer completing 5 ZIP writes and close. Native OS picker visible-selection remains unproven."
   gate_c_native_picker_retry:
     command: "Restart isolated local Vite/proxy, launch /tmp/gate-c-native-picker.mjs, inspect Chrome via Computer Use and process state"
-    result: "Not completed: the available Playwright Chrome instance remained headless and no independently accessible native macOS save dialog was exposed for visible selection."
+    result: "Not completed: the available Playwright Chrome instance remained headless and no independently accessible native macOS save dialog was exposed for visible selection. A direct Computer Use retry also found the temporary Vite/proxy endpoint unavailable (ERR_CONNECTION_REFUSED)."
 key_decisions:
   - "CreatePage only exposes the existing recovered project lifecycle API; it does not synthesize a local fee fallback."
   - "The Create start control remains disabled for non-ready assets and while cost estimation is pending or rejected."
