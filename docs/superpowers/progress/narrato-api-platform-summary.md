@@ -4,7 +4,7 @@
 
 - 分支：`codex/narrato-api-platform`
 - worktree：`/private/tmp/NarratoAI-narrato-api-platform`
-- Gate：**Task 17 恢复已完成**；Gate C 待浏览器级重新验收。
+- Gate：**Gate C 已重新验收但仍阻塞**；Task 17 恢复完成。
 
 ## Task 17A 基线
 
@@ -30,11 +30,11 @@
 ## 剩余 Gate C 风险
 
 - 真实上传的 probe duration 尚未回填到新字段，估价会安全返回 `PROJECT_DURATION_UNAVAILABLE`。
-- 尚无真实认证浏览器会话、Chrome/Edge 用户手势 File System Access 导出证据；须在 Gate C 重新验收中确认。
+- 2026-07-20 重新验收：18 项直接验证和 build 均通过，Playwright 确认三个受保护路由均会跳转登录；但无本地认证 API/项目 fixture，无法验证真实 Create → Result → Chrome/Edge 用户手势 File System Access 导出。
 - Vite 保留 >500 kB chunk advisory。
 
 ## 下一原子任务
 
-**Gate C 重新验收**：集中复核 Task 16–18 的真实 UI 路由、结果导出与 Chrome/Edge 保存证据；Gate 通过前不得开始 Task 19。
+**Gate C 认证浏览器验收**：在可运行的认证 API 与 ready/completed fixture 下，验证完整 Create → Result → Chrome/Edge 用户手势剪映导出；Gate 通过前不得开始 Task 19。
 
 预存未提交内容仅 `.superpowers/` 与 `docs/web/docs/Oss.php`，不得触碰。
