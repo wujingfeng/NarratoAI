@@ -32,13 +32,16 @@ export async function startProject(projectId, assets, request = apiRequest) {
 /** 仅对内容编辑结果防抖；指针移动、播放头和本地选中不应调用这个函数。 */
 export function createDebouncedEditorSaver(projectId, request = apiRequest, delay = 600) {
   let timer;
-  return (content) => new Promise((resolve, reject) => {
+  const save = (content) => new Promise((resolve, reject) => {
     globalThis.clearTimeout(timer);
     timer = globalThis.setTimeout(() => request(`/projects/${projectId}/editor/save`, {
       method: "POST",
       body: JSON.stringify({ content }),
     }).then(resolve, reject), delay);
   });
+  // Rendering freezes the draft. A queued write must not race that transition.
+  save.cancel = () => globalThis.clearTimeout(timer);
+  return save;
 }
 
 /** 提交渲染后立即通知 UI 锁定，避免并发保存写入可变草稿。 */

@@ -7,6 +7,7 @@ import "./styles/tokens.css";
 import "./styles/home.css";
 import "./styles/dashboard.css";
 import "./styles/auth.css";
+import "./styles/project-editor.css";
 
 createRoot(document.getElementById("root")).render(
   <React.StrictMode>

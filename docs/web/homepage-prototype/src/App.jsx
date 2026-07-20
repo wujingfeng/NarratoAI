@@ -7,6 +7,7 @@ import { HomePage } from "./pages/HomePage.jsx";
 import { LoginPage } from "./pages/LoginPage.jsx";
 import { NotFoundPage } from "./pages/NotFoundPage.jsx";
 import { ProjectResultPage } from "./pages/ProjectResultPage.jsx";
+import { ProjectEditorPage } from "./pages/ProjectEditorPage.jsx";
 
 function RequireAuth({ children }) {
   const { isAuthenticated } = useAuth();
@@ -24,6 +25,7 @@ export function App() {
         <Route path="/dashboard" element={<RequireAuth><DashboardPage /></RequireAuth>} />
         <Route path="/create" element={<RequireAuth><CreatePage /></RequireAuth>} />
         <Route path="/projects/:projectId/result" element={<RequireAuth><ProjectResultPage /></RequireAuth>} />
+        <Route path="/projects/:projectId/editor" element={<RequireAuth><ProjectEditorPage /></RequireAuth>} />
         <Route path="*" element={<NotFoundPage />} />
       </Routes>
     </>
