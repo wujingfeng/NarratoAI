@@ -62,6 +62,8 @@
 
 ## 下一原子任务
 
-**Task 20C**：只做两套服务从 fresh SQLite 的 Alembic upgrade + check 验收切片；不新增工作流恢复、完整 e2e 或真实 Provider smoke。
+**Task 20D**：解决 Business mypy 错误与 Core/Business ruff format 漂移；不运行真实 Provider smoke。
+
+Task 20C：`0381536 test: add workflow end to end acceptance`。fresh SQLite 双服务迁移通过；Business E2E 4 项通过，覆盖终态、轮询补偿、失败状态和一次退款。原项目回归 52 项、前端 build/API 验证通过。
 
 预存未提交内容仅 `.superpowers/`、`docs/web/docs/Oss.php` 与 `docs/web/homepage-prototype/.playwright-cli/`，不得触碰。

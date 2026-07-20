@@ -13,9 +13,9 @@
 - Gate C 已通过（用户接受原生 picker 证据例外）；Task 19 全部完成，Task 20A、20B 已完成，Gate D 待剩余 Task 20 验收。
 - Task 19 提交：`e776d9e`、`462ab86`、`3a6bc20`、`2a27f9c`。静态部署、README、编译和 lint 证据已通过；macOS sandbox 无法运行 nginx -t。
 
-## 本窗口唯一原子任务：Task 20C
+## 本窗口唯一原子任务：Task 20D
 
-仅完成一个双服务迁移验收切片：使用 fresh SQLite URL 分别执行 Core 与 Business 的 Alembic upgrade 和 check，并记录真实结果。若发现迁移缺陷，只添加最小直接回归测试或修复；不得添加 workflow recovery、完整 e2e 或真实 Provider smoke。
+仅解决 Business mypy 错误与 Core/Business ruff format 漂移，并重跑静态验收；不得运行真实 Provider smoke。
 
 ## 不可删除的永久规则
 
