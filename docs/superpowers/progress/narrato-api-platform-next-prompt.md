@@ -10,13 +10,12 @@
 
 ## 当前真实基线
 
-- Task 17 已完整恢复，提交为 `5852e3b`、`7b85c63`、`697387b`、`91a428b`。
-- Gate C 直接验证共 18 项与 production build 已通过；三个未认证受保护路由在真实浏览器中均跳转 `/login`。
-- Gate C 已完成隔离 SQLite + Redis 的真实 FastAPI、认证、完成态结果和流式 ZIP 验收；仅缺 headed Chrome/Edge 中原生 macOS 保存选择器可见并完成用户目的地选择的证据。详见 `docs/superpowers/progress/2026-07-20-gate-c-reevaluation-report.md`。
+- Gate C 已通过：用户明确接受真实隔离 FastAPI、认证浏览器、完成态 manifest、File System Access 调用及流式 ZIP 证据；原生 macOS picker 可见选址未自动捕获，作为上线后人工复核项保留。
+- Task 19 尚未开始；按小原子单元先执行 Task 19A。
 
-## 本窗口唯一原子任务：Gate C native picker completion
+## 本窗口唯一原子任务：Task 19A
 
-复用隔离认证 API 与 completed fixture，在 headed 桌面 Chrome 或 Edge 点击“导出到剪映草稿”，可见地完成原生保存选择器和用户目的地选择，记录简洁证据。Gate C 通过前绝不开始 Task 19；若原生 UI 无法自动化，准确记录阻塞而不伪造证据。
+仅创建 Business API 的 web、worker、scheduler Supervisor 定义及静态 `verify-supervisor-config.py`。严格 TDD：先让 verifier 因配置缺失失败，再实现使其验证命令、目录、自动启动/重启、进程组停止、优雅超时和独立日志路径。不得创建 Core Supervisor、Nginx、README 大幅改写或 Task 20 内容。
 
 ## 不可删除的永久规则
 

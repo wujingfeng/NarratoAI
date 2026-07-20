@@ -50,6 +50,4 @@ The controlled writable proves the application call path and streamed completion
 
 ## Gate decision
 
-Gate C remains blocked only pending visible native-picker selection evidence. A final headed-Playwright retry could not surface an automatable macOS dialog: the available Playwright Chrome process remained headless and no separate native dialog was exposed to Computer Use. Task 19 must not start.
-
-A direct Computer Use retry also found the temporary local Vite/proxy endpoint unavailable (`ERR_CONNECTION_REFUSED`), so it could not repeat the authenticated UI flow in the user-facing Chrome window.
+**Passed with user-approved evidence exception.** On 2026-07-20, the user explicitly accepted the existing authentic API, browser, File System Access invocation, and streamed ZIP evidence in place of a visible native-picker destination-selection capture. The native-picker visual proof remains a documented residual limitation, not a failed product path. Task 19 is unblocked.

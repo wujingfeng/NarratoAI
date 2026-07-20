@@ -4,7 +4,7 @@
 
 - 分支：`codex/narrato-api-platform`
 - worktree：`/private/tmp/NarratoAI-narrato-api-platform`
-- Gate：**Gate C 仅剩原生保存选择器可见完成证据**；Task 17 恢复完成。
+- Gate：**Gate C 已通过（用户接受原生保存选择器证据例外）**；Gate D 待开始。
 
 ## Task 17A 基线
 
@@ -31,11 +31,11 @@
 
 - 真实上传的 probe duration 尚未回填到新字段，估价会安全返回 `PROJECT_DURATION_UNAVAILABLE`。
 - 2026-07-20 完成隔离 SQLite + Redis 的真实 FastAPI/认证浏览器验收：完成态结果真实调用 manifest API，Chrome 用户点击到原生 FSA 调用路径，流式 ZIP 写入 5 次并关闭。仅未可见地完成原生 macOS 保存选择器和用户目的地选择。
-- 最终 headed 自动化重试未向 Computer Use 暴露独立原生 macOS 对话框；不能伪造该证据。
+- 原生 macOS 保存选择器未向自动化暴露；用户已明确接受现有真实 API/浏览器/FSA/流式 ZIP 证据作为 Gate C 通过依据，保留为上线后人工复核项。
 - Vite 保留 >500 kB chunk advisory。
 
 ## 下一原子任务
 
-**Gate C 原生保存选择器完成**：在 headed Chrome/Edge 可见地完成剪映导出的原生保存选择器及用户目的地选择；Gate 通过前不得开始 Task 19。
+**Task 19A**：只新增 Business API Supervisor 配置与其静态 verifier；不新增 Core、Nginx 或 Task 20 内容。
 
 预存未提交内容仅 `.superpowers/` 与 `docs/web/docs/Oss.php`，不得触碰。
