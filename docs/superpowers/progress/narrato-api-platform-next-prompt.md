@@ -10,12 +10,12 @@
 
 ## 当前真实基线
 
-- Gate C 已通过（用户接受原生 picker 证据例外）；Task 19 全部完成，Gate D 待 Task 20 验收。
+- Gate C 已通过（用户接受原生 picker 证据例外）；Task 19 全部完成，Task 20A 已完成，Gate D 待剩余 Task 20 验收。
 - Task 19 提交：`e776d9e`、`462ab86`、`3a6bc20`、`2a27f9c`。静态部署、README、编译和 lint 证据已通过；macOS sandbox 无法运行 nginx -t。
 
-## 本窗口唯一原子任务：Task 20A
+## 本窗口唯一原子任务：Task 20B
 
-仅为 Business API/Core 共享响应 envelope 与稳定错误码添加一个契约测试切片。严格 TDD：先写失败契约，再实现最小测试基础并验证；不得添加完整 workflow e2e、故障恢复或真实 Provider smoke。
+仅为 Core callback 认证和事件协议添加一个契约测试切片。严格 TDD：先写失败契约，再实现最小测试基础并验证；不得添加完整 workflow e2e、故障恢复或真实 Provider smoke。
 
 ## 不可删除的永久规则
 

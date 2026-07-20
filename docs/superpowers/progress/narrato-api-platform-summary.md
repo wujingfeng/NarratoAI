@@ -47,8 +47,14 @@
 - `2a27f9c`：两套部署运行手册和 README 静态 verifier。
 - 全 Task 19 静态验证、ruff、py_compile/compileall 和 diff check PASS；`nginx -t` 在 macOS sandbox 因 sysctl/日志权限无法运行，已在运行手册记录。
 
+## Task 20A 证据
+
+- 实施提交：`02a5620 test: add shared api contract coverage`。
+- RED：两个新增契约测试路径不存在，pytest exit 4。
+- GREEN：Core 4 项、Business 2 项契约测试均通过；覆盖 response envelope 四字段、未知字段拒绝和稳定 public error code。
+
 ## 下一原子任务
 
-**Task 20A**：只新增两服务共享响应/错误协议的一组契约测试；不新增 e2e、恢复或真实 Provider smoke 测试。
+**Task 20B**：只新增 Core callback 认证和事件协议的一组契约测试；不新增 e2e、恢复或真实 Provider smoke 测试。
 
 预存未提交内容仅 `.superpowers/` 与 `docs/web/docs/Oss.php`，不得触碰。
