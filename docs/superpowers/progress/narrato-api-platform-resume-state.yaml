@@ -1,37 +1,35 @@
 protocol: SEGMENTED_GOAL_PROTOCOL_V2
 branch: codex/narrato-api-platform
 worktree: /private/tmp/NarratoAI-narrato-api-platform
-current_gate: "Gate C remains blocked; Task 17A project API recovery completed"
+current_gate: "Gate C remains blocked; Task 17B protected Create flow recovery completed"
 last_complete_task:
-  id: Task 17A
+  id: Task 17B
   commits:
-    - "5852e3b feat: add project lifecycle api"
+    - "7b85c63 feat(web): restore protected create flow"
 current_task:
-  id: Task 17A
+  id: Task 17B
   status: completed
   completed_subtasks:
-    - "TDD: lifecycle route test observed a 404 for POST /api/v1/projects before implementation"
-    - "Authenticated project create, cost estimate, and ready-only start endpoints"
-    - "Duration persistence migration and domain-priced estimate response"
+    - "TDD: Create route flow verifier first failed because the missing CreationSummary dependency could not be loaded."
+    - "Restored editable CreatePage dependencies, added protected /create route, and linked dashboard creation entries."
+    - "Start control is disabled until every asset is ready and the API cost estimate has been received; the displayed fee is API-provided."
 implementation_commits:
   - "5852e3b feat: add project lifecycle api"
+  - "7b85c63 feat(web): restore protected create flow"
 tests:
-  task_17a_red:
-    command: "cd docs/api/narratoApi && .venv/bin/python -m pytest tests/integration/test_project_lifecycle_routes.py -q"
-    result: "Expected RED: POST /api/v1/projects returned 404 before lifecycle routes existed."
-  task_17a_verification:
-    command: "cd docs/api/narratoApi && .venv/bin/python -m pytest tests/integration/test_project_lifecycle_routes.py tests/unit/test_project_asset_models.py tests/unit/test_pricing.py -q"
-    result: "Passed: 10 tests passed; existing Starlette TestClient deprecation warning remains."
-  task_17a_quality:
-    command: "cd docs/api/narratoApi && .venv/bin/ruff check narrato_api/projects/router.py narrato_api/projects/service.py narrato_api/assets/models.py tests/integration/test_project_lifecycle_routes.py migrations/versions/0014_asset_duration.py && git diff --check"
-    result: "Passed."
+  task_17b_red:
+    command: "cd docs/web/homepage-prototype && node scripts/verify-create-route-flow.mjs"
+    result: "Expected RED before restoration: verifier failed ENOENT for missing src/components/create/CreationSummary.jsx."
+  task_17b_verification:
+    command: "cd docs/web/homepage-prototype && node scripts/verify-create-route-flow.mjs && node scripts/verify-api-project-flow.mjs && npm run build && git diff --check"
+    result: "Passed: route/flow verifier passed; API project-flow verifier passed 6 checks; Vite build passed. Existing >500 kB output chunk advisory remains."
 key_decisions:
-  - "Web product short-drama-narration is normalized to the existing short_drama_narration domain value."
-  - "Cost estimates use all ready assets, persisted video duration, and the latest ProductPrice; start rechecks readiness and performs fee debit/workflow creation transactionally."
-  - "Start returns workflow_id because the existing domain exposes no frontend job_id."
+  - "CreatePage only exposes the existing recovered project lifecycle API; it does not synthesize a local fee fallback."
+  - "The Create start control remains disabled for non-ready assets and while cost estimation is pending or rejected."
+  - "ProjectResultPage remains deliberately unregistered in this atomic unit."
 remaining_risks:
   - "Asset completion does not yet persist probe duration, so real uploads without duration fail safely with PROJECT_DURATION_UNAVAILABLE rather than being charged or started."
-  - "P0: CreatePage and ProjectResultPage remain absent from App routes; CreatePage still has four missing local dependencies."
+  - "P0: ProjectResultPage remains absent from App routes, so completed results are not yet reachable in the real UI."
   - "P1: editor save/render lock helpers have no editor UI caller; real Chrome/Edge File System Access saving is unverified."
   - "Vite reports an existing >500 kB output chunk advisory."
 workspace_status:
@@ -42,16 +40,15 @@ workspace_status:
     - path: docs/web/docs/Oss.php
       reason: pre-existing untracked workspace content; do not touch
 next_action:
-  id: Task 17B
-  scope: "Make the existing CreatePage compile and reachable as a protected route, wiring its start control to the recovered project API only."
+  id: Task 17C
+  scope: "Make the existing ProjectResultPage reachable through one protected result route that loads the completed-project result from the existing API; do not implement editor UI, duration backfill, or Task 19."
   relevant_files:
     - docs/superpowers/progress/2026-07-17-gate-c-report.md
     - docs/web/homepage-prototype/src/App.jsx
-    - docs/web/homepage-prototype/src/pages/CreatePage.jsx
-    - docs/web/homepage-prototype/src/components/create
-    - docs/web/homepage-prototype/src/data/createData.js
+    - docs/web/homepage-prototype/src/pages/ProjectResultPage.jsx
+    - docs/web/homepage-prototype/src/components/projects/ProjectResultDetails.jsx
     - docs/web/homepage-prototype/src/features/projects/projectApi.js
   acceptance_criteria:
-    - "Use TDD: a direct Create route/flow verifier fails before missing dependencies and route wiring are restored."
-    - "CreatePage is protected and compilation includes its dependency graph; the rendered start control is disabled until assets are ready and displays API-provided fee data."
-    - "Do not add ProjectResultPage, editor UI, asset-duration backfill, or Task 19 in this unit."
+    - "Use TDD: a direct protected result-route verifier fails before route/data wiring is restored."
+    - "A completed project result is loaded from the existing API and exposes only the existing completed-project export controls; incomplete or failed states do not expose downloads."
+    - "Do not change Create flow, add editor UI, asset-duration backfill, or Task 19 in this unit."

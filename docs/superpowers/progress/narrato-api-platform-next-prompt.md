@@ -10,13 +10,14 @@
 
 ## 当前真实基线
 
-- Task 17A 已完成：项目创建、费用估算和 ready-only 启动 API 已实现；提交为 `5852e3b feat: add project lifecycle api`。
-- 10 项直接后端测试、ruff 与 diff check 均通过；TestClient 的既有弃用 warning 保留。
-- Gate C 仍因 Create/Result 路由和真实浏览器验证而阻塞。
+- Task 17A 已完成：认证项目创建、费用估算和 ready-only 启动 API，提交 `5852e3b`。
+- Task 17B 已完成：受保护 `/create` 路由、缺失 Create 依赖和 API 费用/ready 门禁，提交 `7b85c63`。
+- Create route/flow verifier、API project-flow verifier 和 Vite build 已通过；Vite 的 >500 kB chunk advisory 保留。
+- Gate C 仍因 ProjectResultPage 不可达以及编辑器真实 UI/浏览器保存验证而阻塞。
 
-## 本窗口唯一原子任务：Task 17B
+## 本窗口唯一原子任务：Task 17C
 
-只恢复 CreatePage 缺失依赖并注册受保护 `/create` 路由。严格 TDD：先让 Create route/flow verifier 失败，再使其通过。渲染的开始控件必须展示 API 费用并在资产未 ready 时禁用。不得新增 Result 页、编辑器 UI、probe duration 回填或 Task 19。
+只恢复一个受保护的项目结果路由：由既有 API 加载完成项目的结果，并复用既有的完成态下载/剪映导出控件。严格 TDD：先让直接 result-route/data-flow verifier 失败，再实现并验证通过。不得修改 Create flow、添加编辑器 UI、probe duration 回填或 Task 19。
 
 ## 不可删除的永久规则
 
