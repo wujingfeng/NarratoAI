@@ -2,7 +2,7 @@
 
 ## Verdict
 
-**Blocked.** The recovered Task 17 route and module evidence is green, but an authenticated browser/API session and a real Chrome/Edge user-gesture File System Access export have not been demonstrated.
+**Blocked on one final evidence item.** The authenticated business API, browser result flow, user-click File System Access invocation, and streamed ZIP writer path are demonstrated. The native macOS save picker itself was not visibly completed by automation.
 
 ## Direct verification evidence
 
@@ -25,7 +25,17 @@ Playwright opened the local Vite application at `http://127.0.0.1:5174`.
 - `/projects/demo/result` redirected unauthenticated users to `/login`.
 - `/projects/demo/editor` redirected unauthenticated users to `/login`.
 
-This proves protected-route behavior, but cannot prove the authenticated Create → result → export loop because no locally runnable authenticated API session/data fixture was available. It also cannot prove `showSaveFilePicker` because the completed-result export button requires that authenticated completion-state flow and a real user gesture.
+### Authenticated isolated-stack evidence
+
+An isolated SQLite migration copy plus the locally available Redis service were used to run the real FastAPI application; a completed project, artifact, and editor revision were seeded only in that temporary database. The browser used the real login API and real result/manifest endpoints through a local same-origin proxy.
+
+- FastAPI readiness returned 200; real `/auth/login` returned 200.
+- Desktop Google Chrome reported native `showSaveFilePicker` as a function.
+- The real UI logged in, loaded `/create`, loaded the completed result, and user-clicked “导出到剪映草稿”.
+- FastAPI logged real `POST /projects/gate-c-completed/exports/jianying-manifest` with 200.
+- A controlled writable received the actual File System Access call with suggested name `gate-c-jianying.zip`, five ZIP stream writes, and `close`.
+
+The controlled writable proves the application call path and streamed completion but is not a claim that the operating-system picker became visible or that a user selected a native destination.
 
 ## Resolved findings
 
@@ -36,9 +46,8 @@ This proves protected-route behavior, but cannot prove the authenticated Create 
 
 ## Remaining blockers
 
-1. Run a local authenticated API stack with a ready project and completed project fixture in a desktop Chrome or Edge session.
-2. Click the completed result's “导出到剪映草稿” control and confirm the File System Access save picker plus streamed ZIP completion under a user gesture.
+1. In a headed desktop Chrome or Edge session, visibly confirm the native save picker and finish a user-selected destination after clicking the completed result's “导出到剪映草稿” control.
 
 ## Gate decision
 
-Gate C remains blocked pending those two browser-level acceptance proofs. Task 19 must not start.
+Gate C remains blocked only pending visible native-picker selection evidence. Task 19 must not start.

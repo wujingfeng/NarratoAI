@@ -12,11 +12,11 @@
 
 - Task 17 已完整恢复，提交为 `5852e3b`、`7b85c63`、`697387b`、`91a428b`。
 - Gate C 直接验证共 18 项与 production build 已通过；三个未认证受保护路由在真实浏览器中均跳转 `/login`。
-- Gate C 仍阻塞：没有本地认证 API/ready+completed 项目 fixture，因此无法在真实 Chrome/Edge 用户手势下验证 File System Access 剪映 ZIP 导出。详见 `docs/superpowers/progress/2026-07-20-gate-c-reevaluation-report.md`。
+- Gate C 已完成隔离 SQLite + Redis 的真实 FastAPI、认证、完成态结果和流式 ZIP 验收；仅缺 headed Chrome/Edge 中原生 macOS 保存选择器可见并完成用户目的地选择的证据。详见 `docs/superpowers/progress/2026-07-20-gate-c-reevaluation-report.md`。
 
-## 本窗口唯一原子任务：Gate C authenticated browser acceptance
+## 本窗口唯一原子任务：Gate C native picker completion
 
-启动或连接可用的本地认证 API，并准备 ready 和 completed 项目 fixture。用桌面 Chrome 或 Edge 完成 Create → Result → 点击“导出到剪映草稿”流程，记录 File System Access 保存选择器和流式 ZIP 成功的简洁证据。Gate C 通过前绝不开始 Task 19；若环境仍不可用，准确记录阻塞而不伪造证据。
+复用隔离认证 API 与 completed fixture，在 headed 桌面 Chrome 或 Edge 点击“导出到剪映草稿”，可见地完成原生保存选择器和用户目的地选择，记录简洁证据。Gate C 通过前绝不开始 Task 19；若原生 UI 无法自动化，准确记录阻塞而不伪造证据。
 
 ## 不可删除的永久规则
 
