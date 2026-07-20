@@ -14,6 +14,16 @@ export function getAsset(assetId, request = apiRequest) {
   return request(`/assets/${assetId}`);
 }
 
+/** Result endpoint is deliberately completion-gated by the API. */
+export async function getProjectResult(projectId, request = apiRequest) {
+  const result = await request(`/projects/${projectId}/result`);
+  return {
+    id: result.project_id,
+    status: "completed",
+    artifacts: result.artifacts,
+  };
+}
+
 export async function startProject(projectId, assets, request = apiRequest) {
   if (!canStartProject(assets)) throw new Error("所有素材必须校验为 ready 后才能开始");
   return request(`/projects/${projectId}/start`, { method: "POST" });
