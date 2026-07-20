@@ -4,7 +4,7 @@
 
 - 分支：`codex/narrato-api-platform`
 - worktree：`/private/tmp/NarratoAI-narrato-api-platform`
-- Gate：**Gate C 已通过（用户接受原生保存选择器证据例外）**；Gate D 待开始。
+- Gate：**Gate C 已通过（用户接受原生保存选择器证据例外）**；Gate D 待完成 Task 20 剩余验收。
 
 ## Task 17A 基线
 
@@ -53,8 +53,15 @@
 - RED：两个新增契约测试路径不存在，pytest exit 4。
 - GREEN：Core 4 项、Business 2 项契约测试均通过；覆盖 response envelope 四字段、未知字段拒绝和稳定 public error code。
 
+## Task 20B 证据
+
+- 实施提交：`1aa2134 feat: add core callback contract endpoint`。
+- RED：新增 Business callback 契约先失败，因 `/api/v1/internal/core/callbacks` 不存在而返回 404，未满足要求的专用 Bearer 401。
+- GREEN：Core callback delivery 6 项、Business callback contract + reconciler 5 项通过；targeted ruff 与 diff check 通过。
+- Business 内部路由要求独立 `core_callback_token`，禁止复用 request token；`X-Idempotency-Key` 必须等于正文 `event_id`，不匹配稳定返回 `CALLBACK_EVENT_ID_MISMATCH`（409），成功仅确认事件 ID 和接收状态。
+
 ## 下一原子任务
 
-**Task 20B**：只新增 Core callback 认证和事件协议的一组契约测试；不新增 e2e、恢复或真实 Provider smoke 测试。
+**Task 20C**：只做两套服务从 fresh SQLite 的 Alembic upgrade + check 验收切片；不新增工作流恢复、完整 e2e 或真实 Provider smoke。
 
-预存未提交内容仅 `.superpowers/` 与 `docs/web/docs/Oss.php`，不得触碰。
+预存未提交内容仅 `.superpowers/`、`docs/web/docs/Oss.php` 与 `docs/web/homepage-prototype/.playwright-cli/`，不得触碰。
