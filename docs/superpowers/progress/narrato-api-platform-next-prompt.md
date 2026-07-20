@@ -10,12 +10,12 @@
 
 ## 当前真实基线
 
-- Gate C 已通过（用户接受原生 picker 证据例外）；Gate D 待开始。
-- Task 19A 已完成：Business API web/worker/scheduler Supervisor 配置和纯静态 configparser verifier，提交 `e776d9e`。
+- Gate C 已通过（用户接受原生 picker 证据例外）；Task 19 全部完成，Gate D 待 Task 20 验收。
+- Task 19 提交：`e776d9e`、`462ab86`、`3a6bc20`、`2a27f9c`。静态部署、README、编译和 lint 证据已通过；macOS sandbox 无法运行 nginx -t。
 
-## 本窗口唯一原子任务：Task 19B
+## 本窗口唯一原子任务：Task 20A
 
-仅创建 Core API 的 web、analysis、ASR、TTS、render 五个 Supervisor 定义，并扩展既有静态 verifier。严格 TDD：先让 Core 配置缺失导致 verifier 失败，再验证 venv、根 PYTHONPATH、角色队列、自动启停、进程组停止、超时和独立日志。不得创建 Nginx、改写 README 或开始 Task 20。
+仅为 Business API/Core 共享响应 envelope 与稳定错误码添加一个契约测试切片。严格 TDD：先写失败契约，再实现最小测试基础并验证；不得添加完整 workflow e2e、故障恢复或真实 Provider smoke。
 
 ## 不可删除的永久规则
 

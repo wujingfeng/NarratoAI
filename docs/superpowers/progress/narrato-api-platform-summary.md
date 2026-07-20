@@ -40,8 +40,15 @@
 - RED：Supervisor 静态验证器在配置不存在时以 exit 1 失败。
 - GREEN：`verify-supervisor-config.py` 验证 web、worker、scheduler 三个 Business API Program 的 venv、TOML、自动启停、进程组停止、超时和独立日志；`py_compile`、ruff、diff check 均通过。
 
+## Task 19B–19D 证据
+
+- `462ab86`：Core web 与四类 role-named worker 的 Supervisor 配置；由于现有 durable task 仅路由至 `narrato.core.default`，所有 worker 如实消费该队列。
+- `3a6bc20`：Business/Core 反代、SSE、CORS、限流、超时、OSS/CDN Range CORS 示例和静态 Nginx verifier。
+- `2a27f9c`：两套部署运行手册和 README 静态 verifier。
+- 全 Task 19 静态验证、ruff、py_compile/compileall 和 diff check PASS；`nginx -t` 在 macOS sandbox 因 sysctl/日志权限无法运行，已在运行手册记录。
+
 ## 下一原子任务
 
-**Task 19B**：只新增 Core API 的 web 与四类 worker Supervisor 配置，并扩展静态 verifier；不新增 Nginx、README 或 Task 20 内容。
+**Task 20A**：只新增两服务共享响应/错误协议的一组契约测试；不新增 e2e、恢复或真实 Provider smoke 测试。
 
 预存未提交内容仅 `.superpowers/` 与 `docs/web/docs/Oss.php`，不得触碰。
