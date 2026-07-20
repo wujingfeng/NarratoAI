@@ -41,6 +41,9 @@ tests:
   gate_c_reevaluation:
     command: "cd docs/web/homepage-prototype && node scripts/verify-api-auth.mjs && node scripts/verify-api-project-flow.mjs && node scripts/verify-create-route-flow.mjs && node scripts/verify-project-result-route.mjs && node scripts/verify-project-editor-route.mjs && node scripts/verify-jianying-export.mjs && npm run build && git diff --check; Playwright open /create, /projects/demo/result, /projects/demo/editor"
     result: "All 18 direct checks and production build passed. Isolated SQLite + real Redis FastAPI stack passed readiness and login; desktop Chrome completed authenticated Create/result flow and real manifest API POST. User click reached native File System Access call with a controlled writer completing 5 ZIP writes and close. Native OS picker visible-selection remains unproven."
+  gate_c_native_picker_retry:
+    command: "Restart isolated local Vite/proxy, launch /tmp/gate-c-native-picker.mjs, inspect Chrome via Computer Use and process state"
+    result: "Not completed: the available Playwright Chrome instance remained headless and no independently accessible native macOS save dialog was exposed for visible selection."
 key_decisions:
   - "CreatePage only exposes the existing recovered project lifecycle API; it does not synthesize a local fee fallback."
   - "The Create start control remains disabled for non-ready assets and while cost estimation is pending or rejected."
@@ -49,7 +52,7 @@ key_decisions:
   - "Gate C requires a visibly completed native OS save-picker selection; controlled File System Access writers only prove application invocation and stream completion."
 remaining_risks:
   - "Asset completion does not yet persist probe duration, so real uploads without duration fail safely with PROJECT_DURATION_UNAVAILABLE rather than being charged or started."
-  - "Gate C remains blocked only because native macOS save-picker visibility and user-selected destination completion were not captured; all application/API/stream evidence is green."
+  - "Gate C remains blocked only because native macOS save-picker visibility and user-selected destination completion were not captured; the final headed-automation retry did not expose a native dialog to Computer Use. All application/API/stream evidence is green."
   - "Vite reports an existing >500 kB output chunk advisory."
 workspace_status:
   clean: false

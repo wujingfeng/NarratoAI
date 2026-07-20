@@ -31,6 +31,7 @@
 
 - 真实上传的 probe duration 尚未回填到新字段，估价会安全返回 `PROJECT_DURATION_UNAVAILABLE`。
 - 2026-07-20 完成隔离 SQLite + Redis 的真实 FastAPI/认证浏览器验收：完成态结果真实调用 manifest API，Chrome 用户点击到原生 FSA 调用路径，流式 ZIP 写入 5 次并关闭。仅未可见地完成原生 macOS 保存选择器和用户目的地选择。
+- 最终 headed 自动化重试未向 Computer Use 暴露独立原生 macOS 对话框；不能伪造该证据。
 - Vite 保留 >500 kB chunk advisory。
 
 ## 下一原子任务

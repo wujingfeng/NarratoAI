@@ -50,4 +50,4 @@ The controlled writable proves the application call path and streamed completion
 
 ## Gate decision
 
-Gate C remains blocked only pending visible native-picker selection evidence. Task 19 must not start.
+Gate C remains blocked only pending visible native-picker selection evidence. A final headed-Playwright retry could not surface an automatable macOS dialog: the available Playwright Chrome process remained headless and no separate native dialog was exposed to Computer Use. Task 19 must not start.
