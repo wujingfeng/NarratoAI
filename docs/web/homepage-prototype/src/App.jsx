@@ -2,6 +2,7 @@ import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { useAuth } from "./features/auth/AuthProvider.jsx";
 import { RouteEffects } from "./components/RouteEffects.jsx";
 import { DashboardPage } from "./pages/DashboardPage.jsx";
+import { CreatePage } from "./pages/CreatePage.jsx";
 import { HomePage } from "./pages/HomePage.jsx";
 import { LoginPage } from "./pages/LoginPage.jsx";
 import { NotFoundPage } from "./pages/NotFoundPage.jsx";
@@ -20,6 +21,7 @@ export function App() {
         <Route path="/" element={<HomePage />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/dashboard" element={<RequireAuth><DashboardPage /></RequireAuth>} />
+        <Route path="/create" element={<RequireAuth><CreatePage /></RequireAuth>} />
         <Route path="*" element={<NotFoundPage />} />
       </Routes>
     </>

@@ -78,6 +78,17 @@ export function CreatePage() {
   }, [videos]);
 
   const selectedCreationType = creationTypes.find((type) => type.id === selectedType);
+  const assets = videos.map((video) => ({ status: video.assetStatus }));
+  const canStart = Boolean(projectId) && canStartProject(assets);
+
+  useEffect(() => {
+    if (!canStart || apiCredits !== null) return undefined;
+    let active = true;
+    estimateProjectCost(projectId)
+      .then((estimate) => { if (active) setApiCredits(estimate.credits); })
+      .catch((error) => { if (active) showUnavailable(error.message || "无法获取 API 费用"); });
+    return () => { active = false; };
+  }, [apiCredits, canStart, projectId, showUnavailable]);
 
   const handleTypeChange = (typeId) => {
     setSelectedType(typeId);
@@ -148,16 +159,13 @@ export function CreatePage() {
       showUnavailable(`${selectedCreationType.title}当前有 ${videos.length} 个视频，最多支持 ${selectedCreationType.maxVideos} 个`);
       return;
     }
-    const assets = videos.map((video) => ({ status: video.assetStatus }));
-    if (!projectId || !canStartProject(assets)) {
+    if (!canStart) {
       showUnavailable("请等待全部素材校验完成后再开始");
       return;
     }
     try {
-      const estimate = await estimateProjectCost(projectId);
-      setApiCredits(estimate.credits);
       await startProject(projectId, assets);
-      showUnavailable(`项目已开始，预计消耗 ${estimate.credits} 创作点`);
+      showUnavailable(`项目已开始，预计消耗 ${apiCredits} 创作点`);
     } catch (error) {
       showUnavailable(error.message || "项目无法开始");
     }
@@ -199,9 +207,10 @@ export function CreatePage() {
             </div>
             <CreationSummary
               durationLabel={summary.durationLabel}
-              estimatedCredits={apiCredits ?? summary.estimatedCredits}
+              estimatedCredits={apiCredits}
               balance={dashboardCredits.balance}
               onNext={handleNext}
+              disabled={!canStart || apiCredits === null}
             />
           </div>
         </main>
