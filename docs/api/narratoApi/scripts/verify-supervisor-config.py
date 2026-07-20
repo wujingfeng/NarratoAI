@@ -1,8 +1,12 @@
 #!/usr/bin/env python3
-"""Statically validate the Narrato Business API Supervisor definitions.
+"""Statically validate the Narrato API platform Supervisor definitions.
 
 This checker reads configuration only.  It never invokes Supervisor or any
 configured program, so it is safe to run in a development checkout.
+
+Core currently routes every durable ``core.tasks.wake`` message to
+``narrato.core.default``.  The role-named Core workers therefore verify that
+they consume that real queue rather than claiming unimplemented role queues.
 """
 
 from __future__ import annotations
@@ -21,10 +25,17 @@ class ProgramSpec:
     section: str
     command_fragments: tuple[str, ...]
     forbidden_command_fragments: tuple[str, ...] = ()
+    supervisor_dir: Path | None = None
+    environment_key: str = "NARRATO_API_CONFIG"
+    required_pythonpath: str | None = None
 
 
 SERVICE_ROOT = Path(__file__).resolve().parents[1]
 SUPERVISOR_DIR = SERVICE_ROOT / "supervisor"
+REPOSITORY_ROOT = SERVICE_ROOT.parents[2]
+CORE_SERVICE_ROOT = REPOSITORY_ROOT / "coreApi"
+CORE_SUPERVISOR_DIR = CORE_SERVICE_ROOT / "supervisor"
+CORE_DEFAULT_QUEUE = "narrato.core.default"
 PROGRAMS = (
     ProgramSpec(
         filename="narrato-api-web.conf",
@@ -45,6 +56,74 @@ PROGRAMS = (
         section="program:narrato-api-scheduler",
         command_fragments=(".venv/bin/celery", "beat"),
         forbidden_command_fragments=(" worker", "--queues="),
+    ),
+    ProgramSpec(
+        filename="core-api-web.conf",
+        section="program:core-api-web",
+        command_fragments=(
+            "coreApi/.venv/bin/uvicorn",
+            "core_api.main:create_app",
+            "--factory",
+        ),
+        supervisor_dir=CORE_SUPERVISOR_DIR,
+        environment_key="CORE_API_CONFIG",
+        required_pythonpath="/srv/narrato/NarratoAI",
+    ),
+    ProgramSpec(
+        filename="core-worker-analysis.conf",
+        section="program:core-worker-analysis",
+        command_fragments=(
+            "coreApi/.venv/bin/celery",
+            "-A core_api.celery_app:celery_app",
+            "worker",
+            f"--queues={CORE_DEFAULT_QUEUE}",
+            "--hostname=core-analysis@",
+        ),
+        supervisor_dir=CORE_SUPERVISOR_DIR,
+        environment_key="CORE_API_CONFIG",
+        required_pythonpath="/srv/narrato/NarratoAI",
+    ),
+    ProgramSpec(
+        filename="core-worker-asr.conf",
+        section="program:core-worker-asr",
+        command_fragments=(
+            "coreApi/.venv/bin/celery",
+            "-A core_api.celery_app:celery_app",
+            "worker",
+            f"--queues={CORE_DEFAULT_QUEUE}",
+            "--hostname=core-asr@",
+        ),
+        supervisor_dir=CORE_SUPERVISOR_DIR,
+        environment_key="CORE_API_CONFIG",
+        required_pythonpath="/srv/narrato/NarratoAI",
+    ),
+    ProgramSpec(
+        filename="core-worker-tts.conf",
+        section="program:core-worker-tts",
+        command_fragments=(
+            "coreApi/.venv/bin/celery",
+            "-A core_api.celery_app:celery_app",
+            "worker",
+            f"--queues={CORE_DEFAULT_QUEUE}",
+            "--hostname=core-tts@",
+        ),
+        supervisor_dir=CORE_SUPERVISOR_DIR,
+        environment_key="CORE_API_CONFIG",
+        required_pythonpath="/srv/narrato/NarratoAI",
+    ),
+    ProgramSpec(
+        filename="core-worker-render.conf",
+        section="program:core-worker-render",
+        command_fragments=(
+            "coreApi/.venv/bin/celery",
+            "-A core_api.celery_app:celery_app",
+            "worker",
+            f"--queues={CORE_DEFAULT_QUEUE}",
+            "--hostname=core-render@",
+        ),
+        supervisor_dir=CORE_SUPERVISOR_DIR,
+        environment_key="CORE_API_CONFIG",
+        required_pythonpath="/srv/narrato/NarratoAI",
     ),
 )
 
@@ -75,8 +154,8 @@ def _require_true(program: configparser.SectionProxy, option: str, label: str) -
         raise ValueError(f"{label}: {option} must be true")
 
 
-def _verify_program(spec: ProgramSpec) -> None:
-    path = SUPERVISOR_DIR / spec.filename
+def _verify_program(spec: ProgramSpec) -> tuple[str, str]:
+    path = (spec.supervisor_dir or SUPERVISOR_DIR) / spec.filename
     if not path.is_file():
         raise ValueError(f"missing Supervisor configuration: {path}")
 
@@ -90,8 +169,15 @@ def _verify_program(spec: ProgramSpec) -> None:
         raise ValueError(f"{label}: command must use the service .venv")
     if not directory.startswith("/"):
         raise ValueError(f"{label}: directory must be an absolute service path")
-    if "NARRATO_API_CONFIG=" not in environment or ".toml" not in environment:
-        raise ValueError(f"{label}: environment must provide NARRATO_API_CONFIG TOML")
+    if f"{spec.environment_key}=" not in environment or ".toml" not in environment:
+        raise ValueError(
+            f"{label}: environment must provide {spec.environment_key} TOML"
+        )
+    if (
+        spec.required_pythonpath is not None
+        and f'PYTHONPATH="{spec.required_pythonpath}"' not in environment
+    ):
+        raise ValueError(f"{label}: environment must provide repository-root PYTHONPATH")
     for fragment in spec.command_fragments:
         if fragment not in command:
             raise ValueError(f"{label}: command is missing {fragment!r}")
@@ -117,18 +203,24 @@ def _verify_program(spec: ProgramSpec) -> None:
         raise ValueError(f"{label}: log paths must be absolute")
     if stdout_log == stderr_log:
         raise ValueError(f"{label}: stdout_logfile and stderr_logfile must differ")
+    return stdout_log, stderr_log
 
 
 def main() -> int:
-    """Validate every Business API process definition without starting it."""
+    """Validate every API-platform process definition without starting it."""
 
     try:
+        seen_logs: set[str] = set()
         for spec in PROGRAMS:
-            _verify_program(spec)
+            stdout_log, stderr_log = _verify_program(spec)
+            for log_path in (stdout_log, stderr_log):
+                if log_path in seen_logs:
+                    raise ValueError(f"{spec.filename}: log path must be unique: {log_path}")
+                seen_logs.add(log_path)
     except (OSError, ValueError, configparser.Error) as error:
         print(f"Supervisor configuration invalid: {error}", file=sys.stderr)
         return 1
-    print(f"Supervisor configuration valid: {len(PROGRAMS)} Business API programs")
+    print(f"Supervisor configuration valid: {len(PROGRAMS)} API platform programs")
     return 0
 
 
