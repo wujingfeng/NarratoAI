@@ -8,6 +8,9 @@ from typing import Any, Literal
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from narrato_api.billing.models import CreditLedger
+from narrato_api.billing.service import _apply_credit
+from narrato_api.projects.models import Project
 from narrato_api.workflows.models import (
     Workflow,
     WorkflowNode,
@@ -113,4 +116,27 @@ class WorkflowReconciler:
                 ):
                     workflow.state = "completed"
                     workflow.state_version += 1
+                if workflow.state in {"completed", "failed"}:
+                    project = session.get(Project, workflow.project_id)
+                    if project is not None:
+                        project.status = workflow.state
+                        if workflow.state == "failed":
+                            charge = session.scalar(
+                                select(CreditLedger)
+                                .where(
+                                    CreditLedger.reference_id == project.id,
+                                    CreditLedger.entry_type == "charge",
+                                )
+                                .with_for_update()
+                            )
+                            if charge is not None:
+                                _apply_credit(
+                                    session,
+                                    user_id=charge.user_id,
+                                    entry_type="refund",
+                                    amount=-charge.amount,
+                                    idempotency_key=f"refund:{project.id}",
+                                    reference_id=project.id,
+                                    reason="project_failed_refund",
+                                )
                 return True

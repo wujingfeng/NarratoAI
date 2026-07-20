@@ -72,7 +72,7 @@ def get_workflow_reconciler(request: Request) -> WorkflowReconciler:
 def receive_core_callback(
     body: CoreCallbackEvent,
     idempotency_key: Annotated[str | None, Header(alias="X-Idempotency-Key")] = None,
-    reconciler: Annotated[WorkflowReconciler, Depends(get_workflow_reconciler)] = None,
+    reconciler: Annotated[WorkflowReconciler | None, Depends(get_workflow_reconciler)] = None,
     request_id: Annotated[str, Depends(get_request_id)] = "",
 ) -> ApiResponse[CoreCallbackReceipt]:
     """接收 Core 终态事件，要求 Header 和正文使用同一个事件 ID。"""
@@ -83,6 +83,8 @@ def receive_core_callback(
             "Callback event identifier does not match idempotency key",
             409,
         )
+    if reconciler is None:
+        raise RuntimeError("workflow reconciler dependency is unavailable")
     accepted = reconciler.reconcile_callback(
         core_task_id=body.core_task_id,
         event_id=body.event_id,
