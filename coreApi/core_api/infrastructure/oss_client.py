@@ -385,12 +385,15 @@ class Oss2Client:
         connect_timeout: float = 5.0,
         read_timeout: float = 5.0,
     ) -> None:
-        endpoint_url = urlsplit(endpoint)
+        endpoint_url = urlsplit(f"//{endpoint}")
         public_url = urlsplit(public_base_url)
         if (
-            endpoint_url.scheme.lower() != "https"
+            not endpoint
+            or "://" in endpoint
             or not endpoint_url.hostname
             or endpoint_url.username is not None
+            or endpoint_url.path not in {"", "/"}
+            or endpoint_url.query
             or endpoint_url.fragment
             or public_url.scheme.lower() != "https"
             or not public_url.hostname
@@ -403,7 +406,9 @@ class Oss2Client:
             or connect_timeout <= 0
             or read_timeout <= 0
         ):
-            raise ValueError("OSS 配置必须使用完整 HTTPS 地址和非空私有凭据")
+            raise ValueError(
+                "OSS endpoint 必须不带协议，公开地址必须使用 HTTPS 且私有凭据不能为空"
+            )
         self.endpoint = endpoint
         self.bucket = bucket
         self.access_key_id = access_key_id

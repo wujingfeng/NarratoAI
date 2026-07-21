@@ -157,14 +157,28 @@ def test_downloader_rejects_oversize_and_removes_partial_file(tmp_path, advertis
     assert not destination.exists()
 
 
+def test_production_oss_adapter_accepts_protocol_free_endpoint():
+    client = Oss2Client(
+        endpoint="oss.example.test",
+        bucket="bucket",
+        access_key_id="id",
+        access_key_secret="secret",
+        public_base_url="https://cdn.example.test",
+    )
+    assert client.endpoint == "oss.example.test"
+
+
 @pytest.mark.parametrize(
     ("endpoint", "public_url"),
     [
         ("http://oss.example.test", "https://cdn.example.test"),
-        ("https://oss.example.test", "http://cdn.example.test"),
+        ("https://oss.example.test", "https://cdn.example.test"),
+        ("oss.example.test", "http://cdn.example.test"),
     ],
 )
-def test_production_oss_adapter_requires_https(endpoint, public_url):
+def test_production_oss_adapter_rejects_invalid_endpoint_or_public_url(
+    endpoint, public_url
+):
     with pytest.raises(ValueError):
         Oss2Client(
             endpoint=endpoint,

@@ -59,7 +59,7 @@ def test_required_configuration_includes_oss(settings):
 
     configured = settings.model_copy(
         update={
-            "oss_endpoint": "https://oss.example.invalid",
+            "oss_endpoint": "oss.example.invalid",
             "oss_bucket": "narrato-core",
             "oss_access_key_id": "test-key",
             "oss_access_key_secret": "test-secret",
@@ -72,7 +72,7 @@ def test_required_configuration_includes_oss(settings):
 def test_required_configuration_rejects_invalid_task7_security_semantics(settings):
     base = settings.model_copy(
         update={
-            "oss_endpoint": "https://oss.example.invalid",
+            "oss_endpoint": "oss.example.invalid",
             "oss_bucket": "narrato-core",
             "oss_access_key_id": "test-key",
             "oss_access_key_secret": "test-secret",
@@ -80,7 +80,7 @@ def test_required_configuration_rejects_invalid_task7_security_semantics(setting
     )
     assert (
         required_configuration_is_present(
-            base.model_copy(update={"oss_endpoint": "http://oss.example.invalid"})
+            base.model_copy(update={"oss_endpoint": "https://oss.example.invalid"})
         )
         is False
     )
@@ -159,7 +159,7 @@ def test_ready_probes_oss_with_timeout_and_safe_error(settings, monkeypatch):
 
     configured = settings.model_copy(
         update={
-            "oss_endpoint": "https://oss.example.invalid",
+            "oss_endpoint": "oss.example.invalid",
             "oss_bucket": "narrato-core",
             "oss_access_key_id": "test-key",
             "oss_access_key_secret": "test-secret",
@@ -209,7 +209,7 @@ def test_default_readiness_accepts_successful_fake_oss_probe(settings, monkeypat
 
     configured = settings.model_copy(
         update={
-            "oss_endpoint": "https://oss.example.invalid",
+            "oss_endpoint": "oss.example.invalid",
             "oss_bucket": "narrato-core",
             "oss_access_key_id": "test-key",
             "oss_access_key_secret": "test-secret",
@@ -242,7 +242,7 @@ def test_oss2_readiness_passes_real_transport_timeout(monkeypatch):
     fake = type("FakeOss", (), {"Auth": FakeAuth, "Bucket": FakeBucket})
     monkeypatch.setitem(__import__("sys").modules, "oss2", fake)
     client = Oss2Client(
-        endpoint="https://oss.example.invalid",
+        endpoint="oss.example.invalid",
         bucket="core",
         access_key_id="key",
         access_key_secret="secret",
@@ -351,7 +351,7 @@ def test_slow_readiness_probe_does_not_block_event_loop(settings, monkeypatch):
 
     configured = settings.model_copy(
         update={
-            "oss_endpoint": "https://oss.example.invalid",
+            "oss_endpoint": "oss.example.invalid",
             "oss_bucket": "narrato-core",
             "oss_access_key_id": "test-key",
             "oss_access_key_secret": "test-secret",
