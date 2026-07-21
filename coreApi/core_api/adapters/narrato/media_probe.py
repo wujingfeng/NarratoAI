@@ -168,7 +168,7 @@ def parse_srt(content: bytes) -> dict[str, Any]:
 
 @dataclass(slots=True)
 class MediaProbeAdapter:
-    """在独立 attempt 工作区下载并校验视频或 SRT。"""
+    """远程探测视频元数据，并在本地解析小型 SRT。"""
 
     downloader: Downloader
     probe: Callable[[str], ProbeResult]
@@ -195,13 +195,16 @@ class MediaProbeAdapter:
             kind = "subtitle"
         else:
             raise MediaConstraintError("MEDIA_TYPE_INVALID")
+        if media_type == "video":
+            try:
+                probe_result = self.probe(source_url)
+            except Exception as exc:
+                # FFprobe 详情可能含远程 URL 或内部信息，只保留稳定损坏分类。
+                raise MediaDamagedError("MEDIA_DAMAGED") from exc
+            return validate_video(probe_result, declared_extension=extension)
+
         destination = workspace.controlled_path("input", kind, extension)
         self.downloader.download(source_url, destination, max_bytes=limit)
         if media_type == "subtitle":
             return parse_srt(destination.read_bytes())
-        try:
-            probe_result = self.probe(str(destination))
-        except Exception as exc:
-            # FFprobe 详情可能含本地路径，只保留稳定损坏分类。
-            raise MediaDamagedError("MEDIA_DAMAGED") from exc
-        return validate_video(probe_result, declared_extension=extension)
+        raise AssertionError("unreachable media type")

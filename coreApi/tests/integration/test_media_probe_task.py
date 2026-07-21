@@ -420,7 +420,7 @@ def test_media_handler_uses_real_probe_and_writes_terminal_outbox(session, tmp_p
     )
     adapter = MediaProbeAdapter(
         downloader=FixtureDownloader(video),
-        probe=probe_media,
+        probe=lambda _source: probe_media(str(video)),
     )
     handler = AtomicTaskHandler(
         task_service=service,

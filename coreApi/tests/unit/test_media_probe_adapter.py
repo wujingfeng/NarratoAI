@@ -5,10 +5,12 @@ import pytest
 
 from core_api.adapters.narrato.media_probe import (
     MediaConstraintError,
+    MediaProbeAdapter,
     SrtConstraintError,
     parse_srt,
     validate_video,
 )
+from core_api.runtime.workspace import CoreTaskWorkspace
 
 
 class FakeProbe:
@@ -59,6 +61,33 @@ def test_probe_normalizes_valid_video_metadata():
         "height": 720,
         "has_audio": True,
     }
+
+
+def test_video_probe_uses_remote_url_without_downloading(tmp_path):
+    """视频元数据仅由 FFprobe 读取受限 CDN 地址，不落本地输入副本。"""
+
+    received: list[str] = []
+
+    class NoDownload:
+        def download(self, *_args, **_kwargs):
+            raise AssertionError("video probe must not download the source file")
+
+    def probe(source: str) -> FakeProbe:
+        received.append(source)
+        return FakeProbe()
+
+    adapter = MediaProbeAdapter(downloader=NoDownload(), probe=probe)
+    workspace = CoreTaskWorkspace.create(tmp_path, "ctask_01ABC", 1)
+
+    result = adapter.run(
+        source_url="https://cdn.example.test/narrato/api/video.mp4",
+        media_type="video",
+        declared_extension="mp4",
+        workspace=workspace,
+    )
+
+    assert received == ["https://cdn.example.test/narrato/api/video.mp4"]
+    assert result["duration_seconds"] == 600.0
 
 
 def test_srt_parser_returns_normalized_metadata():

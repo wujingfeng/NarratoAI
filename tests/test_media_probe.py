@@ -48,6 +48,29 @@ def test_probe_media_raises_clear_error_for_missing_file(tmp_path):
         probe_media(str(tmp_path / "missing.mp4"))
 
 
+def test_probe_media_accepts_https_source_without_local_file(monkeypatch):
+    from app.services import media_probe
+
+    captured: list[str] = []
+    monkeypatch.setattr(
+        media_probe.subprocess,
+        "run",
+        lambda argv, **_kwargs: (
+            captured.append(argv[-1])
+            or SimpleNamespace(
+                returncode=0,
+                stdout='{"streams":[{"codec_type":"video","codec_name":"h264","width":64,"height":48}],"format":{"duration":"1.0","format_name":"mp4"}}',
+                stderr="",
+            )
+        ),
+    )
+
+    info = probe_media("https://cdn.example.test/narrato/api/video.mp4")
+
+    assert captured == ["https://cdn.example.test/narrato/api/video.mp4"]
+    assert info.container == "mp4"
+
+
 def test_ffprobe_reuses_configured_ffmpeg_sibling(monkeypatch, tmp_path):
     from app.services import media_probe
 
@@ -60,7 +83,9 @@ def test_ffprobe_reuses_configured_ffmpeg_sibling(monkeypatch, tmp_path):
     assert media_probe._ffprobe_binary() == str(ffprobe)
 
 
-def test_ffprobe_missing_explicit_path_falls_back_to_imageio_sibling(monkeypatch, tmp_path):
+def test_ffprobe_missing_explicit_path_falls_back_to_imageio_sibling(
+    monkeypatch, tmp_path
+):
     from app.services import media_probe
 
     ffmpeg = tmp_path / "imageio-ffmpeg"
@@ -85,7 +110,10 @@ def test_ffprobe_missing_explicit_path_falls_back_to_imageio_sibling(monkeypatch
         {"streams": "not-a-list", "format": {"duration": "1"}},
         {"streams": [123], "format": {"duration": "1"}},
         {"streams": [], "format": []},
-        {"streams": [{"codec_type": "video", "width": "bad", "height": 10}], "format": {"duration": "1"}},
+        {
+            "streams": [{"codec_type": "video", "width": "bad", "height": 10}],
+            "format": {"duration": "1"},
+        },
     ],
 )
 def test_probe_media_wraps_invalid_ffprobe_schema(monkeypatch, tmp_path, payload):
