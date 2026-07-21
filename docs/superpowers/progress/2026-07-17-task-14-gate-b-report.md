@@ -1,6 +1,6 @@
 # Task 14 Gate B 复核报告
 
-日期：2026-07-17  
+日期：2026-07-17
 范围：仅复核已提交的 Task 14A--14E；未实现或修改 Core HTTP、router、polling、SSE、重投扫描、Task 15 或下游运行行为。
 
 ## 需求对齐复核
