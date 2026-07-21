@@ -1,6 +1,6 @@
 # SEGMENTED_GOAL_PROTOCOL_V2：NarratoAI API 平台永久续接提示词
 
-在既有 worktree `/private/tmp/NarratoAI-narrato-api-platform`、分支 `codex/narrato-api-platform` 中继续。不得创建新 worktree，不得 `reset`、`restore`、`clean`、删除或覆盖已有改动；不得触碰预存未跟踪 `/.superpowers/`、`docs/web/docs/Oss.php` 与 `docs/web/homepage-prototype/.playwright-cli/`。
+在既有 worktree `/private/tmp/NarratoAI-narrato-api-platform`、分支 `codex/narrato-api-platform` 中继续。不得创建新 worktree，不得 `reset`、`restore`、`clean`、删除或覆盖已有改动；不得触碰预存未跟踪 `/.pytest_cache/`、`/.superpowers/` 与 `docs/web/homepage-prototype/.playwright-cli/`。
 
 ## 开始时恢复真实进度
 

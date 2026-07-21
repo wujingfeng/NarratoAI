@@ -66,4 +66,4 @@
 
 Task 20C：`0381536 test: add workflow end to end acceptance`。fresh SQLite 双服务迁移通过；Business E2E 4 项通过，覆盖终态、轮询补偿、失败状态和一次退款。原项目回归 52 项、前端 build/API 验证通过。
 
-预存未提交内容仅 `.superpowers/`、`docs/web/docs/Oss.php` 与 `docs/web/homepage-prototype/.playwright-cli/`，不得触碰。
+当前未提交内容仅 `.pytest_cache/`、`.superpowers/` 与 `docs/web/homepage-prototype/.playwright-cli/`，均为既有或验证产物，不得触碰。
