@@ -15,6 +15,7 @@ smtp_username = ""
 smtp_password = ""
 smtp_sender = "noreply@example.com"
 smtp_timeout_seconds = 10.0
+smtp_use_ssl = false
 smtp_use_starttls = true
 verification_code_hmac_secret = "replace-with-high-entropy-hmac-secret"
 verification_code_ttl_seconds = 600

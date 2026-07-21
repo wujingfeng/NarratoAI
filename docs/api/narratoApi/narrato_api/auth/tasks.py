@@ -63,6 +63,7 @@ def _run_smtp_subprocess(
             "sender": settings.smtp_sender,
             "socket_timeout_seconds": settings.smtp_timeout_seconds,
             "use_starttls": settings.smtp_use_starttls,
+            "use_ssl": settings.smtp_use_ssl,
             "email": email,
             "verification_code": verification_code,
             "purpose": purpose,

@@ -95,6 +95,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                     sender=current.smtp_sender,
                     timeout_seconds=current.smtp_timeout_seconds,
                     use_starttls=current.smtp_use_starttls,
+                    use_ssl=current.smtp_use_ssl,
                 ),
                 ttl_seconds=current.verification_code_ttl_seconds,
             )

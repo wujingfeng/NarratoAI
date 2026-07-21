@@ -18,6 +18,7 @@ from narrato_api.integrations.mail_client import (
 )
 from narrato_api.config import Settings
 from narrato_api.api.errors import ApiError
+from narrato_api.integrations import mail_client
 
 
 def test_codes_are_hashed_scoped_replaced_and_consumed_once() -> None:
@@ -178,6 +179,63 @@ def test_synchronous_dispatcher_sends_before_returning() -> None:
             "validity_minutes": 10,
         }
     ]
+
+
+def test_smtp_ssl_uses_implicit_tls_without_starttls(monkeypatch) -> None:
+    """465 隐式 TLS 必须使用 SMTP_SSL，不能再协商 STARTTLS。"""
+
+    calls: list[str] = []
+
+    class Connection:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+        def ehlo(self):
+            calls.append("ehlo")
+
+        def starttls(self):
+            calls.append("starttls")
+
+        def login(self, username, password):
+            del username, password
+            calls.append("login")
+
+        def send_message(self, message):
+            del message
+            calls.append("send")
+
+    def smtp_ssl(host, port, *, timeout):
+        assert (host, port, timeout) == ("smtp.163.com", 465, 10.0)
+        calls.append("ssl")
+        return Connection()
+
+    monkeypatch.setattr(mail_client.smtplib, "SMTP_SSL", smtp_ssl)
+    client = mail_client.SmtpMailClient(
+        host="smtp.163.com",
+        port=465,
+        username="user",
+        password="authorization-code",
+        sender="user@163.com",
+        timeout_seconds=10.0,
+        use_starttls=False,
+        use_ssl=True,
+    )
+
+    client.send_verification_code(
+        "recipient@example.com", "123456", purpose="register", validity_minutes=10
+    )
+
+    assert calls == ["ssl", "ehlo", "login", "send"]
+
+
+def test_smtp_tls_modes_are_mutually_exclusive() -> None:
+    """配置不得同时启用隐式 TLS 与 STARTTLS。"""
+
+    with pytest.raises(ValueError, match="smtp_use_ssl and smtp_use_starttls"):
+        Settings(smtp_use_ssl=True, smtp_use_starttls=True)
 
 
 def test_smtp_subprocess_heartbeats_and_keeps_secrets_out_of_argv(monkeypatch) -> None:

@@ -45,7 +45,7 @@ class MailDispatcher(Protocol):
 
 
 class SmtpMailClient:
-    """使用 STARTTLS 和有界超时发送验证码邮件。"""
+    """使用 STARTTLS 或隐式 TLS 和有界超时发送验证码邮件。"""
 
     def __init__(
         self,
@@ -57,6 +57,7 @@ class SmtpMailClient:
         sender: str,
         timeout_seconds: float,
         use_starttls: bool,
+        use_ssl: bool,
     ) -> None:
         """绑定经配置校验的 SMTP 参数。"""
 
@@ -70,6 +71,7 @@ class SmtpMailClient:
         self.sender = sender
         self.timeout_seconds = timeout_seconds
         self.use_starttls = use_starttls
+        self.use_ssl = use_ssl
 
     def send_verification_code(
         self,
@@ -95,7 +97,8 @@ class SmtpMailClient:
         message.set_content(
             f"验证码：{verification_code}。{validity_minutes} 分钟内有效，请勿转发。"
         )
-        with smtplib.SMTP(self.host, self.port, timeout=self.timeout_seconds) as client:
+        smtp_factory = smtplib.SMTP_SSL if self.use_ssl else smtplib.SMTP
+        with smtp_factory(self.host, self.port, timeout=self.timeout_seconds) as client:
             client.ehlo()
             if self.use_starttls:
                 client.starttls()

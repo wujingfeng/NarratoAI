@@ -20,6 +20,7 @@ def main() -> int:
         sender=str(payload["sender"]),
         timeout_seconds=float(payload["socket_timeout_seconds"]),
         use_starttls=bool(payload["use_starttls"]),
+        use_ssl=bool(payload.get("use_ssl", False)),
     )
     client.send_verification_code(
         str(payload["email"]),

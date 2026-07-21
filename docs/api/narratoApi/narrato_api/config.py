@@ -40,6 +40,7 @@ class Settings(BaseSettings):
     smtp_sender: str = "noreply@example.com"
     smtp_timeout_seconds: float = Field(default=10.0, gt=0, le=60)
     smtp_total_deadline_seconds: float = Field(default=20.0, gt=1, le=120)
+    smtp_use_ssl: bool = False
     smtp_use_starttls: bool = True
     verification_code_hmac_secret: str = Field(default="", repr=False)
     verification_code_ttl_seconds: int = Field(default=600, ge=60, le=3600)
@@ -84,7 +85,10 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def validate_verification_delivery_timeouts(self) -> Settings:
-        """发送与 Redis 超时必须小于 generation lease，lease 必须小于 code TTL。"""
+        """校验验证码发送超时与 SMTP TLS 模式。"""
+
+        if self.smtp_use_ssl and self.smtp_use_starttls:
+            raise ValueError("smtp_use_ssl and smtp_use_starttls cannot both be true")
 
         if (
             self.smtp_timeout_seconds >= self.verification_code_send_lease_seconds
