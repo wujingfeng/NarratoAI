@@ -14,7 +14,7 @@ import { canStartProject, createProject, estimateProjectCost, getAsset, startPro
 
 const VIDEO_EXTENSIONS = new Set(["mp4", "mov", "avi"]);
 const VIDEO_SIZE_LIMIT = 300 * 1024 * 1024;
-const SUBTITLE_SIZE_LIMIT = 50 * 1024 * 1024;
+const SUBTITLE_SIZE_LIMIT = 5 * 1024 * 1024;
 
 function formatDuration(totalSeconds) {
   const hours = Math.floor(totalSeconds / 3600);
@@ -186,7 +186,7 @@ export function CreatePage() {
 
   const handleVideoSubtitle = async (videoId, file) => {
     if (!file.name.toLowerCase().endsWith(".srt") || file.size > SUBTITLE_SIZE_LIMIT) {
-      showUnavailable("仅支持 50MB 以内的 SRT 字幕文件");
+      showUnavailable("仅支持 5 MiB 以内的 SRT 字幕文件");
       return;
     }
     if (!projectId || isUploading || uploadInFlight.current) return;

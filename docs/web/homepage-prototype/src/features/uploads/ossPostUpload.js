@@ -2,14 +2,39 @@ import { apiRequest } from "../../services/httpClient.js";
 
 /** 浏览器直传的单文件上限；服务端策略同样会再次校验。 */
 export const MAX_UPLOAD_SIZE_BYTES = 300 * 1024 * 1024;
+export const MAX_SUBTITLE_SIZE_BYTES = 5 * 1024 * 1024;
+
+const CONTENT_TYPE_BY_EXTENSION = {
+  video: {
+    ".mp4": "video/mp4",
+    ".mov": "video/quicktime",
+    ".avi": "video/x-msvideo",
+  },
+  subtitle: {
+    ".srt": "application/x-subrip",
+  },
+};
+
+function fileExtension(filename) {
+  const index = filename.lastIndexOf(".");
+  return index === -1 ? "" : filename.slice(index).toLowerCase();
+}
 
 function declaration(file, assetType) {
-  if (file.size > MAX_UPLOAD_SIZE_BYTES) throw new Error("单个文件不能超过 300 MiB");
+  const contentType = CONTENT_TYPE_BY_EXTENSION[assetType]?.[fileExtension(file.name)];
+  if (!contentType) throw new Error(assetType === "subtitle" ? "仅支持 SRT 字幕文件" : "不支持的文件格式");
+
+  const maxSize = assetType === "subtitle" ? MAX_SUBTITLE_SIZE_BYTES : MAX_UPLOAD_SIZE_BYTES;
+  if (file.size > maxSize) {
+    throw new Error(assetType === "subtitle" ? "字幕文件不能超过 5 MiB" : "单个文件不能超过 300 MiB");
+  }
+
   return {
     asset_type: assetType,
     filename: file.name,
     size_bytes: file.size,
-    content_type: file.type || "application/octet-stream",
+    // 浏览器对 .srt 的 File.type 并不稳定；必须使用 API 约定的 MIME 类型。
+    content_type: contentType,
   };
 }
 
