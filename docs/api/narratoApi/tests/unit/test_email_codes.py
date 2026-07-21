@@ -12,6 +12,7 @@ from narrato_api.auth.service import (
 )
 from narrato_api.integrations.mail_client import (
     CeleryMailDispatcher,
+    SynchronousMailDispatcher,
     seal_verification_code,
     unseal_verification_code,
 )
@@ -139,6 +140,44 @@ def test_celery_dispatcher_never_puts_plain_code_in_broker_kwargs() -> None:
     ) == ("654321", False)
     assert captured["name"] == "narrato.auth.send_verification_email"
     assert captured["expires"] == 600
+
+
+def test_synchronous_dispatcher_sends_before_returning() -> None:
+    """Web 请求必须在 SMTP 客户端完成发送后才返回。"""
+
+    calls: list[dict[str, object]] = []
+
+    class Client:
+        def send_verification_code(
+            self, email, verification_code, *, purpose, validity_minutes
+        ):
+            calls.append(
+                {
+                    "email": email,
+                    "verification_code": verification_code,
+                    "purpose": purpose,
+                    "validity_minutes": validity_minutes,
+                }
+            )
+
+    dispatcher = SynchronousMailDispatcher(client=Client(), ttl_seconds=600)
+    dispatcher.enqueue(
+        "user@example.com",
+        "654321",
+        purpose="register",
+        generation="gen-1",
+        deliver=True,
+        ttl_seconds=600,
+    )
+
+    assert calls == [
+        {
+            "email": "user@example.com",
+            "verification_code": "654321",
+            "purpose": "register",
+            "validity_minutes": 10,
+        }
+    ]
 
 
 def test_smtp_subprocess_heartbeats_and_keeps_secrets_out_of_argv(monkeypatch) -> None:

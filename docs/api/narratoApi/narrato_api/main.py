@@ -21,8 +21,10 @@ from narrato_api.api.router import api_router
 from narrato_api.config import Settings, load_settings
 from narrato_api.database import acquire_database_engine, release_database_engine
 from narrato_api.auth.service import AccountLockRegistry
-from narrato_api.celery_app import create_celery_app
-from narrato_api.integrations.mail_client import CeleryMailDispatcher
+from narrato_api.integrations.mail_client import (
+    SmtpMailClient,
+    SynchronousMailDispatcher,
+)
 from narrato_api.logging import (
     acquire_logging,
     bind_request_id,
@@ -79,17 +81,23 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
         logging_lease = acquire_logging(current)
         database_owned = False
-        dispatcher_owned = False
         body_error: BaseException | None = None
         try:
             _app.state.database_engine = acquire_database_engine(current)
             database_owned = True
             _app.state.auth_account_locks = AccountLockRegistry()
-            _app.state.mail_dispatcher = CeleryMailDispatcher(
-                celery=create_celery_app(current),
-                sealing_secret=current.verification_code_hmac_secret,
+            _app.state.mail_dispatcher = SynchronousMailDispatcher(
+                client=SmtpMailClient(
+                    host=current.smtp_host,
+                    port=current.smtp_port,
+                    username=current.smtp_username,
+                    password=current.smtp_password,
+                    sender=current.smtp_sender,
+                    timeout_seconds=current.smtp_timeout_seconds,
+                    use_starttls=current.smtp_use_starttls,
+                ),
+                ttl_seconds=current.verification_code_ttl_seconds,
             )
-            dispatcher_owned = True
             yield
         except BaseException as error:
             body_error = error
@@ -114,11 +122,6 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 await executor.aclose(timeout=current.readiness_timeout_seconds)
             except BaseException as error:
                 remember_cleanup_error(error, "EXECUTOR_CLEANUP_FAILED")
-            try:
-                if dispatcher_owned:
-                    _app.state.mail_dispatcher.close()
-            except BaseException as error:
-                remember_cleanup_error(error, "CELERY_PRODUCER_CLEANUP_FAILED")
             try:
                 if database_owned:
                     release_database_engine(current)

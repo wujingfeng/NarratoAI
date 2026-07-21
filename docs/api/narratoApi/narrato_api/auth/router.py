@@ -119,7 +119,7 @@ def send_register_code(
     service: Annotated[AuthService, Depends(get_auth_service)],
     request_id: Annotated[str, Depends(get_request_id)],
 ) -> ApiResponse[AcceptedData]:
-    """异步发送注册验证码。"""
+    """同步发送注册验证码。"""
 
     service.send_register_code(body.email)
     return ApiResponse(
@@ -201,7 +201,7 @@ def send_password_code(
     service: Annotated[AuthService, Depends(get_auth_service)],
     request_id: Annotated[str, Depends(get_request_id)],
 ) -> ApiResponse[AcceptedData]:
-    """以不可枚举响应异步发送找回密码验证码。"""
+    """以不可枚举响应同步发送找回密码验证码。"""
 
     service.send_password_reset_code(body.email)
     return ApiResponse(

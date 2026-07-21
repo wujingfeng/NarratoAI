@@ -4,6 +4,7 @@ import smtplib
 import base64
 import hashlib
 import hmac
+import math
 import secrets
 import threading
 from dataclasses import dataclass
@@ -29,7 +30,7 @@ class MailClient(Protocol):
 
 
 class MailDispatcher(Protocol):
-    """API 将邮件投递交给异步 Worker 的协议。"""
+    """认证服务触发验证码投递的协议。"""
 
     def enqueue(
         self,
@@ -102,6 +103,39 @@ class SmtpMailClient:
             if self.username:
                 client.login(self.username, self.password)
             client.send_message(message)
+
+
+class SynchronousMailDispatcher:
+    """在当前 API 请求内完成验证码 SMTP 发送。"""
+
+    def __init__(self, *, client: MailClient, ttl_seconds: int) -> None:
+        """绑定 SMTP 客户端并预先换算验证码有效分钟数。"""
+
+        if ttl_seconds <= 0:
+            raise ValueError("verification code TTL must be positive")
+        self._client = client
+        self._validity_minutes = math.ceil(ttl_seconds / 60)
+
+    def enqueue(
+        self,
+        email: str,
+        verification_code: str,
+        *,
+        purpose: MailPurpose,
+        generation: str,
+        deliver: bool,
+        ttl_seconds: int,
+    ) -> None:
+        """保留服务层接口，并在返回前同步完成真实投递。"""
+
+        del generation, ttl_seconds
+        if deliver:
+            self._client.send_verification_code(
+                email,
+                verification_code,
+                purpose=purpose,
+                validity_minutes=self._validity_minutes,
+            )
 
 
 class CeleryMailDispatcher:

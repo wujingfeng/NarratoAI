@@ -135,7 +135,7 @@ app/                             # 现有 NarratoAI Python 能力，逐步去除
 ## 7. 鉴权和用户
 第一版仅支持个人用户：
 
-- 邮箱验证码注册，验证码默认 10 分钟有效并存 Redis；SMTP 邮件发送作为异步任务执行；支持邮箱密码登录和邮箱验证码找回密码；密码使用 Argon2id 或 bcrypt 哈希，禁止明文或可逆加密；新用户注册成功默认赠送 100 创作点，该数值可配置。
+- 邮箱验证码注册，验证码默认 10 分钟有效并存 Redis；SMTP 邮件在 Web 请求内同步发送，发送失败则请求失败；支持邮箱密码登录和邮箱验证码找回密码；密码使用 Argon2id 或 bcrypt 哈希，禁止明文或可逆加密；新用户注册成功默认赠送 100 创作点，该数值可配置。
 
 登录 Token 规则：
 
@@ -314,7 +314,7 @@ cost = ceil(全部已验证视频总秒数 / 60) * 20
 所有金额使用整数创作点；所有时间使用 UTC 存储；JSON 扩展字段只存能力特有的约束，不代替核心可查询字段。
 ## 16. narratoApi 接口清单
 ### 16.1 认证和账户
-- `POST /api/v1/auth/register-code/send`：异步发送注册验证码；`POST /api/v1/auth/register`：验证码注册并赠送默认创作点；`POST /api/v1/auth/login`：登录并替换旧 Token；`POST /api/v1/auth/logout`：删除当前 Redis Token；`POST /api/v1/auth/password-code/send`：发送找回密码验证码；`POST /api/v1/auth/password/reset`：重置密码并使 Token 失效；`GET /api/v1/users/me`：当前用户信息和创作点余额。
+- `POST /api/v1/auth/register-code/send`：同步发送注册验证码；`POST /api/v1/auth/register`：验证码注册并赠送默认创作点；`POST /api/v1/auth/login`：登录并替换旧 Token；`POST /api/v1/auth/logout`：删除当前 Redis Token；`POST /api/v1/auth/password-code/send`：同步发送找回密码验证码；`POST /api/v1/auth/password/reset`：重置密码并使 Token 失效；`GET /api/v1/users/me`：当前用户信息和创作点余额。
 ### 16.2 项目、上传和配置
 - `POST /api/v1/projects`：创建短剧解说项目；`GET /api/v1/projects`：分页查询当前用户项目；`GET /api/v1/projects/{project_id}`：查询项目详情、状态和进度；`POST /api/v1/projects/{project_id}/delete`：仅终态项目发起异步删除；`POST /api/v1/projects/{project_id}/uploads/policy`：生成 OSS 表单策略；`POST /api/v1/projects/{project_id}/uploads/complete`：确认上传并启动校验；`GET /api/v1/assets/{asset_id}`：查询资产与媒体校验状态；`POST /api/v1/projects/{project_id}/assets/order`：保存视频顺序；`GET /api/v1/capabilities`：读取本地能力目录镜像；`GET /api/v1/products/short-drama-narration/config`：格式、数量、时长和价格配置。
 ### 16.3 费用、执行和编辑
@@ -371,7 +371,7 @@ FFmpeg 临时分片、抽帧图片、缓存和调试文件不对用户展示。�
 
 Supervisor 至少管理：
 
-- `narrato-api-web`：Uvicorn/Gunicorn Web 进程；`narrato-api-worker`：业务编排、邮件和删除 Worker；`narrato-api-scheduler`：Celery Beat 或独立数据库扫描调度器；`core-api-web`：Core FastAPI Web 进程；`core-worker-analysis`、`core-worker-llm`、`core-worker-asr`、`core-worker-tts`、`core-worker-render`。
+- `narrato-api-web`：Uvicorn/Gunicorn Web 进程，并同步发送验证码邮件；`narrato-api-worker`：业务编排和删除 Worker；`narrato-api-scheduler`：Celery Beat 或独立数据库扫描调度器；`core-api-web`：Core FastAPI Web 进程；`core-worker-analysis`、`core-worker-llm`、`core-worker-asr`、`core-worker-tts`、`core-worker-render`。
 
 基础服务为 Nginx、PostgreSQL 和 Redis。两项目可以共用 PostgreSQL 实例和 Redis 实例，但必须使用不同 Database/账号和 Redis Key 前缀、Celery Queue 前缀。
 
