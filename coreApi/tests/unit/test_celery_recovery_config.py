@@ -9,6 +9,7 @@ def test_worker_lost_delivery_and_recovery_scanner_are_configured(settings):
     assert app.conf.task_acks_late is True
     assert app.conf.task_reject_on_worker_lost is True
     assert app.conf.worker_prefetch_multiplier == 1
+    assert "core_api.tasks.celery_tasks" in app.conf.imports
     assert wake_core_task.acks_late is True
     assert wake_core_task.reject_on_worker_lost is True
     assert app.conf.beat_schedule["recover-stalled-core-tasks"] == {

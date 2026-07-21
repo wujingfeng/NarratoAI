@@ -20,6 +20,7 @@ def create_celery_app(settings: Settings | None = None) -> Celery:
         task_acks_late=True,
         task_reject_on_worker_lost=True,
         worker_prefetch_multiplier=1,
+        imports=("core_api.tasks.celery_tasks",),
         beat_schedule={
             "replay-core-dispatch-outbox": {
                 "task": "core.tasks.replay_dispatch_outbox",
