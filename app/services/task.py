@@ -1,7 +1,6 @@
 import math
 import json
 import os.path
-import re
 import traceback
 from os import path
 from loguru import logger
@@ -71,6 +70,8 @@ def _get_auto_transcription_backend(params: VideoClipParams) -> str:
 
 
 def _get_original_subtitle_paths(params: VideoClipParams) -> list[str]:
+    """只返回调用方显式提供并去重后的原片字幕路径。"""
+
     subtitle_paths = getattr(params, "original_subtitle_paths", []) or []
     if isinstance(subtitle_paths, str):
         subtitle_paths = [subtitle_paths]
@@ -88,9 +89,6 @@ def _get_original_subtitle_paths(params: VideoClipParams) -> list[str]:
     single_subtitle_path = str(getattr(params, "original_subtitle_path", "") or "").strip()
     if single_subtitle_path and single_subtitle_path not in seen:
         normalized_paths.insert(0, single_subtitle_path)
-
-    if not normalized_paths:
-        normalized_paths = _find_original_subtitle_paths_for_videos(_get_video_origin_paths(params))
 
     return normalized_paths
 
@@ -115,60 +113,6 @@ def _get_video_origin_paths(params: VideoClipParams) -> list[str]:
         normalized_paths.insert(0, single_video_path)
 
     return normalized_paths
-
-
-def _video_stem_candidates(video_path: str) -> list[str]:
-    stem = path.splitext(path.basename(str(video_path or "").strip()))[0]
-    if not stem:
-        return []
-
-    candidates = [stem]
-    timestamp_stripped = re.sub(r"_[0-9]{14}$", "", stem)
-    if timestamp_stripped and timestamp_stripped not in candidates:
-        candidates.append(timestamp_stripped)
-    return candidates
-
-
-def _find_original_subtitle_paths_for_videos(video_paths: list[str]) -> list[str]:
-    subtitle_dir = utils.subtitle_dir()
-    if not path.isdir(subtitle_dir):
-        return []
-
-    subtitle_files = [
-        path.join(subtitle_dir, filename)
-        for filename in os.listdir(subtitle_dir)
-        if filename.lower().endswith(".srt")
-    ]
-    if not subtitle_files:
-        return []
-
-    resolved_paths = []
-    seen = set()
-    for video_path in video_paths:
-        candidates = _video_stem_candidates(video_path)
-        if not candidates:
-            continue
-
-        matches = []
-        for subtitle_path in subtitle_files:
-            subtitle_stem = path.splitext(path.basename(subtitle_path))[0]
-            for candidate in candidates:
-                if subtitle_stem == candidate or subtitle_stem.startswith(f"{candidate}_"):
-                    matches.append(subtitle_path)
-                    break
-
-        if not matches:
-            continue
-
-        matches.sort(key=lambda item: path.getmtime(item), reverse=True)
-        selected_path = matches[0]
-        if selected_path not in seen:
-            resolved_paths.append(selected_path)
-            seen.add(selected_path)
-
-    if resolved_paths:
-        logger.info(f"未从参数获取原片字幕，已按视频文件名自动匹配: {resolved_paths}")
-    return resolved_paths
 
 
 def _create_programmatic_subtitle_file(
@@ -319,7 +263,8 @@ def start_subclip(task_id: str, params: VideoClipParams, subclip_path_videos: di
         params: 视频参数
         subclip_path_videos: 视频片段路径（可选，仅作为备用方案）
     """
-    global merged_audio_path, merged_subtitle_path
+    merged_audio_path = ""
+    merged_subtitle_path = ""
 
     logger.info(f"\n\n## 开始任务: {task_id}")
     sm.state.update_task(task_id, state=const.TASK_STATE_PROCESSING, progress=0)
@@ -450,11 +395,9 @@ def start_subclip(task_id: str, params: VideoClipParams, subclip_path_videos: di
                 merged_subtitle_path = ""
         except Exception as e:
             logger.error(f"合并音频/字幕文件失败: {str(e)}")
-            # 确保即使合并失败也有默认值
-            if 'merged_audio_path' not in locals():
-                merged_audio_path = ""
-            if 'merged_subtitle_path' not in locals():
-                merged_subtitle_path = ""
+            # 合并失败时沿用本次调用的空产物，禁止读取其他任务结果。
+            merged_audio_path = ""
+            merged_subtitle_path = ""
     else:
         logger.warning("没有需要合并的音频/字幕")
         merged_audio_path = ""
@@ -612,7 +555,8 @@ def start_subclip_unified(task_id: str, params: VideoClipParams):
         task_id: 任务ID
         params: 视频参数
     """
-    global merged_audio_path, merged_subtitle_path
+    merged_audio_path = ""
+    merged_subtitle_path = ""
 
     logger.info(f"\n\n## 开始统一视频处理任务: {task_id}")
     _update_video_generation_task(
@@ -764,11 +708,9 @@ def start_subclip_unified(task_id: str, params: VideoClipParams):
                 merged_subtitle_path = ""
         except Exception as e:
             logger.error(f"合并音频/字幕文件失败: {str(e)}")
-            # 确保即使合并失败也有默认值
-            if 'merged_audio_path' not in locals():
-                merged_audio_path = ""
-            if 'merged_subtitle_path' not in locals():
-                merged_subtitle_path = ""
+            # 合并失败时沿用本次调用的空产物，禁止读取其他任务结果。
+            merged_audio_path = ""
+            merged_subtitle_path = ""
     else:
         logger.warning("没有需要合并的音频/字幕")
         merged_audio_path = ""

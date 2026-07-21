@@ -23,6 +23,28 @@ from typing import Any, Dict, List, Optional, Union
 import PIL.Image
 from loguru import logger
 
+try:
+    from twelvelabs.types.video_context import VideoContext_AssetId as _VideoContextAssetId
+    from twelvelabs.errors import (
+        BadRequestError as _BadRequestError,
+        ForbiddenError as _ForbiddenError,
+        TooManyRequestsError as _TooManyRequestsError,
+    )
+except ImportError:
+    # 可选 SDK 不应阻止注入 Fake client 的纯单元测试。
+    class _VideoContextAssetId:
+        def __init__(self, *, asset_id: str) -> None:
+            self.asset_id = asset_id
+
+    class _BadRequestError(Exception):
+        pass
+
+    class _ForbiddenError(Exception):
+        pass
+
+    class _TooManyRequestsError(Exception):
+        pass
+
 from app.config import config
 from .base import VisionModelProvider
 from .exceptions import APICallError, AuthenticationError, ConfigurationError, RateLimitError
@@ -140,13 +162,6 @@ class TwelveLabsVisionProvider(VisionModelProvider):
         self, batch: List[PIL.Image.Image], prompt: str, max_tokens: int
     ) -> str:
         """把一批关键帧拼成短视频，上传为 Asset，调用 Pegasus 分析后返回文本。"""
-        from twelvelabs.types.video_context import VideoContext_AssetId
-        from twelvelabs.errors import (
-            BadRequestError,
-            ForbiddenError,
-            TooManyRequestsError,
-        )
-
         client = self._build_client()
         asset_id: Optional[str] = None
 
@@ -169,7 +184,7 @@ class TwelveLabsVisionProvider(VisionModelProvider):
 
                 response = client.analyze(
                     model_name=self.model_name,
-                    video=VideoContext_AssetId(asset_id=asset_id),
+                    video=_VideoContextAssetId(asset_id=asset_id),
                     prompt=prompt,
                     max_tokens=max_tokens,
                 )
@@ -177,11 +192,11 @@ class TwelveLabsVisionProvider(VisionModelProvider):
                 if not text:
                     raise APICallError("TwelveLabs Pegasus 返回空响应")
                 return text
-            except ForbiddenError as exc:
+            except _ForbiddenError as exc:
                 raise AuthenticationError(str(exc))
-            except TooManyRequestsError as exc:
+            except _TooManyRequestsError as exc:
                 raise RateLimitError(str(exc))
-            except BadRequestError as exc:
+            except _BadRequestError as exc:
                 raise APICallError(f"请求错误: {getattr(exc, 'body', exc)}")
             finally:
                 # 尽力清理远端 Asset，避免占用配额。

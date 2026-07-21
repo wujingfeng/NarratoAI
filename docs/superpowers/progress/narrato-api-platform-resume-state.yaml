@@ -1,0 +1,114 @@
+protocol: SEGMENTED_GOAL_PROTOCOL_V2
+branch: codex/narrato-api-platform
+worktree: /private/tmp/NarratoAI-narrato-api-platform
+current_gate: "Gate D passed: Task 19 deployment configuration and Task 20 fake-provider acceptance complete"
+last_complete_task:
+  id: Task 20E
+  commits:
+    - "3b31f98 test: complete task 20 acceptance coverage"
+current_task:
+  id: Task 20E
+  status: completed
+  completed_subtasks:
+    - "Created an isolated Core verification venv and passed Core lint, format, mypy, and 388 direct tests."
+    - "Business lint, format, mypy, and 221 direct tests passed; OpenAPI contract includes all recovered project and callback routes."
+implementation_commits:
+  - "5852e3b feat: add project lifecycle api"
+  - "7b85c63 feat(web): restore protected create flow"
+  - "697387b feat(web): expose protected project result"
+  - "91a428b feat(web): wire project editor save flow"
+  - "e776d9e docs: add business api supervisor configuration"
+  - "462ab86 docs: add core supervisor configuration"
+  - "3a6bc20 docs: add nginx deployment configuration"
+  - "2a27f9c docs: add deployment runbooks"
+  - "02a5620 test: add shared api contract coverage"
+  - "1aa2134 feat: add core callback contract endpoint"
+  - "0381536 test: add workflow end to end acceptance"
+  - "b22509b chore: complete api static typing and formatting"
+  - "3b31f98 test: complete task 20 acceptance coverage"
+tests:
+  task_17b_red:
+    command: "cd docs/web/homepage-prototype && node scripts/verify-create-route-flow.mjs"
+    result: "Expected RED before restoration: verifier failed ENOENT for missing src/components/create/CreationSummary.jsx."
+  task_17b_verification:
+    command: "cd docs/web/homepage-prototype && node scripts/verify-create-route-flow.mjs && node scripts/verify-api-project-flow.mjs && npm run build && git diff --check"
+    result: "Passed: route/flow verifier passed; API project-flow verifier passed 6 checks; Vite build passed. Existing >500 kB output chunk advisory remains."
+  task_17c_verification:
+    command: "cd docs/web/homepage-prototype && node scripts/verify-project-result-route.mjs && npm run build && git diff --check"
+    result: "Passed: protected result route/API flow verifier passed 3 checks; Vite build passed."
+  task_17d_verification:
+    command: "cd docs/web/homepage-prototype && node scripts/verify-project-editor-route.mjs && node scripts/verify-api-project-flow.mjs && npm run build && git diff --check"
+    result: "Passed: editor route/save-lock verifier passed 3 checks; Task 17 API verifier passed 6 checks; Vite build passed."
+  task_17_phase_verification:
+    command: "cd docs/web/homepage-prototype && node scripts/verify-api-project-flow.mjs && node scripts/verify-create-route-flow.mjs && node scripts/verify-project-result-route.mjs && node scripts/verify-project-editor-route.mjs && npm run build && git diff --check"
+    result: "Passed: all direct Task 17 verifiers passed (6 + 1 + 3 + 3 checks); production build passed. Existing >500 kB chunk advisory remains."
+  gate_c_reevaluation:
+    command: "cd docs/web/homepage-prototype && node scripts/verify-api-auth.mjs && node scripts/verify-api-project-flow.mjs && node scripts/verify-create-route-flow.mjs && node scripts/verify-project-result-route.mjs && node scripts/verify-project-editor-route.mjs && node scripts/verify-jianying-export.mjs && npm run build && git diff --check; Playwright open /create, /projects/demo/result, /projects/demo/editor"
+    result: "All 18 direct checks and production build passed. Isolated SQLite + real Redis FastAPI stack passed readiness and login; desktop Chrome completed authenticated Create/result flow and real manifest API POST. User click reached native File System Access call with a controlled writer completing 5 ZIP writes and close. Native OS picker visible-selection remains unproven."
+  gate_c_native_picker_retry:
+    command: "Restart isolated local Vite/proxy, launch /tmp/gate-c-native-picker.mjs, inspect Chrome via Computer Use and process state"
+    result: "Not completed: the available Playwright Chrome instance remained headless and no independently accessible native macOS save dialog was exposed for visible selection. A direct Computer Use retry also found the temporary Vite/proxy endpoint unavailable (ERR_CONNECTION_REFUSED)."
+  gate_c_decision:
+    command: "User approval recorded in this conversation"
+    result: "Passed with user-approved evidence exception: authentic API/browser/FSA invocation and streamed ZIP evidence accepted without visible native-picker destination-selection capture."
+  task_19a_red:
+    command: "cd docs/api/narratoApi && .venv/bin/python scripts/verify-supervisor-config.py"
+    result: "Expected RED: exit 1 because required Business API Supervisor configurations were absent."
+  task_19a_verification:
+    command: "cd docs/api/narratoApi && .venv/bin/python scripts/verify-supervisor-config.py && .venv/bin/python -m py_compile scripts/verify-supervisor-config.py && .venv/bin/ruff check scripts/verify-supervisor-config.py && git diff --check"
+    result: "Passed: static verifier accepted 3 Business API programs; Python compile and ruff passed."
+  task_19b_verification:
+    command: "cd docs/api/narratoApi && .venv/bin/python scripts/verify-supervisor-config.py && .venv/bin/python -m py_compile scripts/verify-supervisor-config.py ../../../coreApi/core_api/celery_app.py && .venv/bin/ruff check scripts/verify-supervisor-config.py ../../../coreApi/core_api/celery_app.py && git diff --check"
+    result: "Passed: static verifier accepted 8 API-platform programs; compile, ruff, and diff check passed."
+  task_19c_verification:
+    command: "cd docs/api/narratoApi && .venv/bin/python scripts/verify-nginx-config.py && .venv/bin/python -m py_compile scripts/verify-nginx-config.py && .venv/bin/ruff check scripts/verify-nginx-config.py && git diff --check"
+    result: "Passed: static Nginx directive verifier, compile, ruff, and diff check. nginx -t was attempted but macOS sandbox denied sysctl/log access."
+  task_19_phase_verification:
+    command: "cd docs/api/narratoApi && .venv/bin/python scripts/verify-deployment-readmes.py && .venv/bin/python scripts/verify-supervisor-config.py && .venv/bin/python scripts/verify-nginx-config.py && .venv/bin/ruff check scripts/verify-deployment-readmes.py scripts/verify-supervisor-config.py scripts/verify-nginx-config.py && .venv/bin/python -m py_compile scripts/verify-deployment-readmes.py scripts/verify-supervisor-config.py scripts/verify-nginx-config.py; cd ../../.. && python3 -m compileall -q docs/api/narratoApi/narrato_api coreApi/core_api && git diff --check"
+    result: "Passed: README (2 guides), Supervisor (8 programs), Nginx static validation, ruff, py_compile/compileall, and diff check."
+  task_20a_red:
+    command: "coreApi/.venv/bin/python -m pytest coreApi/tests/contract/test_narrato_contract.py -q; docs/api/narratoApi/.venv/bin/python -m pytest docs/api/narratoApi/tests/contract/test_core_contract.py -q"
+    result: "Expected RED: both target test paths were absent and pytest returned exit 4."
+  task_20a_verification:
+    command: "cd coreApi && .venv/bin/python -m pytest tests/contract/test_narrato_contract.py -q; cd ../docs/api/narratoApi && .venv/bin/python -m pytest tests/contract/test_core_contract.py -q; git diff --check"
+    result: "Passed: Core 4 tests passed (existing TestClient deprecation warning); Business 2 tests passed; diff check passed."
+  task_20b_red:
+    command: "cd docs/api/narratoApi && .venv/bin/python -m pytest tests/contract/test_core_contract.py -q"
+    result: "Expected RED: 2 passed, 1 failed because POST /api/v1/internal/core/callbacks returned 404 instead of the required 401 without its dedicated Bearer token."
+  task_20b_verification:
+    command: "cd coreApi && .venv/bin/python -m pytest tests/unit/test_callback_delivery.py -q; cd ../docs/api/narratoApi && .venv/bin/python -m pytest tests/contract/test_core_contract.py tests/unit/test_reconciler.py -q && .venv/bin/ruff check narrato_api/internal/router.py narrato_api/api/router.py tests/contract/test_core_contract.py; cd ../.. && git diff --check"
+    result: "Passed: Core callback delivery 6 passed; Business callback contract plus reconciler 5 passed; targeted ruff and diff check passed. Both pytest invocations emitted only the existing TestClient deprecation warning."
+key_decisions:
+  - "CreatePage only exposes the existing recovered project lifecycle API; it does not synthesize a local fee fallback."
+  - "The Create start control remains disabled for non-ready assets and while cost estimation is pending or rejected."
+  - "Completed result data is only rendered after the completion-gated result API succeeds; rejected result requests render no export controls."
+  - "The Task 17 editor UI is intentionally a content-draft page rather than a custom media editor, avoiding unsupported timeline/media behavior until real duration and track data exist."
+  - "User explicitly accepted the authentic API/browser/FSA invocation and streamed ZIP evidence as sufficient for Gate C despite absent visible native-picker selection capture."
+  - "Task 19A uses fixed /srv/narrato/NarratoAI and /etc/narrato-api paths as deployment conventions; provisioning belongs to the host deployment step."
+  - "Core role-named workers all consume narrato.core.default because durable wake tasks are not currently routed to role-specific queues; runbooks call this out explicitly."
+  - "Task 20A verifies shared in-service protocol helpers only; cross-service HTTP contract evolution remains a later slice."
+  - "Task 20B receives Core callbacks only on the Business internal route with core_callback_token; it never reuses core_request_token, and event_id must agree with X-Idempotency-Key before reconciliation."
+remaining_risks:
+  - "Asset completion does not yet persist probe duration, so real uploads without duration fail safely with PROJECT_DURATION_UNAVAILABLE rather than being charged or started."
+  - "Native macOS save-picker visibility and user-selected destination completion were not captured; accepted as a Gate C evidence exception and retained as a residual rollout verification item."
+  - "Vite reports an existing >500 kB output chunk advisory."
+  - "nginx -t was not runnable in the macOS sandbox because of sysctl/log-directory permissions; deployment host must execute it."
+  - "Real provider smoke remains optional and unexecuted because no provider credentials are configured."
+workspace_status:
+  clean: false
+  expected_uncommitted:
+    - path: /.pytest_cache/
+      reason: Task 20 local pytest cache generated during verification; leave untouched
+    - path: /.superpowers/
+      reason: pre-existing untracked workspace content; do not touch
+    - path: docs/web/homepage-prototype/.playwright-cli/
+      reason: Gate C browser-tool artifacts generated by the local Playwright CLI; leave untouched
+next_action:
+  id: PROJECT_COMPLETE
+  scope: "All required Task 20 fake-provider and static acceptance is complete."
+  relevant_files:
+    - docs/superpowers/plans/2026-07-16-narrato-api-platform.md
+    - coreApi/tests
+    - docs/api/narratoApi/tests
+  acceptance_criteria:
+    - "No further development action is scheduled."

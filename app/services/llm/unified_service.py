@@ -13,6 +13,7 @@ from .manager import LLMServiceManager
 from .validators import OutputValidator
 from .exceptions import LLMServiceError
 from app.services.prompts import PromptManager
+from .safe_logging import log_llm_error
 
 # 提供商注册由 webui.py:main() 显式调用（见 LLM 提供商注册机制重构）
 # 这样更可靠，错误也更容易调试
@@ -59,8 +60,8 @@ class UnifiedLLMService:
             return results
             
         except Exception as e:
-            logger.error(f"图片分析失败: {str(e)}")
-            raise LLMServiceError(f"图片分析失败: {str(e)}")
+            log_llm_error("unified_image_analysis", e)
+            raise LLMServiceError("图片分析失败") from None
     
     @staticmethod
     async def generate_text(prompt: str,
@@ -106,8 +107,8 @@ class UnifiedLLMService:
             return result
             
         except Exception as e:
-            logger.error(f"文本生成失败: {str(e)}")
-            raise LLMServiceError(f"文本生成失败: {str(e)}")
+            log_llm_error("unified_text_generation", e)
+            raise LLMServiceError("文本生成失败") from None
 
     @staticmethod
     async def generate_text_stream(prompt: str,
@@ -137,8 +138,8 @@ class UnifiedLLMService:
             return result
 
         except Exception as e:
-            logger.error(f"流式文本生成失败: {str(e)}")
-            raise LLMServiceError(f"流式文本生成失败: {str(e)}")
+            log_llm_error("unified_text_stream", e)
+            raise LLMServiceError("流式文本生成失败") from None
     
     @staticmethod
     async def generate_narration_script(prompt: str,
@@ -187,8 +188,8 @@ class UnifiedLLMService:
                     return parsed_result
                     
         except Exception as e:
-            logger.error(f"解说文案生成失败: {str(e)}")
-            raise LLMServiceError(f"解说文案生成失败: {str(e)}")
+            log_llm_error("unified_narration_generation", e)
+            raise LLMServiceError("解说文案生成失败") from None
     
     @staticmethod
     async def analyze_subtitle(subtitle_content: str,
@@ -243,8 +244,8 @@ class UnifiedLLMService:
                 return result
                 
         except Exception as e:
-            logger.error(f"字幕分析失败: {str(e)}")
-            raise LLMServiceError(f"字幕分析失败: {str(e)}")
+            log_llm_error("unified_subtitle_analysis", e)
+            raise LLMServiceError("字幕分析失败") from None
     
     @staticmethod
     def get_provider_info() -> Dict[str, Any]:

@@ -9,10 +9,11 @@ import { DashboardSidebar } from "../components/dashboard/DashboardSidebar.jsx";
 import { DashboardToast } from "../components/dashboard/DashboardToast.jsx";
 import { dashboardCredits, dashboardNavItems } from "../data/dashboardData.js";
 import { creationTypes, initialCreateVideos } from "../data/createData.js";
-import { useI18n } from "../i18n/useI18n.js";
+import { uploadAsset } from "../features/uploads/ossPostUpload.js";
+import { canStartProject, createProject, estimateProjectCost, getAsset, startProject } from "../features/projects/projectApi.js";
 
 const VIDEO_EXTENSIONS = new Set(["mp4", "mov", "avi"]);
-const VIDEO_SIZE_LIMIT = 5 * 1024 * 1024 * 1024;
+const VIDEO_SIZE_LIMIT = 300 * 1024 * 1024;
 const SUBTITLE_SIZE_LIMIT = 50 * 1024 * 1024;
 
 function formatDuration(totalSeconds) {
@@ -51,11 +52,12 @@ function readVideoDuration(file) {
 }
 
 export function CreatePage() {
-  const { formatNumber, t } = useI18n();
   const [toast, setToast] = useState({ id: 0, message: "" });
   const [selectedType, setSelectedType] = useState("narration");
   const [videos, setVideos] = useState(initialCreateVideos);
   const [isDragging, setIsDragging] = useState(false);
+  const [projectId, setProjectId] = useState(null);
+  const [apiCredits, setApiCredits] = useState(null);
   const showUnavailable = useCallback((message) => {
     setToast(({ id }) => ({ id: id + 1, message }));
   }, []);
@@ -76,38 +78,72 @@ export function CreatePage() {
   }, [videos]);
 
   const selectedCreationType = creationTypes.find((type) => type.id === selectedType);
+  const assets = videos.map((video) => ({ status: video.assetStatus }));
+  const canStart = Boolean(projectId) && canStartProject(assets);
+
+  useEffect(() => {
+    if (!canStart || apiCredits !== null) return undefined;
+    let active = true;
+    estimateProjectCost(projectId)
+      .then((estimate) => { if (active) setApiCredits(estimate.credits); })
+      .catch((error) => { if (active) showUnavailable(error.message || "无法获取 API 费用"); });
+    return () => { active = false; };
+  }, [apiCredits, canStart, projectId, showUnavailable]);
 
   const handleTypeChange = (typeId) => {
     setSelectedType(typeId);
   };
 
-  const handleVideoFiles = (files) => {
+  const handleVideoFiles = async (files) => {
     const validFiles = files.filter((file) => {
       const extension = file.name.split(".").pop()?.toLowerCase();
       return VIDEO_EXTENSIONS.has(extension) && file.size <= VIDEO_SIZE_LIMIT;
     });
-    if (validFiles.length !== files.length) showUnavailable(t("create.messages.invalidVideo"));
+    if (validFiles.length !== files.length) showUnavailable("仅支持 300 MiB 以内的 MP4、MOV 或 AVI 文件");
     if (!validFiles.length) return;
     const availableCount = selectedCreationType.maxVideos - videos.length;
     if (availableCount <= 0) {
-      showUnavailable(t("create.messages.maxVideos", { type: t(selectedCreationType.titleKey), count: formatNumber(selectedCreationType.maxVideos) }));
+      showUnavailable(`${selectedCreationType.title}最多上传 ${selectedCreationType.maxVideos} 个视频`);
       return;
     }
     const acceptedFiles = validFiles.slice(0, availableCount);
     if (acceptedFiles.length < validFiles.length) {
-      showUnavailable(t("create.messages.maxVideos", { type: t(selectedCreationType.titleKey), count: formatNumber(selectedCreationType.maxVideos) }));
+      showUnavailable(`${selectedCreationType.title}最多上传 ${selectedCreationType.maxVideos} 个视频`);
     }
     const newVideos = acceptedFiles.map((file, index) => ({
         id: `${file.name}-${file.lastModified}-${file.size}-${Date.now()}-${index}`,
         name: file.name,
         durationSeconds: 0,
         durationLabel: "--:--",
-        subtitleStatusKey: "create.subtitle.pending",
+        subtitleStatus: "待识别，将使用 AI 识别",
         statusTone: "warning",
         subtitleName: null,
         thumbnail: null,
       }));
     setVideos((current) => [...current, ...newVideos]);
+    try {
+      const activeProjectId = projectId || (await createProject()).id;
+      setProjectId(activeProjectId);
+      const uploadedAssets = await Promise.all(acceptedFiles.map((file) => uploadAsset(activeProjectId, file, "video")));
+      setVideos((current) => current.map((video) => {
+        const assetIndex = newVideos.findIndex((item) => item.id === video.id);
+        const asset = uploadedAssets[assetIndex];
+        return asset ? { ...video, assetId: asset.id, assetStatus: asset.status } : video;
+      }));
+      uploadedAssets.forEach((asset) => {
+        if (asset.status === "ready" || asset.status === "invalid") return;
+        const poll = async () => {
+          const latest = await getAsset(asset.id);
+          setVideos((current) => current.map((video) => video.assetId === asset.id
+            ? { ...video, assetStatus: latest.status }
+            : video));
+          if (latest.status === "validating") window.setTimeout(poll, 2000);
+        };
+        window.setTimeout(poll, 2000);
+      });
+    } catch (error) {
+      showUnavailable(error.message || "上传失败，请稍后重试");
+    }
     newVideos.forEach((newVideo, index) => {
       readVideoDuration(acceptedFiles[index]).then((durationSeconds) => {
         if (durationSeconds === null) return;
@@ -118,21 +154,30 @@ export function CreatePage() {
     });
   };
 
-  const handleNext = () => {
+  const handleNext = async () => {
     if (videos.length > selectedCreationType.maxVideos) {
-      showUnavailable(t("create.messages.tooMany", { type: t(selectedCreationType.titleKey), current: formatNumber(videos.length), count: formatNumber(selectedCreationType.maxVideos) }));
+      showUnavailable(`${selectedCreationType.title}当前有 ${videos.length} 个视频，最多支持 ${selectedCreationType.maxVideos} 个`);
       return;
     }
-    showUnavailable(t("create.messages.settingsUnavailable"));
+    if (!canStart) {
+      showUnavailable("请等待全部素材校验完成后再开始");
+      return;
+    }
+    try {
+      await startProject(projectId, assets);
+      showUnavailable(`项目已开始，预计消耗 ${apiCredits} 创作点`);
+    } catch (error) {
+      showUnavailable(error.message || "项目无法开始");
+    }
   };
 
   const handleVideoSubtitle = (videoId, file) => {
     if (!file.name.toLowerCase().endsWith(".srt") || file.size > SUBTITLE_SIZE_LIMIT) {
-      showUnavailable(t("create.messages.invalidSubtitle"));
+      showUnavailable("仅支持 50MB 以内的 SRT 字幕文件");
       return;
     }
     setVideos((current) => current.map((video) => video.id === videoId
-      ? { ...video, subtitleName: file.name, subtitleStatusKey: null, statusTone: "success" }
+      ? { ...video, subtitleName: file.name, subtitleStatus: file.name, statusTone: "success" }
       : video));
   };
 
@@ -143,8 +188,8 @@ export function CreatePage() {
         <DashboardHeader credits={dashboardCredits} onUnavailable={showUnavailable} />
         <main className="create-main">
           <header className="create-heading">
-            <h1 data-route-heading tabIndex="-1">{t("create.routeHeading")}</h1>
-            <p>{t("create.description")}</p>
+            <h1 data-route-heading tabIndex="-1">创建新的 AI 视频</h1>
+            <p>选择创作类型并上传素材</p>
           </header>
           <div className="create-layout">
             <div className="create-form">
@@ -158,13 +203,14 @@ export function CreatePage() {
                 onRemove={(id) => setVideos((current) => current.filter((video) => video.id !== id))}
                 onSubtitleSelect={handleVideoSubtitle}
               />
-              <p className="create-autosave"><ShieldCheck aria-hidden="true" />{t("create.autosave")}</p>
+              <p className="create-autosave"><ShieldCheck aria-hidden="true" />系统会自动保存上传进度</p>
             </div>
             <CreationSummary
               durationLabel={summary.durationLabel}
-              estimatedCredits={summary.estimatedCredits}
+              estimatedCredits={apiCredits}
               balance={dashboardCredits.balance}
               onNext={handleNext}
+              disabled={!canStart || apiCredits === null}
             />
           </div>
         </main>

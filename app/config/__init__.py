@@ -4,7 +4,6 @@ import sys
 from loguru import logger
 
 from app.config import config
-from app.utils import utils
 
 
 def __init_logger():
@@ -55,11 +54,7 @@ def __init_logger():
     logger.remove()
 
     logger.add(
-        sys.stdout,
-        level=_lvl,
-        format=format_record,
-        colorize=True,
-        filter=log_filter
+        sys.stdout, level=_lvl, format=format_record, colorize=True, filter=log_filter
     )
 
     # logger.add(

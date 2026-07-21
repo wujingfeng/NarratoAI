@@ -9,11 +9,9 @@
 '''
 import os
 import json
-import math
 import time
 import traceback
 import html
-import subprocess
 import streamlit as st
 from loguru import logger
 
@@ -23,15 +21,20 @@ from app.services.SDE.short_drama_explanation import (
     generate_narration_copy as generate_narration_copy_legacy,
     match_narration_copy_to_script as match_narration_copy_to_script_legacy,
 )
-from app.services.subtitle_text import read_subtitle_text
-from app.services.short_drama_narration_validation import (
-    normalize_script_video_sources,
+from app.services.short_drama_narration_service import (
+    ShortDramaAnalysisRequest,
+    ShortDramaNarrationError,
+    build_combined_subtitle_content as _service_build_combined_subtitle_content,
+    build_narration_char_range as _service_build_narration_char_range,
+    build_narration_char_range_for_video_paths as _service_build_narration_char_range_for_video_paths,
+    build_short_drama_script,
+    normalize_paths as _service_normalize_paths,
+    parse_and_fix_json as _service_parse_and_fix_json,
 )
 from app.services.tavily_search import TavilySearchError, format_search_context, search_story_context
 # 导入新的LLM服务模块 - 确保提供商被注册
 import app.services.llm  # 这会触发提供商注册
 from app.services.llm.migration_adapter import SubtitleAnalyzerAdapter
-import re
 
 
 PUBLIC_SCRIPT_FIELDS = ["_id", "video_id", "video_name", "timestamp", "picture", "narration", "OST"]
@@ -39,142 +42,12 @@ SHORT_DRAMA_PROMPT_CATEGORY = "short_drama_narration"
 FILM_TV_PROMPT_CATEGORY = "film_tv_narration"
 SHORT_DRAMA_SEARCH_KEYWORDS = "短剧 剧情 介绍 人物 结局"
 FILM_TV_SEARCH_KEYWORDS = "影视 剧情 介绍 人物 结局 电影 电视剧"
-DEFAULT_NARRATION_CHARS_PER_SECOND = 5
-NARRATION_DURATION_COEFFICIENTS = {
-    SHORT_DRAMA_PROMPT_CATEGORY: (0.15, 0.25),
-    FILM_TV_PROMPT_CATEGORY: (0.12, 0.25),
-    "short_drama_editing": (0.2, 0.35),
-    "documentary": (0.2, 0.4),
-}
 
-
-def _normalize_paths(paths):
-    if isinstance(paths, str):
-        paths = [paths]
-    if not paths:
-        return []
-
-    normalized_paths = []
-    seen = set()
-    for path in paths:
-        if not isinstance(path, str):
-            continue
-        path = path.strip()
-        if not path or path in seen:
-            continue
-        normalized_paths.append(path)
-        seen.add(path)
-    return normalized_paths
-
-
-def build_narration_char_range(
-    source_duration_seconds,
-    prompt_category: str,
-    original_sound_ratio: int,
-    chars_per_second: float = DEFAULT_NARRATION_CHARS_PER_SECOND,
-):
-    try:
-        source_duration_seconds = float(source_duration_seconds or 0)
-        chars_per_second = float(chars_per_second or 0)
-        original_sound_ratio = int(original_sound_ratio or 0)
-    except (TypeError, ValueError):
-        return ""
-
-    if source_duration_seconds <= 0 or chars_per_second <= 0:
-        return ""
-
-    ratio = min(max(original_sound_ratio, 0), 100) / 100
-    narration_ratio = max(0.0, 1.0 - ratio)
-    if narration_ratio <= 0:
-        return ""
-
-    min_coefficient, max_coefficient = NARRATION_DURATION_COEFFICIENTS.get(
-        prompt_category,
-        NARRATION_DURATION_COEFFICIENTS[SHORT_DRAMA_PROMPT_CATEGORY],
-    )
-    min_chars = math.floor(source_duration_seconds * min_coefficient * narration_ratio * chars_per_second)
-    max_chars = math.ceil(source_duration_seconds * max_coefficient * narration_ratio * chars_per_second)
-
-    if max_chars <= 0:
-        return ""
-    min_chars = max(1, min_chars)
-    max_chars = max(min_chars, max_chars)
-    return f"{min_chars}-{max_chars}"
-
-
-def _get_media_duration_seconds(video_path: str) -> float:
-    result = subprocess.run(
-        [
-            "ffprobe",
-            "-v",
-            "error",
-            "-show_entries",
-            "format=duration",
-            "-of",
-            "csv=p=0",
-            video_path,
-        ],
-        capture_output=True,
-        text=True,
-        check=True,
-    )
-    return float(result.stdout.strip())
-
-
-def build_narration_char_range_for_video_paths(
-    video_paths,
-    prompt_category: str,
-    original_sound_ratio: int,
-    chars_per_second: float = DEFAULT_NARRATION_CHARS_PER_SECOND,
-):
-    total_duration = 0.0
-    for video_path in _normalize_paths(video_paths):
-        if not os.path.exists(video_path):
-            continue
-        try:
-            total_duration += _get_media_duration_seconds(video_path)
-        except Exception as e:
-            logger.warning(f"获取视频时长失败，跳过动态解说字数范围: {video_path}, error={str(e)}")
-            return ""
-
-    return build_narration_char_range(
-        total_duration,
-        prompt_category=prompt_category,
-        original_sound_ratio=original_sound_ratio,
-        chars_per_second=chars_per_second,
-    )
-
-
-def _build_combined_subtitle_content(subtitle_paths, video_paths=None):
-    sections = []
-    video_paths = _normalize_paths(video_paths)
-    for index, subtitle_path in enumerate(_normalize_paths(subtitle_paths), start=1):
-        if not os.path.exists(subtitle_path):
-            continue
-
-        video_path = video_paths[index - 1] if index <= len(video_paths) else ""
-        if video_path:
-            header = (
-                f"# 视频 {index}: {os.path.basename(video_path)}\n"
-                f"字幕文件: {os.path.basename(subtitle_path)}"
-            )
-        else:
-            header = f"# 视频 {index}\n字幕文件: {os.path.basename(subtitle_path)}"
-        sections.append(f"{header}\n{read_subtitle_text(subtitle_path).text}".strip())
-
-    return "\n\n".join(sections)
-
-
-def _normalize_narration_items_video_sources(items, video_paths):
-    return normalize_script_video_sources(items, _normalize_paths(video_paths))
-
-
-def _strip_planner_only_fields(items):
-    return [
-        {field: item[field] for field in PUBLIC_SCRIPT_FIELDS if field in item}
-        for item in items
-        if isinstance(item, dict)
-    ]
+# 保留 WebUI 既有 helper 名称，具体实现由纯 Python 服务提供。
+_normalize_paths = _service_normalize_paths
+build_narration_char_range = _service_build_narration_char_range
+build_narration_char_range_for_video_paths = _service_build_narration_char_range_for_video_paths
+_build_combined_subtitle_content = _service_build_combined_subtitle_content
 
 
 def _format_progress_status(progress, message: str = "", tr=lambda key: key):
@@ -184,100 +57,15 @@ def _format_progress_status(progress, message: str = "", tr=lambda key: key):
     return f"{tr('Progress')}: {progress}%"
 
 
-def parse_and_fix_json(json_string):
-    """
-    解析并修复JSON字符串
+parse_and_fix_json = _service_parse_and_fix_json
 
-    Args:
-        json_string: 待解析的JSON字符串
 
-    Returns:
-        dict: 解析后的字典，如果解析失败返回None
-    """
-    if not json_string or not json_string.strip():
-        logger.error("JSON字符串为空")
-        return None
+def _script_error_message_key(error: ShortDramaNarrationError) -> str:
+    """将纯服务失败原因映射为 WebUI 既有提示文案。"""
 
-    # 清理字符串
-    json_string = json_string.strip()
-
-    # 尝试直接解析
-    try:
-        return json.loads(json_string)
-    except json.JSONDecodeError as e:
-        logger.warning(f"直接JSON解析失败: {e}")
-
-    # 尝试修复双大括号问题（LLM生成的常见问题）
-    try:
-        # 将双大括号替换为单大括号
-        fixed_braces = json_string.replace('{{', '{').replace('}}', '}')
-        logger.info("修复双大括号格式")
-        return json.loads(fixed_braces)
-    except json.JSONDecodeError:
-        pass
-
-    # 尝试提取JSON部分
-    try:
-        # 查找JSON代码块
-        json_match = re.search(r'```json\s*(.*?)\s*```', json_string, re.DOTALL)
-        if json_match:
-            json_content = json_match.group(1).strip()
-            logger.info("从代码块中提取JSON内容")
-            return json.loads(json_content)
-    except json.JSONDecodeError:
-        pass
-
-    # 尝试查找大括号包围的内容
-    try:
-        # 查找第一个 { 到最后一个 } 的内容
-        start_idx = json_string.find('{')
-        end_idx = json_string.rfind('}')
-        if start_idx != -1 and end_idx != -1 and end_idx > start_idx:
-            json_content = json_string[start_idx:end_idx+1]
-            logger.info("提取大括号包围的JSON内容")
-            return json.loads(json_content)
-    except json.JSONDecodeError:
-        pass
-
-    # 尝试综合修复JSON格式问题
-    try:
-        fixed_json = json_string
-
-        # 1. 修复双大括号问题
-        fixed_json = fixed_json.replace('{{', '{').replace('}}', '}')
-
-        # 2. 提取JSON内容（如果有其他文本包围）
-        start_idx = fixed_json.find('{')
-        end_idx = fixed_json.rfind('}')
-        if start_idx != -1 and end_idx != -1 and end_idx > start_idx:
-            fixed_json = fixed_json[start_idx:end_idx+1]
-
-        # 3. 移除注释
-        fixed_json = re.sub(r'#.*', '', fixed_json)
-        fixed_json = re.sub(r'//.*', '', fixed_json)
-
-        # 4. 移除多余的逗号
-        fixed_json = re.sub(r',\s*}', '}', fixed_json)
-        fixed_json = re.sub(r',\s*]', ']', fixed_json)
-
-        # 5. 修复单引号
-        fixed_json = re.sub(r"'([^']*)':", r'"\1":', fixed_json)
-
-        # 6. 修复没有引号的属性名
-        fixed_json = re.sub(r'(\w+)(\s*):', r'"\1"\2:', fixed_json)
-
-        # 7. 修复重复的引号
-        fixed_json = re.sub(r'""([^"]*?)""', r'"\1"', fixed_json)
-
-        logger.info("尝试综合修复JSON格式问题后解析")
-        return json.loads(fixed_json)
-    except json.JSONDecodeError as e:
-        logger.debug(f"综合修复失败: {e}")
-        pass
-
-    # 如果所有方法都失败，直接返回 None，避免生成不可剪辑的默认假脚本
-    logger.error(f"所有JSON解析方法都失败，原始内容: {json_string[:200]}...")
-    return None
+    if error.reason == "missing_items":
+        return "Generated narration missing items field"
+    return "Generated narration JSON parse failed"
 
 
 def _get_tavily_api_key() -> str:
@@ -792,27 +580,17 @@ def generate_script_short_sunmmary(
             """
             logger.info("开始准备生成解说文案")
 
-            # 结果转换为JSON字符串
-            narration_script = narration_result["narration_script"]
-
-            # 增强JSON解析，包含错误处理和修复
-            narration_dict = parse_and_fix_json(narration_script)
-            if narration_dict is None:
-                st.error(tr("Generated narration JSON parse failed"))
-                logger.error(f"JSON解析失败，原始内容: {narration_script}")
+            try:
+                narration_items = build_short_drama_script(
+                    ShortDramaAnalysisRequest(
+                        video_paths=selected_video_paths,
+                        narration_result=narration_result,
+                    )
+                )
+            except ShortDramaNarrationError as exc:
+                st.error(tr(_script_error_message_key(exc)))
+                logger.error(f"短剧脚本归一化失败: {exc}")
                 st.stop()
-
-            # 验证JSON结构
-            if 'items' not in narration_dict:
-                st.error(tr("Generated narration missing items field"))
-                logger.error(f"JSON结构错误，缺少items字段: {narration_dict}")
-                st.stop()
-
-            narration_items = _normalize_narration_items_video_sources(
-                narration_dict['items'],
-                selected_video_paths,
-            )
-            narration_items = _strip_planner_only_fields(narration_items)
             script = json.dumps(narration_items, ensure_ascii=False, indent=2)
 
             if script is None:

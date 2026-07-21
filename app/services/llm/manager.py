@@ -10,6 +10,7 @@ from loguru import logger
 from app.config import config
 from .base import VisionModelProvider, TextModelProvider
 from .exceptions import ProviderNotFoundError, ConfigurationError
+from .safe_logging import log_llm_error
 
 
 class LLMServiceManager:
@@ -150,7 +151,7 @@ class LLMServiceManager:
             return instance
             
         except Exception as e:
-            logger.error(f"创建视觉模型提供商实例失败: {provider_name} - {str(e)}")
+            log_llm_error("manager_create_vision_provider", e)
             raise ConfigurationError(f"创建提供商实例失败: {str(e)}")
     
     @classmethod
@@ -221,7 +222,7 @@ class LLMServiceManager:
             return instance
             
         except Exception as e:
-            logger.error(f"创建文本模型提供商实例失败: {provider_name} - {str(e)}")
+            log_llm_error("manager_create_text_provider", e)
             raise ConfigurationError(f"创建提供商实例失败: {str(e)}")
     
     @classmethod

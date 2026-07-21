@@ -25,6 +25,7 @@ from app.config import config
 from app.config.defaults import DEFAULT_LLM_GENERATION_CONFIG, normalize_openai_compatible_model_name
 from .base import TextModelProvider, VisionModelProvider
 from .exceptions import APICallError, AuthenticationError, ContentFilterError, RateLimitError
+from .safe_logging import log_llm_error
 
 
 def _normalize_model_name(model_name: str) -> str:
@@ -161,8 +162,8 @@ class OpenAICompatibleVisionProvider(_OpenAICompatibleBase, VisionModelProvider)
                     result = await self._analyze_batch(batch, prompt, **kwargs)
                     return batch_index, result
                 except Exception as exc:
-                    logger.error(f"批次 {batch_index + 1} 处理失败: {exc}")
-                    return batch_index, f"批次处理失败: {exc}"
+                    log_llm_error("openai_vision_batch", exc)
+                    return batch_index, "批次处理失败"
 
         completed = await asyncio.gather(*(run_batch(index, batch) for index, batch in batches))
         completed.sort(key=lambda item: item[0])
@@ -204,10 +205,10 @@ class OpenAICompatibleVisionProvider(_OpenAICompatibleBase, VisionModelProvider)
                 return response.choices[0].message.content
             raise APICallError("OpenAI 兼容接口返回空响应")
         except OpenAIAuthError as exc:
-            logger.error(f"OpenAI 兼容接口认证失败: {exc}")
+            log_llm_error("openai_vision_auth", exc)
             raise AuthenticationError(str(exc))
         except OpenAIRateLimitError as exc:
-            logger.error(f"OpenAI 兼容接口速率限制: {exc}")
+            log_llm_error("openai_vision_rate_limit", exc)
             raise RateLimitError(str(exc))
         except OpenAIBadRequestError as exc:
             error_msg = str(exc)
@@ -215,10 +216,10 @@ class OpenAICompatibleVisionProvider(_OpenAICompatibleBase, VisionModelProvider)
                 raise ContentFilterError(f"内容被安全过滤器阻止: {error_msg}")
             raise APICallError(f"请求错误: {error_msg}")
         except OpenAIAPIError as exc:
-            logger.error(f"OpenAI 兼容接口 API 错误: {exc}")
+            log_llm_error("openai_vision_api", exc)
             raise APICallError(f"API 错误: {exc}")
         except Exception as exc:
-            logger.error(f"OpenAI 兼容接口调用失败: {exc}")
+            log_llm_error("openai_vision_call", exc)
             raise APICallError(f"调用失败: {exc}")
 
     def _image_to_base64(self, img: PIL.Image.Image) -> str:
@@ -270,7 +271,7 @@ class OpenAICompatibleTextProvider(_OpenAICompatibleBase, TextModelProvider):
         try:
             on_chunk({"type": chunk_type, "text": text})
         except Exception as exc:
-            logger.debug(f"流式回调更新失败: {exc}")
+            log_llm_error("openai_stream_callback", exc)
 
     @staticmethod
     def _extract_reasoning_delta(delta: Any) -> str:
@@ -337,16 +338,16 @@ class OpenAICompatibleTextProvider(_OpenAICompatibleBase, TextModelProvider):
             raise APICallError(f"请求错误: {error_msg}")
 
         except OpenAIAuthError as exc:
-            logger.error(f"OpenAI 兼容接口认证失败: {exc}")
+            log_llm_error("openai_text_auth", exc)
             raise AuthenticationError(str(exc))
         except OpenAIRateLimitError as exc:
-            logger.error(f"OpenAI 兼容接口速率限制: {exc}")
+            log_llm_error("openai_text_rate_limit", exc)
             raise RateLimitError(str(exc))
         except OpenAIAPIError as exc:
-            logger.error(f"OpenAI 兼容接口 API 错误: {exc}")
+            log_llm_error("openai_text_api", exc)
             raise APICallError(f"API 错误: {exc}")
         except Exception as exc:
-            logger.error(f"OpenAI 兼容接口调用失败: {exc}")
+            log_llm_error("openai_text_call", exc)
             raise APICallError(f"调用失败: {exc}")
 
     async def generate_text_stream(
@@ -413,16 +414,16 @@ class OpenAICompatibleTextProvider(_OpenAICompatibleBase, TextModelProvider):
             raise APICallError(f"请求错误: {error_msg}")
 
         except OpenAIAuthError as exc:
-            logger.error(f"OpenAI 兼容接口认证失败: {exc}")
+            log_llm_error("openai_stream_auth", exc)
             raise AuthenticationError(str(exc))
         except OpenAIRateLimitError as exc:
-            logger.error(f"OpenAI 兼容接口速率限制: {exc}")
+            log_llm_error("openai_stream_rate_limit", exc)
             raise RateLimitError(str(exc))
         except OpenAIAPIError as exc:
-            logger.error(f"OpenAI 兼容接口 API 错误: {exc}")
+            log_llm_error("openai_stream_api", exc)
             raise APICallError(f"API 错误: {exc}")
         except Exception as exc:
-            logger.error(f"OpenAI 兼容接口流式调用失败: {exc}")
+            log_llm_error("openai_stream_call", exc)
             raise APICallError(f"流式调用失败: {exc}")
 
     async def _make_api_call(self, payload: Dict[str, Any]) -> Dict[str, Any]:
