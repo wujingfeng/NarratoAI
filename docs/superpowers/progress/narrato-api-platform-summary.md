@@ -62,7 +62,7 @@
 
 ## 下一原子任务
 
-**Task 20D**：解决 Business mypy 错误与 Core/Business ruff format 漂移；不运行真实 Provider smoke。
+**Task 20E**：修复 Core 开发环境后运行剩余静态与测试验收；不运行真实 Provider smoke。
 
 Task 20C：`0381536 test: add workflow end to end acceptance`。fresh SQLite 双服务迁移通过；Business E2E 4 项通过，覆盖终态、轮询补偿、失败状态和一次退款。原项目回归 52 项、前端 build/API 验证通过。
 

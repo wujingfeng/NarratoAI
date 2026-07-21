@@ -13,9 +13,9 @@
 - Gate C 已通过（用户接受原生 picker 证据例外）；Task 19 全部完成，Task 20A、20B 已完成，Gate D 待剩余 Task 20 验收。
 - Task 19 提交：`e776d9e`、`462ab86`、`3a6bc20`、`2a27f9c`。静态部署、README、编译和 lint 证据已通过；macOS sandbox 无法运行 nginx -t。
 
-## 本窗口唯一原子任务：Task 20D
+## 本窗口唯一原子任务：Task 20E
 
-仅解决 Business mypy 错误与 Core/Business ruff format 漂移，并重跑静态验收；不得运行真实 Provider smoke。
+仅修复 Core 开发环境并运行剩余 Core 静态与测试验收；不得运行真实 Provider smoke。
 
 ## 不可删除的永久规则
 
