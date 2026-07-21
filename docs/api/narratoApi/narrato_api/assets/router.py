@@ -102,7 +102,7 @@ def create_upload_policy(
         filename=body.filename,
         size_bytes=body.size_bytes,
         object_key=policy.key,
-        cdn_url=f"{settings.oss_endpoint.rstrip('/')}/{settings.oss_bucket}/{policy.key}",
+        cdn_url=f"{settings.oss_url.rstrip('/')}/{policy.key}",
     )
     return ApiResponse(
         code="UPLOAD_POLICY_CREATED",

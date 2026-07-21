@@ -161,8 +161,12 @@ def test_settings_reject_unknown_toml_and_hide_secrets(tmp_path) -> None:
     with pytest.raises(ValidationError):
         Settings(core_base_url="http://core.example.test")
 
+    assert Settings(oss_endpoint="oss-cn-shanghai.aliyuncs.com").oss_endpoint == (
+        "oss-cn-shanghai.aliyuncs.com"
+    )
+
     with pytest.raises(ValidationError):
-        Settings(oss_endpoint="oss-cn-shanghai.aliyuncs.com")
+        Settings(oss_endpoint="https://oss-cn-shanghai.aliyuncs.com")
 
     with pytest.raises(ValidationError):
         Settings(oss_url="narrato.oss-cn-shanghai.aliyuncs.com")

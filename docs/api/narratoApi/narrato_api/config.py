@@ -85,10 +85,21 @@ class Settings(BaseSettings):
             raise ValueError("SMTP configuration contains control characters")
         return value
 
-    @field_validator("oss_endpoint", "oss_url")
+    @field_validator("oss_endpoint")
     @classmethod
-    def require_absolute_https_oss_url(cls, value: str) -> str:
-        """拒绝会被浏览器或 urllib 误解为相对路径的 OSS 地址。"""
+    def require_oss_endpoint_host(cls, value: str) -> str:
+        """OSS Endpoint 仅保存不含协议的域名，由客户端按 Bucket 组成地址。"""
+
+        if not value:
+            return value
+        if any(token in value for token in ("://", "/", "?", "#", "@")):
+            raise ValueError("OSS endpoint must be a hostname without a scheme")
+        return value.rstrip(".")
+
+    @field_validator("oss_url")
+    @classmethod
+    def require_absolute_https_oss_upload_url(cls, value: str) -> str:
+        """H5 直传地址必须是完整的无凭据 HTTPS URL。"""
 
         if not value:
             return value

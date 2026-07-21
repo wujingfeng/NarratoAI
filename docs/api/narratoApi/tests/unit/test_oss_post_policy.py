@@ -8,7 +8,15 @@ import pytest
 
 from narrato_api.assets.constraints import AssetDeclarationError
 from narrato_api.assets.service import project_for_update_statement
-from narrato_api.integrations.oss_client import OssPostPolicyService
+from narrato_api.integrations.oss_client import HttpOssClient, OssPostPolicyService
+
+
+def test_oss_client_composes_bucket_url_from_endpoint_host() -> None:
+    client = HttpOssClient(endpoint="oss-cn-shanghai.aliyuncs.com")
+
+    assert client.public_url("game339", "narrato/api/episode.mp4") == (
+        "https://game339.oss-cn-shanghai.aliyuncs.com/narrato/api/episode.mp4"
+    )
 
 
 def test_video_policy_uses_fixed_api_prefix_type_and_300_mib_limit() -> None:

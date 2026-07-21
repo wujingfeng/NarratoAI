@@ -76,7 +76,7 @@ def upload_fixture(
     app = create_app(
         Settings(
             database_url=f"sqlite:///{database_path}",
-            oss_endpoint="https://cdn.example.test",
+            oss_endpoint="oss-cn-shanghai.aliyuncs.com",
             oss_url="https://narrato.oss-cn-shanghai.aliyuncs.com",
             oss_bucket="narrato",
             oss_access_key_id="key",

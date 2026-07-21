@@ -160,7 +160,7 @@ class HttpOssClient:
 
         if not self.endpoint or not bucket or not object_key:
             raise OssClientError("OSS delete is not configured")
-        request = Request(f"{self.endpoint}/{bucket}/{object_key}", method="DELETE")
+        request = Request(self.public_url(bucket, object_key), method="DELETE")
         try:
             with urlopen(request, timeout=10):
                 return
@@ -174,5 +174,6 @@ class HttpOssClient:
     def public_url(self, bucket: str, object_key: str) -> str:
         """返回部署配置对应的公开对象 URL。"""
 
-        prefix = f"{self.endpoint}/{bucket}" if bucket else self.endpoint
-        return f"{prefix}/{object_key}"
+        if not self.endpoint or not bucket:
+            raise OssClientError("OSS endpoint is not configured")
+        return f"https://{bucket}.{self.endpoint}/{object_key}"

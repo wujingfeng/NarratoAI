@@ -24,8 +24,9 @@ auth_redis_timeout_seconds = 3.0
 password_argon2_time_cost = 3
 password_argon2_memory_cost_kib = 65536
 password_argon2_parallelism = 2
+# OSS 服务 Endpoint：仅填写域名，不含协议或 Bucket，例如 oss-cn-shanghai.aliyuncs.com。
 oss_endpoint = ""
-# 浏览器 H5 表单直传地址，必须是完整 HTTPS URL，例如 Bucket 的 OSS 外网域名。
+# 浏览器 H5 表单直传地址：协议 + Bucket + Endpoint，例如 https://example-bucket.oss-cn-shanghai.aliyuncs.com。
 oss_url = ""
 oss_bucket = ""
 oss_access_key_id = ""
