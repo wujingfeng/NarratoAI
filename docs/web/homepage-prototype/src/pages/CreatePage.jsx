@@ -8,7 +8,7 @@ import { DashboardMobileNav } from "../components/dashboard/DashboardMobileNav.j
 import { DashboardSidebar } from "../components/dashboard/DashboardSidebar.jsx";
 import { DashboardToast } from "../components/dashboard/DashboardToast.jsx";
 import { dashboardCredits, dashboardNavItems } from "../data/dashboardData.js";
-import { creationTypes, initialCreateVideos } from "../data/createData.js";
+import { creationTypes } from "../data/createData.js";
 import { uploadAsset } from "../features/uploads/ossPostUpload.js";
 import { canStartProject, createProject, estimateProjectCost, getAsset, startProject } from "../features/projects/projectApi.js";
 
@@ -54,7 +54,7 @@ function readVideoDuration(file) {
 export function CreatePage() {
   const [toast, setToast] = useState({ id: 0, message: "" });
   const [selectedType, setSelectedType] = useState("narration");
-  const [videos, setVideos] = useState(initialCreateVideos);
+  const [videos, setVideos] = useState([]);
   const [isDragging, setIsDragging] = useState(false);
   const [projectId, setProjectId] = useState(null);
   const [apiCredits, setApiCredits] = useState(null);
@@ -70,10 +70,8 @@ export function CreatePage() {
 
   const summary = useMemo(() => {
     const totalSeconds = videos.reduce((total, video) => total + video.durationSeconds, 0);
-    const pendingCount = videos.filter((video) => video.durationSeconds === 0).length;
     return {
       durationLabel: formatDuration(totalSeconds),
-      estimatedCredits: Math.ceil(totalSeconds / 6) + pendingCount * 10,
     };
   }, [videos]);
 
@@ -110,32 +108,45 @@ export function CreatePage() {
     if (acceptedFiles.length < validFiles.length) {
       showUnavailable(`${selectedCreationType.title}最多上传 ${selectedCreationType.maxVideos} 个视频`);
     }
-    const newVideos = acceptedFiles.map((file, index) => ({
-        id: `${file.name}-${file.lastModified}-${file.size}-${Date.now()}-${index}`,
-        name: file.name,
-        durationSeconds: 0,
-        durationLabel: "--:--",
-        subtitleStatus: "待识别，将使用 AI 识别",
-        statusTone: "warning",
-        subtitleName: null,
-        thumbnail: null,
-      }));
-    setVideos((current) => [...current, ...newVideos]);
     try {
       const activeProjectId = projectId || (await createProject()).id;
       setProjectId(activeProjectId);
-      const uploadedAssets = await Promise.all(acceptedFiles.map((file) => uploadAsset(activeProjectId, file, "video")));
-      setVideos((current) => current.map((video) => {
-        const assetIndex = newVideos.findIndex((item) => item.id === video.id);
-        const asset = uploadedAssets[assetIndex];
-        return asset ? { ...video, assetId: asset.id, assetStatus: asset.status } : video;
+      const uploaded = await Promise.all(acceptedFiles.map(async (file) => ({
+        file,
+        asset: await uploadAsset(activeProjectId, file, "video"),
+      })));
+      const uploadedVideos = uploaded.map(({ file, asset }) => ({
+        id: asset.id,
+        assetId: asset.id,
+        assetStatus: asset.status,
+        name: file.name,
+        durationSeconds: 0,
+        durationLabel: "--:--",
+        subtitleStatus: asset.status === "ready" ? "素材已校验" : "素材校验中",
+        statusTone: asset.status === "ready" ? "success" : "warning",
+        subtitleName: null,
+        thumbnail: null,
       }));
-      uploadedAssets.forEach((asset) => {
+      setVideos((current) => [...current, ...uploadedVideos]);
+      uploadedVideos.forEach((newVideo, index) => {
+        readVideoDuration(acceptedFiles[index]).then((durationSeconds) => {
+          if (durationSeconds === null) return;
+          setVideos((current) => current.map((video) => video.id === newVideo.id
+            ? { ...video, durationSeconds, durationLabel: formatDuration(durationSeconds) }
+            : video));
+        });
+      });
+      uploaded.forEach(({ asset }) => {
         if (asset.status === "ready" || asset.status === "invalid") return;
         const poll = async () => {
           const latest = await getAsset(asset.id);
           setVideos((current) => current.map((video) => video.assetId === asset.id
-            ? { ...video, assetStatus: latest.status }
+            ? {
+              ...video,
+              assetStatus: latest.status,
+              subtitleStatus: latest.status === "ready" ? "素材已校验" : latest.status === "invalid" ? "素材校验失败" : "素材校验中",
+              statusTone: latest.status === "ready" ? "success" : "warning",
+            }
             : video));
           if (latest.status === "validating") window.setTimeout(poll, 2000);
         };
@@ -144,14 +155,6 @@ export function CreatePage() {
     } catch (error) {
       showUnavailable(error.message || "上传失败，请稍后重试");
     }
-    newVideos.forEach((newVideo, index) => {
-      readVideoDuration(acceptedFiles[index]).then((durationSeconds) => {
-        if (durationSeconds === null) return;
-        setVideos((current) => current.map((video) => video.id === newVideo.id
-          ? { ...video, durationSeconds, durationLabel: formatDuration(durationSeconds) }
-          : video));
-      });
-    });
   };
 
   const handleNext = async () => {

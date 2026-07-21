@@ -6,8 +6,5 @@ export const creationTypes = [
   { id: "remix", title: "短剧混剪", titleKey: "create.types.remix.title", description: "组合多个素材片段，快速生成混剪", descriptionKey: "create.types.remix.description", icon: Scissors, tone: "orange", maxVideos: 10 },
 ];
 
-export const initialCreateVideos = [
-  { id: "demo-01", name: "第01集片段.mp4", durationSeconds: 184, durationLabel: "03:04", subtitleStatus: "待识别，将使用 AI 识别", subtitleStatusKey: "create.subtitle.aiRecognition", statusTone: "warning", subtitleName: null, thumbnail: null },
-  { id: "demo-02", name: "第02集片段.mp4", durationSeconds: 247, durationLabel: "04:07", subtitleStatus: "待识别，将使用 AI 识别", subtitleStatusKey: "create.subtitle.aiRecognition", statusTone: "warning", subtitleName: null, thumbnail: null },
-  { id: "demo-03", name: "第03集片段.mp4", durationSeconds: 91, durationLabel: "01:31", subtitleStatus: "待识别，将使用 AI 识别", subtitleStatusKey: "create.subtitle.aiRecognition", statusTone: "warning", subtitleName: null, thumbnail: null },
-];
+// 保留空导出以兼容旧调用方；创建页不再使用任何默认素材。
+export const initialCreateVideos = [];
