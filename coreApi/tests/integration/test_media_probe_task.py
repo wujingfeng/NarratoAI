@@ -475,11 +475,13 @@ def test_media_handler_classifies_damaged_video_non_retryable(session, tmp_path)
     assert failed.error["retryable"] is False
 
 
-def test_media_handler_validates_srt_without_uploading_input(session, tmp_path):
+def test_media_handler_accepts_srt_without_downloading_input(session, tmp_path):
     from core_api.tasks.service import TaskService
 
-    subtitle = tmp_path / "fixture.srt"
-    subtitle.write_text("1\n00:00:00,000 --> 00:00:01,500\n字幕\n", encoding="utf-8")
+    class NoDownload:
+        def download(self, *_args, **_kwargs):
+            raise AssertionError("subtitle probe must not download the source file")
+
     service = TaskService(session)
     task = service.create_core_task(
         caller="narrato-api",
@@ -496,7 +498,7 @@ def test_media_handler_validates_srt_without_uploading_input(session, tmp_path):
         task_service=service,
         work_root=tmp_path / "work",
         media_probe_adapter=MediaProbeAdapter(
-            downloader=FixtureDownloader(subtitle), probe=lambda _: None
+            downloader=NoDownload(), probe=lambda _: None
         ),
     )
 
@@ -504,7 +506,7 @@ def test_media_handler_validates_srt_without_uploading_input(session, tmp_path):
 
     finished = service.get_task(task.id)
     assert finished.status == CoreTaskStatus.SUCCEEDED
-    assert finished.result["cue_count"] == 1
+    assert finished.result == {"media_type": "subtitle"}
     assert (
         session.scalar(select(CoreTask).where(CoreTask.id == task.id)).result.get(
             "artifacts"

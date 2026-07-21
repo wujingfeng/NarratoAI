@@ -164,7 +164,7 @@ narrato/coreApi/YYYY/MM/DD/<random-md5>.<ext>
 4. 上传成功后前端立即调用上传确认接口。
 5. `narratoApi` HEAD 校验对象存在、路径、声明大小和元数据。
 6. 资产进入 `validating`，异步请求 Core 媒体探测。
-7. Core 使用 FFprobe 或字幕解析器校验真实容器、编码、损坏、时长、分辨率、流和 SRT 时间轴。
+7. Core 通过 FFprobe 直接读取受限 CDN 视频 URL 的有限元数据，校验容器、时长、分辨率和流；SRT 在上传确认阶段仅复核对象声明，实际字幕处理节点再读取并解析内容。
 8. 验证成功转为 `ready`，失败转为 `invalid`；只有全部资产 `ready` 才能开始任务。
 
 数据库同时保存 `bucket`、`object_key` 和公开 CDN URL。文件默认不自动过期；只有用户主动删除允许删除的终态项目或账号时，才异步删除关联对象并记录审计结果。
@@ -325,7 +325,7 @@ cost = ceil(全部已验证视频总秒数 / 60) * 20
 明确不提供 `/cancel`、用户 `/retry`、已完成项目再次渲染和失败项目导出接口。
 ## 17. Core 原子接口清单
 ### 17.1 异步原子能力创建
-- `POST /api/v1/media-probe/tasks`：探测视频或校验 SRT；`POST /api/v1/asr/tasks`：音频语音识别；`POST /api/v1/video-analysis/tasks`：帧、镜头、剧情等分析；`POST /api/v1/script-generation/tasks`：生成解说文案和结构化时间轴；`POST /api/v1/tts/tasks`：根据稳定音色 ID 生成配音；`POST /api/v1/subtitle/tasks`：生成、校正或合并字幕；`POST /api/v1/video-render/tasks`：裁剪、合成和输出最终视频。
+- `POST /api/v1/media-probe/tasks`：探测视频元数据或确认 SRT 声明；`POST /api/v1/asr/tasks`：音频语音识别；`POST /api/v1/video-analysis/tasks`：帧、镜头、剧情等分析；`POST /api/v1/script-generation/tasks`：生成解说文案和结构化时间轴；`POST /api/v1/tts/tasks`：根据稳定音色 ID 生成配音；`POST /api/v1/subtitle/tasks`：生成、校正或合并字幕；`POST /api/v1/video-render/tasks`：裁剪、合成和输出最终视频。
 ### 17.2 共用查询和控制
 - `GET /api/v1/tasks/{core_task_id}`：统一返回状态、进度、错误和产物；`GET /api/v1/tasks/{core_task_id}/events`：供诊断或低延迟服务间查询；`GET /api/v1/capabilities`：返回已启用的统一能力目录与版本；`POST /api/v1/jianying/manifests/build`：轻量、无状态生成剪映基础 JSON 和资源映射；`GET /api/v1/health/live`：Core 存活检查；`GET /api/v1/health/ready`：Core DB、Redis、OSS 和必要配置检查。
 

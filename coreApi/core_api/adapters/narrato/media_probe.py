@@ -168,7 +168,7 @@ def parse_srt(content: bytes) -> dict[str, Any]:
 
 @dataclass(slots=True)
 class MediaProbeAdapter:
-    """远程探测视频元数据，并在本地解析小型 SRT。"""
+    """远程探测视频元数据，并依据已复核声明接收 SRT。"""
 
     downloader: Downloader
     probe: Callable[[str], ProbeResult]
@@ -185,14 +185,10 @@ class MediaProbeAdapter:
 
         if media_type == "video":
             extension = _extension(declared_extension, video_only=True)
-            limit = VIDEO_MAX_BYTES
-            kind = "video"
         elif media_type == "subtitle":
             extension = _extension(declared_extension)
             if extension != "srt":
                 raise SrtConstraintError("SRT_EXTENSION_INVALID")
-            limit = SRT_MAX_BYTES
-            kind = "subtitle"
         else:
             raise MediaConstraintError("MEDIA_TYPE_INVALID")
         if media_type == "video":
@@ -203,8 +199,6 @@ class MediaProbeAdapter:
                 raise MediaDamagedError("MEDIA_DAMAGED") from exc
             return validate_video(probe_result, declared_extension=extension)
 
-        destination = workspace.controlled_path("input", kind, extension)
-        self.downloader.download(source_url, destination, max_bytes=limit)
-        if media_type == "subtitle":
-            return parse_srt(destination.read_bytes())
-        raise AssertionError("unreachable media type")
+        # 上传确认已经通过对象大小、类型、扩展名和归属复核；SRT 内容在后续实际
+        # 使用字幕的处理节点读取，探测阶段不再创建本地副本。
+        return {"media_type": "subtitle"}
