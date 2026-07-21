@@ -149,7 +149,7 @@ class HttpOssClient:
             with urlopen(Request(url, method="HEAD"), timeout=5) as response:
                 raw_size = response.headers.get("Content-Length")
                 content_type = response.headers.get("Content-Type", "").split(";", 1)[0]
-        except (HTTPError, URLError, TimeoutError) as error:
+        except (HTTPError, URLError, TimeoutError, ValueError) as error:
             raise OssClientError("OSS object could not be verified") from error
         if raw_size is None or not raw_size.isdecimal() or not content_type:
             raise OssClientError("OSS object metadata is incomplete")

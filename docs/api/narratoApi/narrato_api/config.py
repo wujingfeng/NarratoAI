@@ -5,6 +5,7 @@ import tomllib
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlsplit
 
 from pydantic import Field, HttpUrl, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -83,6 +84,23 @@ class Settings(BaseSettings):
         if any(ord(char) < 32 or ord(char) == 127 for char in value):
             raise ValueError("SMTP configuration contains control characters")
         return value
+
+    @field_validator("oss_endpoint", "oss_url")
+    @classmethod
+    def require_absolute_https_oss_url(cls, value: str) -> str:
+        """拒绝会被浏览器或 urllib 误解为相对路径的 OSS 地址。"""
+
+        if not value:
+            return value
+        parsed = urlsplit(value)
+        if (
+            parsed.scheme != "https"
+            or not parsed.netloc
+            or parsed.username
+            or parsed.password
+        ):
+            raise ValueError("OSS URL must be a credential-free HTTPS URL")
+        return value.rstrip("/")
 
     @model_validator(mode="after")
     def validate_verification_delivery_timeouts(self) -> Settings:

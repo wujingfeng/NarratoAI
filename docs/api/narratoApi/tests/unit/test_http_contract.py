@@ -161,6 +161,12 @@ def test_settings_reject_unknown_toml_and_hide_secrets(tmp_path) -> None:
     with pytest.raises(ValidationError):
         Settings(core_base_url="http://core.example.test")
 
+    with pytest.raises(ValidationError):
+        Settings(oss_endpoint="oss-cn-shanghai.aliyuncs.com")
+
+    with pytest.raises(ValidationError):
+        Settings(oss_url="narrato.oss-cn-shanghai.aliyuncs.com")
+
 
 def test_celery_has_independent_prefix_and_no_result_backend(tmp_path) -> None:
     settings = _settings(tmp_path)
