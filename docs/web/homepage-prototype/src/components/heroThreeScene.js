@@ -11,7 +11,6 @@ import {
   MeshBasicMaterial,
   PerspectiveCamera,
   PlaneGeometry,
-  QuadraticBezierCurve3,
   Scene,
   SRGBColorSpace,
   TubeGeometry,
@@ -73,13 +72,62 @@ function getViewportAtScenePlane(camera) {
   return { width: height * camera.aspect, height };
 }
 
-function mapWorkbenchRectToScene(workbenchRect, heroRect, camera) {
+function transformPoint(matrix, x, y, originX, originY) {
+  const point = new DOMPoint(x - originX, y - originY, 0, 1).matrixTransform(matrix);
+  const divisor = point.w || 1;
+  return { x: point.x / divisor + originX, y: point.y / divisor + originY };
+}
+
+function getWorkbenchScreenQuad(workbenchElement, workbenchRect) {
+  const style = getComputedStyle(workbenchElement);
+  const matrix = new DOMMatrix(style.transform === "none" ? undefined : style.transform);
+  const [originX = "0", originY = "0"] = style.transformOrigin.split(" ");
+  const ox = Number.parseFloat(originX) || 0;
+  const oy = Number.parseFloat(originY) || 0;
+  const width = workbenchElement.offsetWidth;
+  const height = workbenchElement.offsetHeight;
+  const localPoints = [
+    transformPoint(matrix, 0, 0, ox, oy),
+    transformPoint(matrix, width, 0, ox, oy),
+    transformPoint(matrix, width, height, ox, oy),
+    transformPoint(matrix, 0, height, ox, oy),
+  ];
+  const minimumX = Math.min(...localPoints.map((point) => point.x));
+  const minimumY = Math.min(...localPoints.map((point) => point.y));
+  return localPoints.map((point) => ({
+    x: workbenchRect.left + point.x - minimumX,
+    y: workbenchRect.top + point.y - minimumY,
+  }));
+}
+
+function screenPointToScenePlane(point, heroRect, camera) {
+  const ndc = new Vector3(
+    ((point.x - heroRect.left) / Math.max(heroRect.width, MIN_DIMENSION)) * 2 - 1,
+    -(((point.y - heroRect.top) / Math.max(heroRect.height, MIN_DIMENSION)) * 2 - 1),
+    0.5,
+  );
+  const worldPoint = ndc.unproject(camera);
+  const direction = worldPoint.sub(camera.position).normalize();
+  return camera.position.clone().add(direction.multiplyScalar(-camera.position.z / direction.z));
+}
+
+function projectScenePointToScreen(point, heroRect, camera) {
+  const projected = point.clone().project(camera);
+  return {
+    x: heroRect.left + (projected.x + 1) * 0.5 * heroRect.width,
+    y: heroRect.top + (1 - projected.y) * 0.5 * heroRect.height,
+  };
+}
+
+function mapWorkbenchRectToScene(workbenchElement, workbenchRect, heroRect, camera) {
   const viewport = getViewportAtScenePlane(camera);
   const heroWidth = Math.max(heroRect.width, MIN_DIMENSION);
   const heroHeight = Math.max(heroRect.height, MIN_DIMENSION);
   const centerX = workbenchRect.left - heroRect.left + workbenchRect.width * 0.5;
   const centerY = workbenchRect.top - heroRect.top + workbenchRect.height * 0.5;
   const unitsPerPixel = viewport.height / heroHeight;
+  const screenQuad = getWorkbenchScreenQuad(workbenchElement, workbenchRect);
+  const sceneQuad = screenQuad.map((point) => screenPointToScenePlane(point, heroRect, camera));
 
   return {
     width: Math.max(workbenchRect.width * unitsPerPixel, 0.1),
@@ -87,60 +135,27 @@ function mapWorkbenchRectToScene(workbenchRect, heroRect, camera) {
     centerX: (centerX / heroWidth - 0.5) * viewport.width,
     centerY: (0.5 - centerY / heroHeight) * viewport.height,
     unitsPerPixel,
+    screenQuad,
+    sceneQuad,
   };
-}
-
-function createRailCurve(width, height, depth, tone) {
-  const halfWidth = width * 0.5;
-  const halfHeight = height * 0.5;
-  const corner = Math.min(width * 0.07, height * 0.09, 0.22);
-  const z = depth * 0.5 + 0.03;
-  const curve = new CurvePath();
-
-  if (tone === "cyan") {
-    curve.add(new LineCurve3(
-      new Vector3(-halfWidth, -halfHeight + corner * 1.15, z),
-      new Vector3(-halfWidth, halfHeight - corner, z),
-    ));
-    curve.add(new QuadraticBezierCurve3(
-      new Vector3(-halfWidth, halfHeight - corner, z),
-      new Vector3(-halfWidth, halfHeight, z),
-      new Vector3(-halfWidth + corner, halfHeight, z),
-    ));
-    curve.add(new LineCurve3(
-      new Vector3(-halfWidth + corner, halfHeight, z),
-      new Vector3(halfWidth * 0.44, halfHeight, z),
-    ));
-  } else {
-    curve.add(new LineCurve3(
-      new Vector3(halfWidth * 0.54, halfHeight, z),
-      new Vector3(halfWidth - corner, halfHeight, z),
-    ));
-    curve.add(new QuadraticBezierCurve3(
-      new Vector3(halfWidth - corner, halfHeight, z),
-      new Vector3(halfWidth, halfHeight, z),
-      new Vector3(halfWidth, halfHeight - corner, z),
-    ));
-    curve.add(new LineCurve3(
-      new Vector3(halfWidth, halfHeight - corner, z),
-      new Vector3(halfWidth, -halfHeight + corner, z),
-    ));
-    curve.add(new QuadraticBezierCurve3(
-      new Vector3(halfWidth, -halfHeight + corner, z),
-      new Vector3(halfWidth, -halfHeight, z),
-      new Vector3(halfWidth - corner, -halfHeight, z),
-    ));
-    curve.add(new LineCurve3(
-      new Vector3(halfWidth - corner, -halfHeight, z),
-      new Vector3(-halfWidth * 0.38, -halfHeight, z),
-    ));
-  }
-
-  return curve;
 }
 
 function createRailMesh(curve, radius, material) {
   return new Mesh(new TubeGeometry(curve, 96, radius, 6, false), material);
+}
+
+function createRailCurvesFromQuad([topLeft, topRight, bottomRight, bottomLeft]) {
+  const cyanEnd = topLeft.clone().lerp(topRight, 0.46);
+  const violetStart = topLeft.clone().lerp(topRight, 0.54);
+  const violetEnd = bottomRight.clone().lerp(bottomLeft, 0.62);
+  const cyan = new CurvePath();
+  cyan.add(new LineCurve3(bottomLeft, topLeft));
+  cyan.add(new LineCurve3(topLeft, cyanEnd));
+  const violet = new CurvePath();
+  violet.add(new LineCurve3(violetStart, topRight));
+  violet.add(new LineCurve3(topRight, bottomRight));
+  violet.add(new LineCurve3(bottomRight, violetEnd));
+  return { cyan, violet };
 }
 
 function disposeMaterial(material, disposedMaterials) {
@@ -227,11 +242,12 @@ export function createHeroThreeScene({
   const scene = new Scene();
   const camera = new PerspectiveCamera(CAMERA_FOV, 1, 0.1, 48);
   const panelGroup = new Group();
+  const railGroup = new Group();
   const panelGeometry = new RoundedBoxGeometry(1, 1, 0.06, 8, 0.06);
   const panelMaterial = new MeshBasicMaterial({
     color: 0x041424,
     transparent: true,
-    opacity: 0.12,
+    opacity: 0.04,
     depthWrite: false,
     side: DoubleSide,
   });
@@ -266,7 +282,7 @@ export function createHeroThreeScene({
   const floorMaterial = new MeshBasicMaterial({
     color: 0x030917,
     transparent: true,
-    opacity: 0.72,
+    opacity: 0.06,
     depthWrite: false,
     side: DoubleSide,
   });
@@ -293,25 +309,24 @@ export function createHeroThreeScene({
     const pulse = isStaticMode() ? 1 : 0.89 + Math.sin(elapsed / RAIL_PULSE_MS * Math.PI * 2) * 0.11;
     const intensity = fade * pulse;
 
-    setObjectOpacity(cyanCoreMaterial, 0.98 * intensity);
-    setObjectOpacity(cyanGlowMaterial, 0.32 * intensity);
-    setObjectOpacity(violetCoreMaterial, 0.88 * intensity);
-    setObjectOpacity(violetGlowMaterial, 0.28 * intensity);
+    setObjectOpacity(cyanCoreMaterial, 0.28 * intensity);
+    setObjectOpacity(cyanGlowMaterial, 0.09 * intensity);
+    setObjectOpacity(violetCoreMaterial, 0.25 * intensity);
+    setObjectOpacity(violetGlowMaterial, 0.08 * intensity);
   }
 
   function removeRailMeshes() {
     for (const mesh of railMeshes) {
-      panelGroup.remove(mesh);
+      railGroup.remove(mesh);
       mesh.geometry.dispose();
     }
     railMeshes = [];
   }
 
-  function rebuildRailGeometry(width, height, depth) {
+  function rebuildRailGeometry(sceneQuad) {
     removeRailMeshes();
 
-    const cyanCurve = createRailCurve(width, height, depth, "cyan");
-    const violetCurve = createRailCurve(width, height, depth, "violet");
+    const { cyan: cyanCurve, violet: violetCurve } = createRailCurvesFromQuad(sceneQuad);
     railMeshes = [
       createRailMesh(cyanCurve, 0.016, cyanCoreMaterial),
       createRailMesh(cyanCurve, 0.05, cyanGlowMaterial),
@@ -321,7 +336,7 @@ export function createHeroThreeScene({
 
     for (const mesh of railMeshes) {
       mesh.renderOrder = 6;
-      panelGroup.add(mesh);
+      railGroup.add(mesh);
     }
   }
 
@@ -344,6 +359,7 @@ export function createHeroThreeScene({
     const rendererAttributes = renderer.getContextAttributes?.();
     const shouldUseBloom = !state.postprocessFallback
       && !isMobilePose(state.poseName)
+      && !state.reducedMotion
       && rendererAttributes?.alpha === true;
 
     if (state.shouldUseBloom === shouldUseBloom) return;
@@ -366,7 +382,7 @@ export function createHeroThreeScene({
   function syncSceneGeometry() {
     const heroRect = heroElement.getBoundingClientRect();
     const workbenchRect = workbenchElement.getBoundingClientRect();
-    const mappedPanel = mapWorkbenchRectToScene(workbenchRect, heroRect, camera);
+    const mappedPanel = mapWorkbenchRectToScene(workbenchElement, workbenchRect, heroRect, camera);
     const pose = HERO_PANEL_POSES[state.poseName];
     const panelDepth = Math.max(0.08, pose.depth * mappedPanel.unitsPerPixel * 0.24);
     const floorWidth = Math.max(mappedPanel.width * 1.5, 4.4);
@@ -374,13 +390,15 @@ export function createHeroThreeScene({
     const floorY = mappedPanel.centerY - mappedPanel.height * 0.5 - 0.14;
 
     panelGroup.position.set(mappedPanel.centerX, mappedPanel.centerY, 0);
-    panelGroup.rotation.set(
-      MathUtils.degToRad(pose.rotateX),
-      MathUtils.degToRad(pose.rotateY),
-      MathUtils.degToRad(pose.rotateZ),
-    );
+    panelGroup.rotation.set(0, 0, 0);
     panelProxy.scale.set(mappedPanel.width, mappedPanel.height, panelDepth / 0.06);
-    rebuildRailGeometry(mappedPanel.width, mappedPanel.height, panelDepth);
+    rebuildRailGeometry(mappedPanel.sceneQuad);
+    const projectedQuad = mappedPanel.sceneQuad.map((point) => projectScenePointToScreen(point, heroRect, camera));
+    const alignmentError = Math.max(...projectedQuad.flatMap((point, index) => [
+      Math.abs(point.x - mappedPanel.screenQuad[index].x),
+      Math.abs(point.y - mappedPanel.screenQuad[index].y),
+    ]));
+    mountElement.dataset.threeAlignmentError = alignmentError.toFixed(2);
 
     reflector.position.set(mappedPanel.centerX, floorY, -panelDepth * 1.8);
     reflector.scale.set(floorWidth, floorDepth, 1);
@@ -402,7 +420,7 @@ export function createHeroThreeScene({
   function renderScene() {
     if (state.disposed) return;
 
-    if (state.shouldUseBloom) {
+    if (!state.postprocessFallback) {
       try {
         composer.render();
         return;
@@ -491,6 +509,7 @@ export function createHeroThreeScene({
 
     if (state.reducedMotion === nextValue) return;
     state.reducedMotion = nextValue;
+    syncBloomMode();
     renderAt(performance.now());
     if (isStaticMode()) stopLoop();
     else startLoop();
@@ -555,6 +574,7 @@ export function createHeroThreeScene({
     panelProxy.renderOrder = 4;
     panelGroup.add(panelProxy);
     scene.add(panelGroup);
+    scene.add(railGroup);
 
     floor.rotation.x = -Math.PI * 0.5;
     floor.renderOrder = 0;
@@ -568,7 +588,8 @@ export function createHeroThreeScene({
     });
     reflector.rotation.x = -Math.PI * 0.5;
     reflector.material.transparent = true;
-    reflector.material.opacity = 0.54;
+    reflector.material.opacity = 0.68;
+    reflector.material.blending = AdditiveBlending;
     reflector.material.depthWrite = false;
     reflector.renderOrder = 1;
     scene.add(reflector);

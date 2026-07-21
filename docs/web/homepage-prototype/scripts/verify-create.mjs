@@ -71,6 +71,7 @@ if (process.env.CREATE_SCAN_ONLY === "1") process.exit(0);
 
 const browser = await chromium.launch({ executablePath, headless: true });
 const page = await browser.newPage({ viewport: { width: 1487, height: 1058 } });
+await page.addInitScript(() => localStorage.setItem("narrato.locale", "zh-CN"));
 page.setDefaultTimeout(8000);
 const failures = [];
 const apiRequests = [];

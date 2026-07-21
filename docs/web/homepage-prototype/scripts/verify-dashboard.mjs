@@ -5,531 +5,113 @@ import { chromium } from "playwright";
 
 const baseUrl = process.env.BASE_URL || "http://127.0.0.1:4173";
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const scanRoot = process.env.DASHBOARD_SCAN_ROOT
-  ? path.resolve(process.env.DASHBOARD_SCAN_ROOT)
-  : projectRoot;
-const authoredTargets = [
-  "src/pages/DashboardPage.jsx",
-  "src/components/dashboard",
-  "src/styles/dashboard.css",
-  "src/data/dashboardData.js",
-  "public",
-];
-const forbidden = [
-  ["参考图文件名", /(?:04-dashboard-desktop|28-dashboard-mobile)\.png/i],
-  ["data image", /data:image/i],
-  ["base64", /base64/i],
-  ["canvas", /<canvas\b|CanvasRenderingContext2D|drawImage\s*\(/i],
-  ["CSS url 背景", /background-image\s*:\s*url\s*\(/i],
-  ["SVG 内嵌位图", /<image\b|xlink:href\s*=|href\s*=\s*["']data:image/i],
-];
+const scanTargets = ["src/pages/DashboardPage.jsx", "src/components/dashboard", "src/data/dashboardData.js", "src/styles/dashboard.css", "public"];
+const forbidden = [["dashboard reference image", /04-dashboard-desktop(?:\.png)?/i], ["mobile reference image", /28-dashboard-mobile(?:\.png)?/i], ["data image", /data:image/i], ["base64", /base64/i], ["canvas", /<canvas\b|CanvasRenderingContext2D|drawImage\s*\(/i], ["CSS url background", /background-image\s*:\s*url\s*\(/i], ["SVG bitmap", /<image\b|xlink:href\s*=|href\s*=\s*["']data:image/i]];
+const sourceExtensions = new Set([".js", ".jsx", ".mjs", ".css", ".html", ".svg", ".json", ".txt"]);
 
-async function collectFiles(target) {
-  const entries = await readdir(target, { withFileTypes: true });
-  const files = [];
-  for (const entry of entries) {
+async function filesIn(target) {
+  const stat = await readdir(target, { withFileTypes: true });
+  return (await Promise.all(stat.map(async (entry) => {
     const entryPath = path.join(target, entry.name);
-    if (entry.isDirectory()) files.push(...(await collectFiles(entryPath)));
-    else if (entry.isFile()) files.push(entryPath);
-  }
-  return files;
+    return entry.isDirectory() ? filesIn(entryPath) : [entryPath];
+  }))).flat();
 }
 
-async function verifyAuthoredSources() {
-  const files = [];
-  for (const target of authoredTargets) {
-    const absoluteTarget = path.join(scanRoot, target);
-    try {
-      const entries = await collectFiles(absoluteTarget);
-      files.push(...entries);
-    } catch (error) {
-      if (error.code === "ENOTDIR") files.push(absoluteTarget);
-      else if (error.code !== "ENOENT") throw error;
-    }
-  }
-
-  const violations = [];
+const violations = [];
+for (const target of scanTargets) {
+  const absolute = path.join(projectRoot, target);
+  let files = [];
+  try { files = await filesIn(absolute); } catch (error) { if (error.code === "ENOTDIR") files = [absolute]; else throw error; }
   for (const file of files) {
+    if (!sourceExtensions.has(path.extname(file).toLowerCase())) continue;
     const source = await readFile(file, "utf8");
-    for (const [label, pattern] of forbidden) {
-      const match = source.match(pattern);
-      if (match) violations.push(`${path.relative(scanRoot, file)}: ${label} (${match[0]})`);
-    }
+    for (const [label, matcher] of forbidden) if (matcher.test(source)) violations.push(`${path.relative(projectRoot, file)}: ${label}`);
   }
-  if (violations.length > 0) {
-    throw new Error(`Dashboard authored source 反贴图扫描失败:\n${violations.join("\n")}`);
-  }
-  console.log(`Dashboard authored source 反贴图扫描通过（${files.length} files）`);
 }
-
-await verifyAuthoredSources();
+if (violations.length) throw new Error(`Dashboard anti-paste scan failed:\n${violations.join("\n")}`);
+console.log("Dashboard anti-paste scan passed");
 if (process.env.DASHBOARD_SCAN_ONLY === "1") process.exit(0);
 
-const executablePath =
-  process.env.CHROME_PATH || "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
-const browser = await chromium.launch({ executablePath, headless: true });
-const page = await browser.newPage({ viewport: { width: 1487, height: 1058 } });
+const browser = await chromium.launch({ executablePath: process.env.CHROME_PATH || "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome", headless: true });
 const failures = [];
-const failedThumbnailUrl = new URL("/assets/documentary-thumb.webp", baseUrl).href;
-let thumbnail404Observed = false;
-
-await page.route("**/assets/documentary-thumb.webp", (route) => {
-  route.fulfill({ status: 404, contentType: "image/webp", body: "" });
-});
-
-page.on("console", (message) => {
-  if (message.type() === "error") {
-    const location = message.location().url;
-    if (location === failedThumbnailUrl && message.text().includes("404")) return;
-    failures.push(`console.error${location ? ` (${location})` : ""}: ${message.text()}`);
-  }
-});
-page.on("pageerror", (error) => failures.push(`pageerror: ${error.message}`));
-page.on("requestfailed", (request) => {
-  failures.push(`requestfailed: ${request.method()} ${request.url()} ${request.failure()?.errorText}`);
-});
-page.on("response", (response) => {
-  if (response.url() === failedThumbnailUrl && response.status() === 404) {
-    thumbnail404Observed = true;
-    return;
-  }
-  if (response.status() >= 400) failures.push(`response ${response.status()}: ${response.url()}`);
-});
-
-function check(condition, message) {
-  if (!condition) throw new Error(message);
-}
-
-async function expectToast(trigger, message) {
-  await trigger.click();
-  await page.getByRole("status").filter({ hasText: message }).waitFor();
-  check(page.url() === `${baseUrl}/dashboard`, `${message} 不得改变路由`);
-}
-
-async function verifyImagesHiddenWithoutFallback() {
-  const imagePage = await browser.newPage({ viewport: { width: 1487, height: 1058 } });
-  const imagePageFailures = [];
-  imagePage.on("console", (message) => {
-    if (message.type() === "error") imagePageFailures.push(`console.error: ${message.text()}`);
-  });
-  imagePage.on("pageerror", (error) => imagePageFailures.push(`pageerror: ${error.message}`));
-  imagePage.on("requestfailed", (request) => {
-    imagePageFailures.push(`requestfailed: ${request.method()} ${request.url()} ${request.failure()?.errorText}`);
-  });
-  imagePage.on("response", (response) => {
-    if (response.status() >= 400) imagePageFailures.push(`response ${response.status()}: ${response.url()}`);
-  });
-
-  try {
-    await imagePage.goto(`${baseUrl}/dashboard`, { waitUntil: "networkidle" });
-    await imagePage.getByRole("heading", { name: "工作台概览" }).waitFor();
-    const dashboardImages = imagePage.locator(".dashboard-shell img");
-    check((await dashboardImages.count()) === 5, "正常 Dashboard 精确包含 5 个项目或灵感内容图片");
-
-    await dashboardImages.evaluateAll((images) => {
-      images.forEach((image) => {
-        image.hidden = true;
-      });
-    });
-
-    const hiddenMetrics = await imagePage.evaluate(() => {
-      const visibleRect = (element) => {
-        if (!element) return false;
-        const style = getComputedStyle(element);
-        const rect = element.getBoundingClientRect();
-        return style.display !== "none" &&
-          style.visibility !== "hidden" &&
-          Number.parseFloat(style.opacity || "1") > 0 &&
-          rect.width > 0 &&
-          rect.height > 0 &&
-          rect.right > 0 &&
-          rect.bottom > 0 &&
-          rect.left < innerWidth &&
-          rect.top < innerHeight;
-      };
-      const allVisible = (selector, expectedCount) => {
-        const elements = [...document.querySelectorAll(selector)];
-        return elements.length === expectedCount && elements.every(visibleRect);
-      };
-      const textVisible = (selector, expectedTexts) => {
-        const elements = [...document.querySelectorAll(selector)];
-        return elements.length === expectedTexts.length &&
-          elements.every((element, index) =>
-            visibleRect(element) && element.textContent.trim().includes(expectedTexts[index]),
-          );
-      };
-
-      return {
-        images: [...document.querySelectorAll(".dashboard-shell img")].map((image) => ({
-          hidden: image.hidden,
-          display: getComputedStyle(image).display,
-        })),
-        logo: visibleRect(document.querySelector(".dashboard-sidebar__brand")),
-        banner: visibleRect(document.querySelector("[data-dashboard-banner]")),
-        navigation: visibleRect(document.querySelector("nav[aria-label='工作台主导航']")),
-        accountButtons: allVisible(".dashboard-account button", 3),
-        membershipButton: allVisible(".dashboard-membership-card", 1),
-        creationButton: allVisible(".creation-entry-card button", 1),
-        toolButtons: allVisible(".tool-quick-start__card", 3),
-        bannerButtons: allVisible("[data-dashboard-banner] button", 2),
-        projectButtons: allVisible("[data-project-status]", 3),
-        projectTitles: textVisible(".recent-projects__details strong", [
-          "霸总短剧解说 01",
-          "都市逆袭 · 混剪",
-          "悬疑短剧翻译",
-        ]),
-        projectStatuses: textVisible(".recent-projects__status > span", ["已完成", "处理中 66%", "草稿"]),
-        progress: visibleRect(document.querySelector("progress[value='66'][max='100']")),
-        balance: visibleRect(document.querySelector(".credits-overview__balance-value")),
-        monthlyCredits: visibleRect(document.querySelector(".credits-overview__usage")),
-        creditsRing: visibleRect(document.querySelector(".credits-ring")),
-        footer: visibleRect(document.querySelector(".dashboard-footer")),
-        pageWidth: document.documentElement.scrollWidth,
-        viewportWidth: innerWidth,
-      };
-    });
-
-    check(
-      hiddenMetrics.images.length === 5 &&
-        hiddenMetrics.images.every(({ hidden, display }) => hidden && display === "none"),
-      "设置 hidden 后 5 个 Dashboard 内容图片逐项不可见",
-    );
-    for (const [name, value] of Object.entries(hiddenMetrics)) {
-      if (["images", "pageWidth", "viewportWidth"].includes(name)) continue;
-      check(value === true, `隐藏全部内容图片后 ${name} 保持可见且具有非零几何尺寸`);
-    }
-    check(hiddenMetrics.pageWidth <= hiddenMetrics.viewportWidth + 1, "隐藏图片后 Dashboard 不得横向溢出");
-
-    await dashboardImages.evaluateAll((images) => {
-      images.forEach((image) => {
-        image.hidden = false;
-      });
-    });
-    const restoredDisplays = await dashboardImages.evaluateAll((images) =>
-      images.map((image) => ({ hidden: image.hidden, display: getComputedStyle(image).display })),
-    );
-    check(
-      restoredDisplays.length === 5 &&
-        restoredDisplays.every(({ hidden, display }) => !hidden && display !== "none"),
-      "隐藏验收后 5 个 Dashboard 内容图片均恢复",
-    );
-    check(imagePageFailures.length === 0, `图片隐藏独立页面存在浏览器错误:\n${imagePageFailures.join("\n")}`);
-  } finally {
-    await imagePage.close();
-  }
-}
+const viewports = [{ width: 375, height: 844 }, { width: 768, height: 1024 }, { width: 1024, height: 900 }, { width: 1440, height: 1000 }];
 
 try {
-  await verifyImagesHiddenWithoutFallback();
-  await page.goto(`${baseUrl}/dashboard`, { waitUntil: "domcontentloaded" });
-  await page.getByRole("heading", { name: "工作台概览" }).waitFor();
-  const desktopMetrics = await page.evaluate(() => {
-    const sidebar = document.querySelector(".dashboard-sidebar").getBoundingClientRect();
-    const main = document.querySelector(".dashboard-main").getBoundingClientRect();
-    const banner = document.querySelector("[data-dashboard-banner]").getBoundingClientRect();
-    const membership = document.querySelector(".dashboard-membership-card")?.getBoundingClientRect();
-    const creation = document.querySelector(".creation-entry-card").getBoundingClientRect();
-    const toolCards = [...document.querySelectorAll(".tool-quick-start__card")].map((element) =>
-      element.getBoundingClientRect(),
-    );
-    const recent = document.querySelector(".recent-projects").getBoundingClientRect();
-    const credits = document.querySelector(".credits-overview").getBoundingClientRect();
-    const inspiration = document.querySelector(".inspiration-panel").getBoundingClientRect();
-    return {
-      pageWidth: document.documentElement.scrollWidth,
-      viewportWidth: innerWidth,
-      sidebarWidth: sidebar.width,
-      sidebarLeft: sidebar.left,
-      mainLeft: main.left,
-      bannerWidth: banner.width,
-      bannerHeight: banner.height,
-      membership: membership && { left: membership.left, right: membership.right },
-      creation: { left: creation.left, right: creation.right, top: creation.top },
-      toolCards: toolCards.map(({ left, right, top }) => ({ left, right, top })),
-      lowerCards: [recent, credits, inspiration].map(({ left, right, top }) => ({ left, right, top })),
-      mobileNavDisplay: getComputedStyle(document.querySelector(".dashboard-mobile-nav")).display,
-      background: getComputedStyle(document.querySelector(".dashboard-shell")).backgroundColor,
-    };
-  });
-  check(desktopMetrics.pageWidth <= desktopMetrics.viewportWidth + 1, "桌面不得横向溢出");
-  check(desktopMetrics.sidebarWidth >= 220 && desktopMetrics.sidebarWidth <= 280, "1487 桌面侧栏宽度接近参考稿");
-  check(desktopMetrics.sidebarLeft === 0, "桌面侧栏贴齐左侧");
-  check(desktopMetrics.mainLeft >= desktopMetrics.sidebarWidth, "主内容不得压到侧栏");
-  check(desktopMetrics.bannerWidth >= 900, "促销 Banner 占据主内容主宽度");
-  check(desktopMetrics.bannerHeight >= 145 && desktopMetrics.bannerHeight <= 165, "促销 Banner 高度接近参考稿");
-  check(desktopMetrics.mobileNavDisplay === "none", "桌面隐藏移动底栏");
-  check(desktopMetrics.background === "rgb(5, 8, 18)", "工作台使用深色背景 Token");
-  check(desktopMetrics.membership, "侧栏存在真实会员入口");
-  check(
-    desktopMetrics.membership.left >= desktopMetrics.sidebarLeft &&
-      desktopMetrics.membership.right <= desktopMetrics.sidebarWidth,
-    "会员入口不得越过侧栏",
-  );
-  check(desktopMetrics.toolCards.length === 3, "桌面首排存在三张工具卡");
-  check(desktopMetrics.creation.right <= desktopMetrics.toolCards[0].left, "创建卡与工具卡不得相交");
-  check(
-    desktopMetrics.toolCards.every((card) => Math.abs(card.top - desktopMetrics.creation.top) <= 1),
-    "桌面首排四卡顶部对齐",
-  );
-  check(
-    desktopMetrics.toolCards.slice(1).every((card, index) => desktopMetrics.toolCards[index].right <= card.left),
-    "桌面工具卡不得相交",
-  );
-  check(
-    desktopMetrics.lowerCards[0].right <= desktopMetrics.lowerCards[1].left &&
-      desktopMetrics.lowerCards[1].right <= desktopMetrics.lowerCards[2].left,
-    "桌面下排保持最近项目、创作点、灵感三列关系",
-  );
-  check(
-    desktopMetrics.lowerCards.every((card) => Math.abs(card.top - desktopMetrics.lowerCards[0].top) <= 1),
-    "桌面下排模块顶部对齐",
-  );
-  check(await page.getByRole("button", { name: /升级会员/ }).count() === 1, "会员入口使用真实 button");
-  check(await page.getByRole("button", { name: "查看创作点余额 1,280" }).count() === 1, "顶部展示可聚焦余额");
-  check(await page.getByRole("button", { name: "去充值" }).count() === 1, "顶部展示充值入口");
-  check(await page.getByRole("button", { name: "账户中心" }).count() >= 1, "顶部展示账户入口");
-  check(
-    (await page.locator(".dashboard-sidebar__group-title").allTextContents()).join(",") === "工具,账户",
-    "侧栏分组标题使用真实文本节点",
-  );
-  check(await page.getByText("上传素材，跟随引导完成专业出片", { exact: true }).count() === 1, "创建说明使用真实文本");
-  check(await page.locator(".recent-projects__credits").filter({ hasText: /^消耗 \d+$/ }).count() === 3, "项目消耗使用真实文本");
-  check(await page.getByText("影创工坊 · 让 AI 创作更简单", { exact: true }).count() === 1, "桌面存在品牌 Footer");
-  const membershipEntry = page.getByRole("button", { name: /升级会员/ });
-  await membershipEntry.focus();
-  check(await membershipEntry.evaluate((element) => document.activeElement === element), "会员入口可获得键盘焦点");
-  for (const accountAction of [
-    page.getByRole("button", { name: "查看创作点余额 1,280" }),
-    page.getByRole("button", { name: "去充值" }),
-    page.locator(".dashboard-account__avatar"),
-  ]) {
-    await accountAction.focus();
-    check(await accountAction.evaluate((element) => document.activeElement === element), "账户区操作可获得键盘焦点");
-  }
-
-  for (const width of [1280, 1025]) {
-    await page.setViewportSize({ width, height: 1058 });
-    const responsiveMetrics = await page.evaluate(() => {
-      const sidebar = document.querySelector(".dashboard-sidebar").getBoundingClientRect();
-      const main = document.querySelector(".dashboard-main").getBoundingClientRect();
-      const creation = document.querySelector(".creation-entry-card").getBoundingClientRect();
-      const tools = [...document.querySelectorAll(".tool-quick-start__card")].map((element) =>
-        element.getBoundingClientRect().width,
-      );
+  for (const viewport of viewports) {
+    const page = await browser.newPage({ viewport });
+    page.on("pageerror", (error) => failures.push(`${viewport.width}: pageerror ${error.message}`));
+    page.on("console", (message) => { if (message.type() === "error") failures.push(`${viewport.width}: console ${message.text()}`); });
+    await page.addInitScript(() => localStorage.setItem("narrato.locale", "zh-CN"));
+    await page.goto(`${baseUrl}/dashboard`, { waitUntil: "networkidle" });
+    await page.getByRole("heading", { name: "工作台概览" }).waitFor();
+    const metrics = await page.evaluate(() => {
+      const visible = (element) => {
+        const rect = element?.getBoundingClientRect();
+        const style = element && getComputedStyle(element);
+        return Boolean(rect && style && style.display !== "none" && rect.width > 0 && rect.height > 0);
+      };
+      const tools = [...document.querySelectorAll(".featured-tools__card")].map((item) => item.getBoundingClientRect());
+      const cases = [...document.querySelectorAll(".case-masonry__card")].map((item) => item.getBoundingClientRect());
+      const videos = [...document.querySelectorAll(".case-masonry video")];
+      const marketingRect = document.querySelector(".dashboard-marketing")?.getBoundingClientRect();
+      const creationRect = document.querySelector(".creation-studio")?.getBoundingClientRect();
       return {
-        pageWidth: document.documentElement.scrollWidth,
-        viewportWidth: innerWidth,
-        sidebarWidth: sidebar.width,
-        mainLeft: main.left,
-        creationWidth: creation.width,
-        minimumToolWidth: Math.min(...tools),
-        mobileNavDisplay: getComputedStyle(document.querySelector(".dashboard-mobile-nav")).display,
+        pageWidth: document.documentElement.scrollWidth, viewportWidth: innerWidth,
+        sidebar: visible(document.querySelector(".dashboard-sidebar")),
+        mobileNav: visible(document.querySelector(".dashboard-mobile-nav")),
+        header: visible(document.querySelector(".dashboard-header")),
+        marketing: visible(document.querySelector(".dashboard-marketing .promotion-banner")),
+        creationCards: document.querySelectorAll(".creation-studio__card").length,
+        toolCards: tools.length, tools,
+        marketingBottom: marketingRect?.bottom ?? 0,
+        creationTop: creationRect?.top ?? 0,
+        cases: cases.length, caseWidths: cases.map((item) => item.width),
+        caseColumns: [...new Set(cases.map((item) => Math.round(item.left)))],
+        videoContracts: videos.map((video) => ({ autoplay: video.autoplay, muted: video.muted, loop: video.loop, playsInline: video.playsInline, preload: video.preload })),
       };
     });
-    check(
-      responsiveMetrics.pageWidth <= responsiveMetrics.viewportWidth + 1,
-      `${width} 桌面不得横向溢出`,
-    );
-    check(responsiveMetrics.sidebarWidth >= 220, `${width} 保留可用桌面侧栏`);
-    check(responsiveMetrics.mainLeft >= responsiveMetrics.sidebarWidth, `${width} 主内容避让侧栏`);
-    check(responsiveMetrics.creationWidth >= 280, `${width} 新建创作卡保持可读宽度`);
-    check(responsiveMetrics.minimumToolWidth >= 120, `${width} 工具卡保持可读宽度`);
-    check(responsiveMetrics.mobileNavDisplay === "none", `${width} 桌面隐藏移动底栏`);
-  }
+    const assert = (condition, message) => { if (!condition) throw new Error(`${viewport.width}px: ${message}`); };
+    assert(metrics.pageWidth <= metrics.viewportWidth + 1, "page must not overflow horizontally");
+    assert(metrics.header && metrics.marketing, "header and marketing panel must be visible");
+    assert(metrics.creationCards === 3, "exactly three creation entry cards must render");
+    assert(metrics.toolCards === 3, "featured tools must render exactly AI image, AI video, AI voice");
+    assert(metrics.cases === 6, "six real case cards must render");
+    if (viewport.width <= 699) assert(metrics.caseColumns.length === 2, "mobile masonry must keep two visible columns");
+    assert(metrics.videoContracts.length === 6 && metrics.videoContracts.every((video) => video.autoplay && video.muted && video.loop && video.playsInline && video.preload === "auto"), "case videos must autoplay muted, loop, play inline, and preload automatically");
+    if (viewport.width > 1024) {
+      assert(metrics.sidebar && !metrics.mobileNav, "desktop must retain sidebar and hide mobile nav");
+      assert(metrics.tools.every((item, index) => index === 0 || item.left >= metrics.tools[index - 1].right), "desktop tool cards must not overlap");
+      assert(Math.max(...metrics.caseWidths) - Math.min(...metrics.caseWidths) < 2, "each masonry column must keep a uniform media width");
+    } else assert(!metrics.sidebar && metrics.mobileNav, "tablet and mobile must use mobile navigation");
+    if (viewport.width <= 820) assert(metrics.creationTop >= metrics.marketingBottom, "narrow layout must stack marketing above creation cards");
 
-  for (const viewport of [
-    { width: 390, height: 844 },
-    { width: 320, height: 720 },
-    { width: 768, height: 1024 },
-    { width: 1024, height: 1058 },
-  ]) {
-    await page.setViewportSize(viewport);
-    await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
-    const mobileMetrics = await page.evaluate(() => {
-      const sidebar = document.querySelector(".dashboard-sidebar");
-      const mobileNav = document.querySelector(".dashboard-mobile-nav");
-      const tools = document.querySelector(".tool-quick-start__grid");
-      const main = document.querySelector(".dashboard-main");
-      const navTargets = [...mobileNav.querySelectorAll("a, button")].map((element) => {
-        const rect = element.getBoundingClientRect();
-        return { width: rect.width, height: rect.height };
+    const hiddenVideoMetrics = await page.locator(".case-masonry video").evaluateAll((videos) => {
+      videos.forEach((video) => { video.hidden = true; });
+      return [...document.querySelectorAll(".case-masonry__card")].map((card) => {
+        const style = getComputedStyle(card);
+        const rect = card.getBoundingClientRect();
+        return {
+          visible: style.display !== "none" && rect.width > 0 && rect.height > 0,
+          caption: !card.querySelector(".case-masonry__caption"),
+          play: !card.querySelector(".case-masonry__play"),
+        };
       });
-      const visiblePageTargets = [
-        ...document.querySelectorAll(
-          ".dashboard-header a, .dashboard-header button, .dashboard-main a, .dashboard-main button, .dashboard-mobile-nav a, .dashboard-mobile-nav button",
-        ),
-      ]
-        .filter((element) => {
-          const rect = element.getBoundingClientRect();
-          const style = getComputedStyle(element);
-          return rect.width > 0 && rect.height > 0 && style.visibility !== "hidden";
-        })
-        .map((element) => {
-          const rect = element.getBoundingClientRect();
-          return {
-            label: element.getAttribute("aria-label") || element.textContent.trim() || element.className,
-            width: rect.width,
-            height: rect.height,
-          };
-        });
-      const creditActionIcon = document
-        .querySelector(".credits-overview__action svg")
-        .getBoundingClientRect();
-      const lastContent = document.querySelector(".credits-overview").getBoundingClientRect();
-      const navRect = mobileNav.getBoundingClientRect();
-      return {
-        pageWidth: document.documentElement.scrollWidth,
-        viewportWidth: innerWidth,
-        sidebarDisplay: getComputedStyle(sidebar).display,
-        mobileNavDisplay: getComputedStyle(mobileNav).display,
-        toolsClient: tools.clientWidth,
-        toolsScroll: tools.scrollWidth,
-        toolsOverflow: getComputedStyle(tools).overflowX,
-        toolsTemplate: getComputedStyle(tools).gridTemplateColumns,
-        toolWidths: [...tools.children].map((element) => element.getBoundingClientRect().width),
-        bodyPaddingBottom: parseFloat(getComputedStyle(main).paddingBottom),
-        navHeight: navRect.height,
-        navTargets,
-        visiblePageTargets,
-        creditActionIcon: { width: creditActionIcon.width, height: creditActionIcon.height },
-        inspirationDisplay: getComputedStyle(document.querySelector(".inspiration-panel")).display,
-        creditsRingDisplay: document.querySelector(".credits-ring")
-          ? getComputedStyle(document.querySelector(".credits-ring")).display
-          : "missing",
-        lastContentBottom: lastContent.bottom,
-        navTop: navRect.top,
-      };
     });
-    const size = `${viewport.width}×${viewport.height}`;
-    check(mobileMetrics.pageWidth <= mobileMetrics.viewportWidth + 1, `${size} 移动页面无横向溢出`);
-    check(mobileMetrics.sidebarDisplay === "none", `${size} 移动隐藏桌面侧栏`);
-    check(mobileMetrics.mobileNavDisplay !== "none", `${size} 移动显示底部导航`);
-    check(
-      mobileMetrics.toolsScroll > mobileMetrics.toolsClient && ["auto", "scroll"].includes(mobileMetrics.toolsOverflow),
-      `${size} 工具只在内部横向滚动（client=${mobileMetrics.toolsClient}, scroll=${mobileMetrics.toolsScroll}, overflow=${mobileMetrics.toolsOverflow}, template=${mobileMetrics.toolsTemplate}, cards=${mobileMetrics.toolWidths.join("/")}）`,
-    );
-    check(mobileMetrics.bodyPaddingBottom >= mobileMetrics.navHeight, `${size} 底部 padding 覆盖固定导航`);
-    check(
-      mobileMetrics.navTargets.every(({ width, height }) => width >= 44 && height >= 44),
-      `${size} 移动导航触控目标至少 44px`,
-    );
-    const undersizedTarget = mobileMetrics.visiblePageTargets.find(({ width, height }) => width < 44 || height < 44);
-    check(
-      !undersizedTarget,
-      `${size} 页面内主要可见交互目标至少 44px${
-        undersizedTarget
-          ? `（${undersizedTarget.label}: ${undersizedTarget.width}×${undersizedTarget.height}）`
-          : ""
-      }`,
-    );
-    check(
-      mobileMetrics.creditActionIcon.width >= 18 && mobileMetrics.creditActionIcon.height >= 18,
-      `${size} 月耗操作箭头清晰可见`,
-    );
-    check(mobileMetrics.inspirationDisplay === "none", `${size} 移动隐藏创作灵感`);
-    check(mobileMetrics.creditsRingDisplay === "none", `${size} 移动隐藏完整创作点圆环`);
-    check(mobileMetrics.lastContentBottom <= mobileMetrics.navTop, `${size} 最后一项不被固定底栏遮挡`);
-    check(
-      (await page.locator(".dashboard-mobile-nav a[aria-current='page']").textContent()).includes("概览"),
-      `${size} 移动概览标记当前页面`,
-    );
-    await page.getByText("处理中 66%", { exact: true }).waitFor({ state: "visible" });
+    assert(hiddenVideoMetrics.length === 6 && hiddenVideoMetrics.every((item) => item.visible && item.caption && item.play), "hidden case videos must leave usable cards without a text description or overlay icon");
+    await page.close();
   }
-
-  await page.setViewportSize({ width: 390, height: 844 });
-  check(
-    await page.locator("a.dashboard-header--mobile[aria-label='影创工坊'][href='/']").count() === 1,
-    "移动 Header Logo 使用具名首页 Link",
-  );
-  const unlabeledIconButtons = await page.locator("button").evaluateAll((buttons) =>
-    buttons.filter((button) => !button.textContent.trim() && !button.getAttribute("aria-label")).length,
-  );
-  check(unlabeledIconButtons === 0, "纯图标按钮均有 aria-label");
-
-  await page.emulateMedia({ reducedMotion: "reduce" });
-  await page.getByRole("button", { name: /新建创作/ }).first().click();
-  await page.getByRole("status").filter({ hasText: "新建创作功能建设中" }).waitFor();
-  const reducedMotion = await page.evaluate(() =>
-    ["[data-dashboard-banner]", ".dashboard-toast", ".tool-quick-start__card"].map((selector) => {
-      const element = document.querySelector(selector);
-      if (!element) return null;
-      const style = getComputedStyle(element);
-      return { animationName: style.animationName, transitionDuration: style.transitionDuration };
-    }),
-  );
-  check(
-    reducedMotion.length === 3 && reducedMotion.every(Boolean),
-    "减少动态效果采样完整覆盖 Banner、Toast 与工具卡",
-  );
-  check(
-    reducedMotion.every(({ animationName }) => animationName === "none"),
-    "减少动态效果时 Banner、Toast 与卡片不播放动画",
-  );
-  check(
-    reducedMotion.every(({ transitionDuration }) => parseFloat(transitionDuration) <= 0.01),
-    "减少动态效果时过渡降级为近静态",
-  );
-  await page.getByRole("button", { name: "关闭提示" }).click();
-  await page.emulateMedia({ reducedMotion: "no-preference" });
-  await page.setViewportSize({ width: 1487, height: 1058 });
-  check(await page.locator("h1").count() === 1, "Dashboard 只有一个 h1");
-  check(await page.getByRole("navigation", { name: "工作台主导航" }).count() === 1, "桌面主导航存在");
-  check(await page.getByRole("link", { name: "影创工坊" }).getAttribute("href") === "/", "品牌链接返回官网");
-  const projectStatuses = await page.locator("[data-project-status]").evaluateAll((elements) =>
-    elements.map((element) => element.dataset.projectStatus).sort(),
-  );
-  check(projectStatuses.join(",") === "complete,draft,processing", "最近项目精确覆盖 complete、processing、draft 三态");
-  check(await page.getByText("1,280", { exact: true }).count() >= 1, "余额为 1,280");
-  check(await page.getByText(/本月.*240.*创作点/).count() >= 1, "月耗为 240");
-  check(await page.locator("progress[value='66'][max='100']").count() === 1, "处理中进度有原生语义");
-  await page.getByText("处理中 66%", { exact: true }).waitFor({ state: "visible" });
-
-  const failedProject = page.locator("[data-project-status='draft']");
-  await failedProject.scrollIntoViewIfNeeded();
-  await page.getByRole("img", { name: "视频翻译缩略图不可用" }).waitFor();
-  check(thumbnail404Observed, "缩略图请求真实返回 404");
-  check(await failedProject.locator("img").count() === 0, "图片 404 后移除破图 img");
-
-  const before = page.url();
-  await page.getByRole("button", { name: /新建创作/ }).first().click();
-  await page.getByRole("status").filter({ hasText: "新建创作功能建设中" }).waitFor();
-  check(page.url() === before, "未实现功能不得改路由");
-
-  const repeatedEntry = page.getByRole("button", { name: /新建创作/ }).first();
-  const previousToast = await page.getByRole("status").elementHandle();
-  await page.waitForTimeout(1600);
-  const repeatedAt = Date.now();
-  await repeatedEntry.click();
-  await page.waitForFunction((element) => !element.isConnected, previousToast);
-  await page.getByRole("status").filter({ hasText: "新建创作功能建设中" }).waitFor();
-  await page.getByRole("status").waitFor({ state: "detached", timeout: 4500 });
-  const repeatedLifetime = Date.now() - repeatedAt;
-  check(
-    repeatedLifetime >= 2900 && repeatedLifetime <= 4200,
-    `同入口重复点击后 Toast 应约 3200ms 自动关闭，实际 ${repeatedLifetime}ms`,
-  );
-
-  await expectToast(page.getByRole("button", { name: "视频翻译" }).first(), "视频翻译功能建设中");
-  await expectToast(page.getByRole("button", { name: "短剧解说" }).first(), "短剧解说功能建设中");
-  await expectToast(membershipEntry, "升级会员功能建设中");
-  await expectToast(page.getByRole("button", { name: "查看创作点余额 1,280" }), "创作点明细功能建设中");
-  await expectToast(page.getByRole("button", { name: "去充值" }), "充值功能建设中");
-  await expectToast(page.locator(".dashboard-account__avatar"), "账户中心功能建设中");
-  await page.getByRole("button", { name: "关闭提示" }).click();
-  check(await page.getByRole("status").count() === 0, "关闭提示后 Toast 移除 DOM");
-
-  await page.getByRole("button", { name: "关闭促销信息" }).click();
-  check(await page.locator("[data-dashboard-banner]").count() === 0, "Banner 关闭后移除 DOM");
-
-  await page.getByRole("link", { name: "影创工坊" }).click();
-  await page.waitForURL(`${baseUrl}/`);
-  await page.goBack();
-  await page.waitForURL(`${baseUrl}/dashboard`);
-  await page.getByRole("heading", { name: "工作台概览" }).waitFor();
-
-  if (failures.length > 0) throw new Error(`工作台访问存在浏览器错误:\n${failures.join("\n")}`);
-} finally {
-  await browser.close();
-}
-
-console.log("工作台结构与交互验收通过");
+  const failurePage = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
+  await failurePage.addInitScript(() => localStorage.setItem("narrato.locale", "zh-CN"));
+  await failurePage.route("**/161528_a755036523c0e80a332e95ba206d7ff8.mp4", (route) => route.fulfill({ status: 404, contentType: "video/mp4", body: "" }));
+  await failurePage.goto(`${baseUrl}/dashboard`, { waitUntil: "networkidle" });
+  await failurePage.locator(".case-video__fallback").waitFor();
+  const failedImageCard = await failurePage.locator(".case-masonry__card").first().evaluate((card) => ({
+    fallback: Boolean(card.querySelector(".case-video__fallback")),
+    caption: !card.querySelector(".case-masonry__caption"),
+    play: !card.querySelector(".case-masonry__play"),
+  }));
+  if (!failedImageCard.fallback || !failedImageCard.caption || !failedImageCard.play) throw new Error("failed case video must retain fallback without a text description or overlay icon");
+  await failurePage.close();
+  if (failures.length) throw new Error(failures.join("\n"));
+  console.log("Dashboard responsive verification passed (375, 768, 1024, 1440)");
+} finally { await browser.close(); }

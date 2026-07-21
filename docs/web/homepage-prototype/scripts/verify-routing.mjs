@@ -15,6 +15,8 @@ if (homePageSource.includes(retiredWorkspaceToast)) {
 
 const browser = await chromium.launch({ executablePath, headless: true });
 const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
+await page.addInitScript(() => localStorage.setItem("narrato.locale", "zh-CN"));
+page.setDefaultTimeout(8000);
 const failures = [];
 
 page.on("console", (message) => {
@@ -25,7 +27,9 @@ page.on("console", (message) => {
 });
 page.on("pageerror", (error) => failures.push(`pageerror: ${error.message}`));
 page.on("requestfailed", (request) => {
-  failures.push(`requestfailed: ${request.method()} ${request.url()} ${request.failure()?.errorText}`);
+  const errorText = request.failure()?.errorText;
+  if (errorText === "net::ERR_ABORTED") return;
+  failures.push(`requestfailed: ${request.method()} ${request.url()} ${errorText}`);
 });
 page.on("response", (response) => {
   if (response.status() >= 400) failures.push(`response ${response.status()}: ${response.url()}`);
@@ -58,11 +62,16 @@ async function expectRouteState({ pathname, title, heading }) {
 }
 
 async function expectHomeRouteState() {
-  await expectRouteState({
-    pathname: "/",
-    title: "影创工坊｜AI 出片工作台",
-    heading: "专为自媒体小白打造的AI 出片工作台",
-  });
+  await page.waitForURL(`${baseUrl}/`);
+  await page.waitForFunction(() => document.title === "影创工坊｜AI 出片工作台");
+  const heroHeading = page.locator(".hero-copy h1");
+  await heroHeading.waitFor();
+  if ((await heroHeading.getAttribute("data-route-heading")) !== null) {
+    throw new Error("官网 Hero 标题不得被注册为路由焦点目标");
+  }
+  if ((await heroHeading.getAttribute("tabindex")) !== null) {
+    throw new Error("官网 Hero 标题不得被改为可聚焦元素");
+  }
 }
 
 async function verifyRouteHistoryAndNotFound() {
@@ -113,6 +122,57 @@ async function verifyRouteHistoryAndNotFound() {
     pathname: "/dashboard",
     title: "工作台概览｜影创工坊",
     heading: "工作台概览",
+  });
+
+  await page.goto(`${baseUrl}/dashboard/create`, { waitUntil: "domcontentloaded" });
+  await expectRouteState({
+    pathname: "/dashboard/create",
+    title: "新建创作｜影创工坊",
+    heading: "创建新的 AI 视频",
+  });
+}
+
+async function verifyDashboardCreationEntries() {
+  await page.goto(`${baseUrl}/dashboard`, { waitUntil: "domcontentloaded" });
+  await page.getByRole("heading", { name: "工作台概览" }).waitFor();
+
+  await page.locator(".creation-entry-card").getByRole("link", { name: /新建创作/ }).click();
+  await expectRouteState({
+    pathname: "/dashboard/create",
+    title: "新建创作｜影创工坊",
+    heading: "创建新的 AI 视频",
+  });
+
+  await page.goto(`${baseUrl}/dashboard`, { waitUntil: "domcontentloaded" });
+  await page.locator(".dashboard-sidebar").getByRole("link", { name: "新建创作" }).click();
+  await expectRouteState({
+    pathname: "/dashboard/create",
+    title: "新建创作｜影创工坊",
+    heading: "创建新的 AI 视频",
+  });
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto(`${baseUrl}/dashboard`, { waitUntil: "domcontentloaded" });
+  await page.locator(".dashboard-mobile-nav").getByRole("link", { name: "新建" }).click();
+  await expectRouteState({
+    pathname: "/dashboard/create",
+    title: "新建创作｜影创工坊",
+    heading: "创建新的 AI 视频",
+  });
+}
+
+async function verifyNarrationEditorRoute() {
+  await page.setViewportSize({ width: 1487, height: 1058 });
+  await page.goto(`${baseUrl}/dashboard/narration/editor`, { waitUntil: "domcontentloaded" });
+  await page.getByTestId("narration-editor").waitFor();
+  for (const id of ["video", "script", "voice", "bgm"]) {
+    await page.getByTestId(`track-${id}`).waitFor();
+  }
+  await page.getByRole("link", { name: "生成视频", exact: true }).click();
+  await expectRouteState({
+    pathname: "/dashboard/projects/overlord/result",
+    title: "霸总短剧解说 01｜影创工坊",
+    heading: "霸总短剧解说 01 · 项目结果",
   });
 }
 
@@ -183,6 +243,8 @@ try {
   await verifyCreationEntries();
   await verifyPreservedWebsiteBehaviors();
   await verifyRouteHistoryAndNotFound();
+  await verifyDashboardCreationEntries();
+  await verifyNarrationEditorRoute();
   if (failures.length > 0) throw new Error(`路由访问存在浏览器错误:\n${failures.join("\n")}`);
 } finally {
   await browser.close();

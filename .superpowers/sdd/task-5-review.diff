@@ -1,0 +1,879 @@
+diff -ruN /tmp/narrato-i18n/task5-before/src/components/narration/NarrationAnalysisBoard.jsx docs/web/homepage-prototype/src/components/narration/NarrationAnalysisBoard.jsx
+--- /tmp/narrato-i18n/task5-before/src/components/narration/NarrationAnalysisBoard.jsx	2026-07-15 22:29:22
++++ docs/web/homepage-prototype/src/components/narration/NarrationAnalysisBoard.jsx	2026-07-15 22:50:07
+@@ -1,20 +1,22 @@
+ import { ArrowsOutSimple, CaretLeft, CaretRight, CheckCircle, Crosshair, FileText, Sparkle, Star, UserCircle } from "@phosphor-icons/react";
++import { useI18n } from "../../i18n/useI18n.js";
+ 
+ const icons = { caption: FileText, book: Sparkle, target: Crosshair, star: Star };
+ const ORBIT_CIRCUMFERENCE = 911;
+ 
+ export function NarrationAnalysisBoard({ videos, stages, logs, progress, barGlowPosition, barGlowOpacity, isHolding, animationRefs, selectedIndex, onSelect, onOpen, onScroll, railRef }) {
++  const { formatNumber, t } = useI18n();
+   return <div className="analysis-layout">
+     <section className="analysis-card analysis-card--main" aria-labelledby="analysis-title">
+-      <h2 id="analysis-title">正在理解剧情并提取高光</h2>
+-      <div className="analysis-workflow">{stages.map((stage) => { const Icon = icons[stage.icon]; return <div className={`analysis-stage is-${stage.state}`} key={stage.title}><span className="analysis-stage__icon"><Icon /></span><div><strong>{stage.title}</strong><small>{stage.status}</small></div><span className="analysis-stage__state">{stage.state === "done" ? <CheckCircle weight="fill" /> : <i />}</span></div>; })}</div>
+-      <div className="analysis-orbit" aria-label={`AI 分析进度 ${progress}%`}><svg viewBox="0 0 320 320" aria-hidden="true"><circle className="analysis-orbit__track" cx="160" cy="160" r="145" /><circle className="analysis-orbit__pulse" ref={animationRefs.pulse} cx="160" cy="160" r="120" /><circle className="analysis-orbit__progress" ref={animationRefs.ring} cx="160" cy="160" r="145" transform="rotate(-90 160 160)" style={{ strokeDasharray: ORBIT_CIRCUMFERENCE, strokeDashoffset: ORBIT_CIRCUMFERENCE - (ORBIT_CIRCUMFERENCE * progress) / 100 }} /></svg><span className="analysis-orbit__halo" ref={animationRefs.halo} aria-hidden="true" /><div className="analysis-orbit__gem" ref={animationRefs.gem}>✦</div><strong>{progress}%</strong></div><p className="analysis-estimate">预计还需约 45 秒</p>
+-      <div className={`analysis-total ${isHolding ? "is-holding" : ""}`}><span>整体进度</span><div><i ref={animationRefs.bar} style={{ width: `${progress}%` }} /><em className="analysis-total__glow" style={{ left: `${barGlowPosition}%`, opacity: barGlowOpacity }} aria-hidden="true" /></div><b>{progress}%</b>{isHolding && <small>· 持续分析中</small>}</div>
++      <h2 id="analysis-title">{t("analysis.title")}</h2>
++      <div className="analysis-workflow">{stages.map((stage) => { const Icon = icons[stage.icon]; return <div className={`analysis-stage is-${stage.state}`} key={stage.id}><span className="analysis-stage__icon"><Icon /></span><div><strong>{t(stage.titleKey)}</strong><small>{t(stage.statusKey)}</small></div><span className="analysis-stage__state">{stage.state === "done" ? <CheckCircle weight="fill" /> : <i />}</span></div>; })}</div>
++      <div className="analysis-orbit" aria-label={t("analysis.progress", { progress })}><svg viewBox="0 0 320 320" aria-hidden="true"><circle className="analysis-orbit__track" cx="160" cy="160" r="145" /><circle className="analysis-orbit__pulse" ref={animationRefs.pulse} cx="160" cy="160" r="120" /><circle className="analysis-orbit__progress" ref={animationRefs.ring} cx="160" cy="160" r="145" transform="rotate(-90 160 160)" style={{ strokeDasharray: ORBIT_CIRCUMFERENCE, strokeDashoffset: ORBIT_CIRCUMFERENCE - (ORBIT_CIRCUMFERENCE * progress) / 100 }} /></svg><span className="analysis-orbit__halo" ref={animationRefs.halo} aria-hidden="true" /><div className="analysis-orbit__gem" ref={animationRefs.gem}>✦</div><strong>{progress}%</strong></div><p className="analysis-estimate">{t("analysis.estimate")}</p>
++      <div className={`analysis-total ${isHolding ? "is-holding" : ""}`}><span>{t("analysis.overall")}</span><div><i ref={animationRefs.bar} style={{ width: `${progress}%` }} /><em className="analysis-total__glow" style={{ left: `${barGlowPosition}%`, opacity: barGlowOpacity }} aria-hidden="true" /></div><b>{progress}%</b>{isHolding && <small>· {t("analysis.holding")}</small>}</div>
+     </section>
+     <aside className="analysis-aside">
+-      <section className="analysis-card analysis-materials"><header><h2>素材概览</h2><p><b>3</b> 集视频 <span>总时长 <strong>08:42</strong></span></p></header><div className="analysis-video-rail" aria-label="视频素材列表"><button type="button" aria-label="向左滚动素材" onClick={() => onScroll(-1)}><CaretLeft /></button><div className="analysis-video-scroll" ref={railRef}>{videos.map((video, index) => <button className={`analysis-video ${index === selectedIndex ? "is-selected" : ""}`} key={video.id} type="button" onClick={() => onSelect(index)} aria-pressed={index === selectedIndex}><span className={`analysis-thumb analysis-thumb--${video.scene}`} /><b>{video.label}</b><small>{video.duration}</small>{index === selectedIndex && <span className="analysis-video__expand" role="button" tabIndex="0" aria-label={`全屏播放 ${video.label}`} onClick={(event) => { event.stopPropagation(); onOpen(); }} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); event.stopPropagation(); onOpen(); } }}><ArrowsOutSimple weight="bold" /></span>}</button>)}</div><button type="button" aria-label="向右滚动素材" onClick={() => onScroll(1)}><CaretRight /></button></div></section>
+-      <section className="analysis-card analysis-discover"><h2>已发现</h2><div><p><UserCircle /><span>人物</span><strong>6</strong></p><p><Sparkle /><span>剧情转折</span><strong>12</strong></p><p><Star /><span>候选高光</span><strong>18</strong></p></div></section>
+-      <section className="analysis-card analysis-log"><h2>任务日志</h2>{logs.map(([time, text, state]) => <p className={state === "active" ? "is-active" : ""} key={time}><time>{time}</time><i /> <span>{text}</span>{state === "done" ? <CheckCircle weight="fill" /> : <em />}</p>)}</section>
++      <section className="analysis-card analysis-materials"><header><h2>{t("analysis.materials.title")}</h2><p>{t("analysis.materials.summary", { count: formatNumber(3) })} <span>{t("analysis.materials.totalDuration")} <strong>08:42</strong></span></p></header><div className="analysis-video-rail" aria-label={t("analysis.materials.list")}><button type="button" aria-label={t("analysis.materials.scrollLeft")} onClick={() => onScroll(-1)}><CaretLeft /></button><div className="analysis-video-scroll" ref={railRef}>{videos.map((video, index) => <button className={`analysis-video ${index === selectedIndex ? "is-selected" : ""}`} key={video.id} type="button" onClick={() => onSelect(index)} aria-pressed={index === selectedIndex}><span className={`analysis-thumb analysis-thumb--${video.scene}`} /><b>{video.label}</b><small>{video.duration}</small>{index === selectedIndex && <span className="analysis-video__expand" role="button" tabIndex="0" aria-label={t("analysis.materials.fullscreen", { episode: video.label })} onClick={(event) => { event.stopPropagation(); onOpen(); }} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); event.stopPropagation(); onOpen(); } }}><ArrowsOutSimple weight="bold" /></span>}</button>)}</div><button type="button" aria-label={t("analysis.materials.scrollRight")} onClick={() => onScroll(1)}><CaretRight /></button></div></section>
++      <section className="analysis-card analysis-discover"><h2>{t("analysis.discovered.title")}</h2><div><p><UserCircle /><span>{t("analysis.discovered.characters")}</span><strong>{formatNumber(6)}</strong></p><p><Sparkle /><span>{t("analysis.discovered.turns")}</span><strong>{formatNumber(12)}</strong></p><p><Star /><span>{t("analysis.discovered.highlights")}</span><strong>{formatNumber(18)}</strong></p></div></section>
++      <section className="analysis-card analysis-log"><h2>{t("analysis.taskLog")}</h2>{logs.map(({ time, messageKey, state }) => <p className={state === "active" ? "is-active" : ""} key={time}><time>{time}</time><i /> <span>{t(messageKey)}</span>{state === "done" ? <CheckCircle weight="fill" /> : <em />}</p>)}</section>
+     </aside>
+   </div>;
+ }
+diff -ruN /tmp/narrato-i18n/task5-before/src/components/narration/NarrationFullscreenPlayer.jsx docs/web/homepage-prototype/src/components/narration/NarrationFullscreenPlayer.jsx
+--- /tmp/narrato-i18n/task5-before/src/components/narration/NarrationFullscreenPlayer.jsx	2026-07-15 22:29:22
++++ docs/web/homepage-prototype/src/components/narration/NarrationFullscreenPlayer.jsx	2026-07-15 22:33:18
+@@ -1,20 +1,22 @@
+ import { CaretLeft, CaretRight, Play, X } from "@phosphor-icons/react";
+ import { useEffect } from "react";
++import { useI18n } from "../../i18n/useI18n.js";
+ 
+ export function NarrationFullscreenPlayer({ videos, activeIndex, onChange, onClose }) {
++  const { formatNumber, t } = useI18n();
+   const video = videos[activeIndex];
+   useEffect(() => {
+     const closeOnEscape = (event) => event.key === "Escape" && onClose();
+     window.addEventListener("keydown", closeOnEscape);
+     return () => window.removeEventListener("keydown", closeOnEscape);
+   }, [onClose]);
+-  return <div className="analysis-player" role="dialog" aria-modal="true" aria-label={`${video.label} 全屏播放`}>
+-    <button className="analysis-player__close" type="button" onClick={onClose} aria-label="关闭全屏播放"><X weight="bold" /></button>
+-    <button className="analysis-player__switch analysis-player__switch--prev" type="button" onClick={() => onChange((activeIndex - 1 + videos.length) % videos.length)} aria-label="播放上一个视频"><CaretLeft weight="bold" /></button>
++  return <div className="analysis-player" role="dialog" aria-modal="true" aria-label={t("analysis.player.dialog", { episode: video.label })}>
++    <button className="analysis-player__close" type="button" onClick={onClose} aria-label={t("analysis.player.close")}><X weight="bold" /></button>
++    <button className="analysis-player__switch analysis-player__switch--prev" type="button" onClick={() => onChange((activeIndex - 1 + videos.length) % videos.length)} aria-label={t("analysis.player.previous")}><CaretLeft weight="bold" /></button>
+     <div className={`analysis-player__screen analysis-thumb analysis-thumb--${video.scene}`}>
+-      <span className="analysis-player__episode">{video.label}</span><button type="button" className="analysis-player__play" aria-label="播放或暂停"><Play weight="fill" /></button><span className="analysis-player__time">00:00 / {video.duration}</span>
++      <span className="analysis-player__episode">{video.label}</span><button type="button" className="analysis-player__play" aria-label={t("analysis.player.toggle")}><Play weight="fill" /></button><span className="analysis-player__time">00:00 / {video.duration}</span>
+     </div>
+-    <button className="analysis-player__switch analysis-player__switch--next" type="button" onClick={() => onChange((activeIndex + 1) % videos.length)} aria-label="播放下一个视频"><CaretRight weight="bold" /></button>
+-    <p className="analysis-player__hint">{activeIndex + 1} / {videos.length} · 使用左右按钮切换视频</p>
++    <button className="analysis-player__switch analysis-player__switch--next" type="button" onClick={() => onChange((activeIndex + 1) % videos.length)} aria-label={t("analysis.player.next")}><CaretRight weight="bold" /></button>
++    <p className="analysis-player__hint">{t("analysis.player.hint", { current: formatNumber(activeIndex + 1), total: formatNumber(videos.length) })}</p>
+   </div>;
+ }
+diff -ruN /tmp/narrato-i18n/task5-before/src/components/narration/NarrationPreview.jsx docs/web/homepage-prototype/src/components/narration/NarrationPreview.jsx
+--- /tmp/narrato-i18n/task5-before/src/components/narration/NarrationPreview.jsx	2026-07-15 22:29:22
++++ docs/web/homepage-prototype/src/components/narration/NarrationPreview.jsx	2026-07-15 22:32:39
+@@ -1,22 +1,24 @@
+ import { CaretLeft, CaretRight } from "@phosphor-icons/react";
++import { useI18n } from "../../i18n/useI18n.js";
+ 
+ export function NarrationPreview({ style }) {
++  const { formatNumber, t } = useI18n();
+   return <aside className="narration-preview" aria-labelledby="preview-title">
+-    <h2 id="preview-title">效果预览</h2>
++    <h2 id="preview-title">{t("narration.preview.title")}</h2>
+     <div className="narration-preview__frame">
+-      <div className="narration-preview__tags"><span>旁白配音中</span><span>字幕已开启</span></div>
+-      <span className="narration-preview__safe-area">安全区</span>
+-      <div className="narration-preview__scene" aria-label="短剧画面预览">
++      <div className="narration-preview__tags"><span>{t("narration.preview.voicing")}</span><span>{t("narration.preview.captionsOn")}</span></div>
++      <span className="narration-preview__safe-area">{t("narration.preview.safeArea")}</span>
++      <div className="narration-preview__scene" aria-label={t("narration.preview.sceneLabel")}>
+         <div className="narration-preview__lamp" />
+         <div className="narration-preview__window" />
+         <div className="narration-preview__chair" />
+         <div className="narration-preview__person"><i /><b /><em /></div>
+       </div>
+-      <p className={`narration-preview__caption ${style === "classic" ? "is-classic" : style === "shadow" ? "is-shadow" : ""}`}>他一步步<br />走向权力的巅峰</p>
++      <p className={`narration-preview__caption ${style === "classic" ? "is-classic" : style === "shadow" ? "is-shadow" : ""}`}>{t("narration.preview.captionLine1")}<br />{t("narration.preview.captionLine2")}</p>
+     </div>
+-    <div className="narration-preview__dots" aria-label="预览轮播"><CaretLeft aria-hidden="true" /><i /><i className="is-active" /><i /><CaretRight aria-hidden="true" /></div>
++    <div className="narration-preview__dots" aria-label={t("narration.preview.carousel")}><CaretLeft aria-hidden="true" /><i /><i className="is-active" /><i /><CaretRight aria-hidden="true" /></div>
+     <div className="narration-preview__stats">
+-      <div><span>源视频</span><strong>08:42</strong></div><div><span>预计成片约</span><strong>01:25</strong></div><div><span>预计消耗</span><strong><b>87</b> 创作点</strong></div>
++      <div><span>{t("narration.preview.source")}</span><strong>08:42</strong></div><div><span>{t("narration.preview.estimatedOutput")}</span><strong>01:25</strong></div><div><span>{t("narration.preview.estimatedCost")}</span><strong>{t("narration.preview.credits", { count: formatNumber(87) })}</strong></div>
+     </div>
+   </aside>;
+ }
+diff -ruN /tmp/narrato-i18n/task5-before/src/components/narration/NarrationSettingsForm.jsx docs/web/homepage-prototype/src/components/narration/NarrationSettingsForm.jsx
+--- /tmp/narrato-i18n/task5-before/src/components/narration/NarrationSettingsForm.jsx	2026-07-15 22:29:22
++++ docs/web/homepage-prototype/src/components/narration/NarrationSettingsForm.jsx	2026-07-15 22:32:39
+@@ -1,13 +1,15 @@
+ import { CaretUp, Check, DeviceMobile, Play, Rectangle, Square } from "@phosphor-icons/react";
++import { useI18n } from "../../i18n/useI18n.js";
+ 
+ const ratioIcons = { portrait: DeviceMobile, landscape: Rectangle, square: Square };
+ 
+ export function NarrationSettingsForm({ styles, ratios, subtitleStyles, selectedStyle, selectedRatio, selectedSubtitle, requirements, onStyleChange, onRatioChange, onSubtitleChange, onRequirementsChange, onUnavailable }) {
+-  return <section className="narration-settings" aria-label="解说设置">
+-    <fieldset className="narration-fieldset narration-style-picker"><legend>选择解说风格</legend><div className="narration-style-grid">{styles.map((style) => { const Icon = style.icon; const selected = selectedStyle === style.id; return <button className={`narration-style-card narration-style-card--${style.tone} ${selected ? "is-selected" : ""}`} type="button" aria-pressed={selected} onClick={() => onStyleChange(style.id)} key={style.id}><Icon weight="duotone" aria-hidden="true" />{selected && <span className="narration-selected"><Check weight="bold" /></span>}<strong>{style.title}</strong><small>{style.description}</small></button>; })}</div></fieldset>
+-    <fieldset className="narration-fieldset narration-ratio-picker"><legend>视频比例</legend><div className="narration-ratio-grid">{ratios.map((ratio) => { const Icon = ratioIcons[ratio.glyph]; const selected = selectedRatio === ratio.id; return <button className={`narration-ratio ${selected ? "is-selected" : ""}`} type="button" aria-pressed={selected} onClick={() => onRatioChange(ratio.id)} key={ratio.id}><Icon aria-hidden="true" /><span>{ratio.label}</span>{selected && <i><Check weight="bold" /></i>}</button>; })}</div></fieldset>
+-    <fieldset className="narration-fieldset narration-voice-picker"><legend>配音角色</legend><div className="narration-voice-card"><span className="narration-voice-avatar" aria-hidden="true"><i /><b /></span><div className="narration-voice-main"><strong>沉稳男声 · 顾言</strong><span className="narration-wave" aria-hidden="true">▁▂▁▃▅▂▁▆▃▁▂▅▃▁▂▁▅▃▂▆▁</span></div><button type="button" onClick={() => onUnavailable("正在试听沉稳男声") }><Play weight="fill" aria-hidden="true" />试听</button><button type="button" onClick={() => onUnavailable("配音角色选择功能建设中")}>更换</button></div></fieldset>
+-    <fieldset className="narration-fieldset narration-subtitle-picker"><legend>字幕样式</legend><div className="narration-subtitle-grid">{subtitleStyles.map((subtitle) => { const selected = selectedSubtitle === subtitle.id; return <button className={`narration-subtitle-card ${subtitle.className} ${selected ? "is-selected" : ""}`} type="button" aria-pressed={selected} onClick={() => onSubtitleChange(subtitle.id)} key={subtitle.id}>{selected && <span className="narration-selected"><Check weight="bold" /></span>}<strong>他一步步<br />走向权力的巅峰</strong><small>{subtitle.label}</small></button>; })}</div></fieldset>
+-    <fieldset className="narration-fieldset narration-requirements"><legend>更多要求（可选） <CaretUp aria-hidden="true" /></legend><label><span className="sr-only">更多要求</span><textarea maxLength="200" value={requirements} onChange={(event) => onRequirementsChange(event.target.value)} placeholder="例如：开头 3 秒直接抛出反转，全程不要拖沓" /><em>{requirements.length} / 200</em></label></fieldset>
++  const { formatNumber, t } = useI18n();
++  return <section className="narration-settings" aria-label={t("narration.form.label")}>
++    <fieldset className="narration-fieldset narration-style-picker"><legend>{t("narration.form.style")}</legend><div className="narration-style-grid">{styles.map((style) => { const Icon = style.icon; const selected = selectedStyle === style.id; return <button className={`narration-style-card narration-style-card--${style.tone} ${selected ? "is-selected" : ""}`} type="button" aria-pressed={selected} onClick={() => onStyleChange(style.id)} key={style.id}><Icon weight="duotone" aria-hidden="true" />{selected && <span className="narration-selected"><Check weight="bold" /></span>}<strong>{t(style.titleKey)}</strong><small>{t(style.descriptionKey)}</small></button>; })}</div></fieldset>
++    <fieldset className="narration-fieldset narration-ratio-picker"><legend>{t("narration.form.ratio")}</legend><div className="narration-ratio-grid">{ratios.map((ratio) => { const Icon = ratioIcons[ratio.glyph]; const selected = selectedRatio === ratio.id; return <button className={`narration-ratio ${selected ? "is-selected" : ""}`} type="button" aria-pressed={selected} onClick={() => onRatioChange(ratio.id)} key={ratio.id}><Icon aria-hidden="true" /><span>{t(ratio.labelKey)}</span>{selected && <i><Check weight="bold" /></i>}</button>; })}</div></fieldset>
++    <fieldset className="narration-fieldset narration-voice-picker"><legend>{t("narration.form.voice")}</legend><div className="narration-voice-card"><span className="narration-voice-avatar" aria-hidden="true"><i /><b /></span><div className="narration-voice-main"><strong>{t("narration.form.voiceName")}</strong><span className="narration-wave" aria-hidden="true">▁▂▁▃▅▂▁▆▃▁▂▅▃▁▂▁▅▃▂▆▁</span></div><button type="button" onClick={() => onUnavailable(t("narration.messages.previewingVoice"))}><Play weight="fill" aria-hidden="true" />{t("narration.form.previewVoice")}</button><button type="button" onClick={() => onUnavailable(t("narration.messages.voiceUnavailable"))}>{t("narration.form.changeVoice")}</button></div></fieldset>
++    <fieldset className="narration-fieldset narration-subtitle-picker"><legend>{t("narration.form.subtitle")}</legend><div className="narration-subtitle-grid">{subtitleStyles.map((subtitle) => { const selected = selectedSubtitle === subtitle.id; return <button className={`narration-subtitle-card ${subtitle.className} ${selected ? "is-selected" : ""}`} type="button" aria-pressed={selected} onClick={() => onSubtitleChange(subtitle.id)} key={subtitle.id}>{selected && <span className="narration-selected"><Check weight="bold" /></span>}<strong>{t("narration.preview.captionLine1")}<br />{t("narration.preview.captionLine2")}</strong><small>{t(subtitle.labelKey)}</small></button>; })}</div></fieldset>
++    <fieldset className="narration-fieldset narration-requirements"><legend>{t("narration.form.moreRequirements")} <CaretUp aria-hidden="true" /></legend><label><span className="sr-only">{t("narration.form.requirements")}</span><textarea maxLength="200" value={requirements} onChange={(event) => onRequirementsChange(event.target.value)} placeholder={t("narration.form.placeholder")} /><em>{formatNumber(requirements.length)} / 200</em></label></fieldset>
+   </section>;
+ }
+diff -ruN /tmp/narrato-i18n/task5-before/src/components/narration/NarrationStepper.jsx docs/web/homepage-prototype/src/components/narration/NarrationStepper.jsx
+--- /tmp/narrato-i18n/task5-before/src/components/narration/NarrationStepper.jsx	2026-07-15 22:29:22
++++ docs/web/homepage-prototype/src/components/narration/NarrationStepper.jsx	2026-07-15 22:32:00
+@@ -1,10 +1,12 @@
+ import { Check } from "@phosphor-icons/react";
++import { useI18n } from "../../i18n/useI18n.js";
+ 
+ export function NarrationStepper({ steps }) {
+-  return <ol className="narration-stepper" aria-label="短剧解说制作进度">
+-    {steps.map((step, index) => <li className={index < 1 ? "is-complete" : index === 1 ? "is-current" : ""} key={step}>
++  const { t } = useI18n();
++  return <ol className="narration-stepper" aria-label={t("narration.stepperLabel")}>
++    {steps.map((step, index) => <li className={index < 1 ? "is-complete" : index === 1 ? "is-current" : ""} key={step.id}>
+       <span className="narration-stepper__number">{index < 1 ? <Check weight="bold" aria-hidden="true" /> : index + 1}</span>
+-      <span>{step}</span>
++      <span>{t(step.labelKey)}</span>
+     </li>)}
+   </ol>;
+ }
+diff -ruN /tmp/narrato-i18n/task5-before/src/components/projects/ProjectResultDetails.jsx docs/web/homepage-prototype/src/components/projects/ProjectResultDetails.jsx
+--- /tmp/narrato-i18n/task5-before/src/components/projects/ProjectResultDetails.jsx	2026-07-15 22:29:22
++++ docs/web/homepage-prototype/src/components/projects/ProjectResultDetails.jsx	2026-07-15 22:50:07
+@@ -1,48 +1,52 @@
+ import { Check, FilmSlate, PlayCircle } from "@phosphor-icons/react";
++import { useI18n } from "../../i18n/useI18n.js";
+ 
+ export function ProjectTaskSteps({ steps }) {
++  const { t } = useI18n();
+   return (
+     <section className="project-result-side-card" aria-labelledby="task-steps-title">
+-      <div className="project-result-side-card__heading"><h3 id="task-steps-title">任务步骤</h3><span>全部完成</span></div>
++      <div className="project-result-side-card__heading"><h3 id="task-steps-title">{t("projectResult.details.taskSteps")}</h3><span>{t("projectResult.details.allComplete")}</span></div>
+       <ol className="project-result-steps">
+-        {steps.map((step) => <li key={step}><i><Check weight="bold" aria-hidden="true" /></i><span>{step}</span></li>)}
++        {steps.map((step) => <li key={step.id}><i><Check weight="bold" aria-hidden="true" /></i><span>{t(step.labelKey)}</span></li>)}
+       </ol>
+     </section>
+   );
+ }
+ 
+ export function ProjectOperationLog({ logs }) {
++  const { t } = useI18n();
+   return (
+     <section className="project-result-side-card" aria-labelledby="operation-log-title">
+-      <h3 id="operation-log-title">操作日志</h3>
++      <h3 id="operation-log-title">{t("projectResult.details.operationLog")}</h3>
+       <ol className="project-result-log">
+-        {logs.map(([time, event]) => <li key={time}><time>{time}</time><span>{event}</span></li>)}
++        {logs.map(({ time, messageKey }) => <li key={time}><time>{time}</time><span>{t(messageKey)}</span></li>)}
+       </ol>
+     </section>
+   );
+ }
+ 
+ export function ProjectCreditCost({ items, total }) {
++  const { formatNumber, t } = useI18n();
+   return (
+     <section className="project-result-bottom-card project-result-cost" aria-labelledby="credit-cost-title">
+-      <div className="project-result-bottom-card__heading"><h3 id="credit-cost-title">创作点消耗</h3><span>总计 {total} 创作点</span></div>
++      <div className="project-result-bottom-card__heading"><h3 id="credit-cost-title">{t("projectResult.details.creditCost")}</h3><span>{t("projectResult.details.totalCredits", { count: formatNumber(total) })}</span></div>
+       <div className="project-result-cost__grid">
+-        {items.map(({ label, value, icon: Icon, tone }) => <div className={`project-result-cost__item project-result-cost__item--${tone}`} key={label}><Icon aria-hidden="true" /><strong>{value}</strong><span>{label}</span></div>)}
++        {items.map(({ id, labelKey, value, icon: Icon, tone }) => <div className={`project-result-cost__item project-result-cost__item--${tone}`} key={id}><Icon aria-hidden="true" /><strong>{formatNumber(value)}</strong><span>{t(labelKey)}</span></div>)}
+       </div>
+     </section>
+   );
+ }
+ 
+ export function ProjectSummary({ summary }) {
++  const { t } = useI18n();
+   return (
+     <section className="project-result-bottom-card project-result-summary" aria-labelledby="project-summary-title">
+-      <h3 id="project-summary-title">项目摘要</h3>
++      <h3 id="project-summary-title">{t("projectResult.details.summary")}</h3>
+       <div className="project-result-summary__grid">
+-        <div className="project-result-summary__media"><FilmSlate aria-hidden="true" /><span>{summary.source}</span></div>
+-        <dl><div><dt>创建时间</dt><dd>{summary.createdAt}</dd></div><div><dt>项目类型</dt><dd>{summary.type}</dd></div></dl>
+-        <div className="project-result-summary__media"><PlayCircle aria-hidden="true" /><span>{summary.output}</span></div>
++        <div className="project-result-summary__media"><FilmSlate aria-hidden="true" /><span>{t(summary.sourceKey)}</span></div>
++        <dl><div><dt>{t("projectResult.details.createdAt")}</dt><dd>{summary.createdAt}</dd></div><div><dt>{t("projectResult.details.projectType")}</dt><dd>{t(summary.typeKey)}</dd></div></dl>
++        <div className="project-result-summary__media"><PlayCircle aria-hidden="true" /><span>{t(summary.outputKey)}</span></div>
+       </div>
+     </section>
+   );
+ }
+-
+diff -ruN /tmp/narrato-i18n/task5-before/src/components/projects/ProjectResultPlayer.jsx docs/web/homepage-prototype/src/components/projects/ProjectResultPlayer.jsx
+--- /tmp/narrato-i18n/task5-before/src/components/projects/ProjectResultPlayer.jsx	2026-07-15 22:29:22
++++ docs/web/homepage-prototype/src/components/projects/ProjectResultPlayer.jsx	2026-07-15 22:31:59
+@@ -1,5 +1,6 @@
+ import { ArrowsOut, Pause, Play, SpeakerHigh, SpeakerSlash } from "@phosphor-icons/react";
+ import { forwardRef } from "react";
++import { useI18n } from "../../i18n/useI18n.js";
+ 
+ function formatTime(value) {
+   if (!Number.isFinite(value)) return "00:00";
+@@ -22,6 +23,7 @@
+   onPlayStateChange,
+   onFullscreen,
+ }, ref) {
++  const { t } = useI18n();
+   const progress = duration > 0 ? Math.min(100, Math.max(0, (currentTime / duration) * 100)) : 0;
+   return (
+     <div className="project-result-player">
+@@ -37,20 +39,21 @@
+         onPlay={() => onPlayStateChange(true)}
+         onPause={() => onPlayStateChange(false)}
+         onEnded={() => onPlayStateChange(false)}
++        aria-label={t("projectResult.player.video", { title: project.title })}
+       />
+       <div className="project-result-player__controls">
+-        <button type="button" onClick={onTogglePlay} aria-label={isPlaying ? "暂停视频" : "播放视频"}>
++        <button type="button" onClick={onTogglePlay} aria-label={t(isPlaying ? "projectResult.player.pause" : "projectResult.player.play")}>
+           {isPlaying ? <Pause weight="fill" aria-hidden="true" /> : <Play weight="fill" aria-hidden="true" />}
+         </button>
+         <span className="project-result-player__time">{formatTime(currentTime)} <i>/</i> {duration ? formatTime(duration) : project.duration}</span>
+         <label className="project-result-player__progress">
+-          <span className="sr-only">视频播放进度</span>
++          <span className="sr-only">{t("projectResult.player.progress")}</span>
+           <input type="range" min="0" max="100" step="0.1" value={progress} onChange={onSeek} style={{ "--progress": `${progress}%` }} />
+         </label>
+-        <button type="button" onClick={onToggleMute} aria-label={isMuted ? "取消静音" : "静音"}>
++        <button type="button" onClick={onToggleMute} aria-label={t(isMuted ? "projectResult.player.unmute" : "projectResult.player.mute")}>
+           {isMuted ? <SpeakerSlash aria-hidden="true" /> : <SpeakerHigh aria-hidden="true" />}
+         </button>
+-        <button type="button" onClick={onFullscreen} aria-label="全屏播放"><ArrowsOut aria-hidden="true" /></button>
++        <button type="button" onClick={onFullscreen} aria-label={t("projectResult.player.fullscreen")}><ArrowsOut aria-hidden="true" /></button>
+       </div>
+     </div>
+   );
+diff -ruN /tmp/narrato-i18n/task5-before/src/data/narrationAnalysisData.js docs/web/homepage-prototype/src/data/narrationAnalysisData.js
+--- /tmp/narrato-i18n/task5-before/src/data/narrationAnalysisData.js	2026-07-15 22:29:22
++++ docs/web/homepage-prototype/src/data/narrationAnalysisData.js	2026-07-15 22:50:07
+@@ -6,16 +6,16 @@
+ ];
+ 
+ export const analysisStages = [
+-  { title: "字幕识别", status: "已完成", state: "done", icon: "caption" },
+-  { title: "剧情结构理解", status: "已完成", state: "done", icon: "book" },
+-  { title: "冲突与爽点定位", status: "进行中", state: "active", icon: "target" },
+-  { title: "高光片段评分", status: "等待中", state: "waiting", icon: "star" },
++  { id: "caption", titleKey: "analysis.stages.caption", statusKey: "analysis.status.done", state: "done", icon: "caption" },
++  { id: "story", titleKey: "analysis.stages.story", statusKey: "analysis.status.done", state: "done", icon: "book" },
++  { id: "conflict", titleKey: "analysis.stages.conflict", statusKey: "analysis.status.active", state: "active", icon: "target" },
++  { id: "highlights", titleKey: "analysis.stages.highlights", statusKey: "analysis.status.waiting", state: "waiting", icon: "star" },
+ ];
+ 
+ export const analysisLogs = [
+-  ["14:30:25", "开始读取视频素材", "done"],
+-  ["14:30:31", "字幕识别完成", "done"],
+-  ["14:30:38", "已合并 3 集剧情时间线", "done"],
+-  ["14:30:52", "已识别主要人物关系", "done"],
+-  ["14:31:04", "正在定位剧情冲突与爽点", "active"],
++  { time: "14:30:25", messageKey: "analysis.logs.read", state: "done" },
++  { time: "14:30:31", messageKey: "analysis.logs.caption", state: "done" },
++  { time: "14:30:38", messageKey: "analysis.logs.merge", state: "done" },
++  { time: "14:30:52", messageKey: "analysis.logs.characters", state: "done" },
++  { time: "14:31:04", messageKey: "analysis.logs.conflict", state: "active" },
+ ];
+diff -ruN /tmp/narrato-i18n/task5-before/src/data/narrationData.js docs/web/homepage-prototype/src/data/narrationData.js
+--- /tmp/narrato-i18n/task5-before/src/data/narrationData.js	2026-07-15 22:29:22
++++ docs/web/homepage-prototype/src/data/narrationData.js	2026-07-15 22:31:35
+@@ -1,22 +1,22 @@
+ import { ChatCircleDots, Heart, Lightning, Smiley } from "@phosphor-icons/react";
+ 
+-export const narrationSteps = ["上传素材", "设置参数", "AI 分析", "编辑片段", "解说文案", "配音字幕", "导出"];
++export const narrationSteps = ["upload", "settings", "analysis", "edit", "script", "voice", "export"].map((id) => ({ id, labelKey: `narration.steps.${id}` }));
+ 
+ export const narrationStyles = [
+-  { id: "reversal", title: "高能反转", description: "节奏紧凑，反转不断\n抓住观众注意力", icon: Lightning, tone: "violet" },
+-  { id: "suspense", title: "悬疑推进", description: "层层递进，悬念引导\n保持观众好奇心", icon: ChatCircleDots, tone: "orange" },
+-  { id: "emotion", title: "情感共鸣", description: "情感饱满，代入共情\n引发观众共鸣", icon: Heart, tone: "pink" },
+-  { id: "casual", title: "轻松吐槽", description: "幽默解说，轻松有趣\n适合休闲观看", icon: Smiley, tone: "cyan" },
++  { id: "reversal", titleKey: "narration.styles.reversal.title", descriptionKey: "narration.styles.reversal.description", icon: Lightning, tone: "violet" },
++  { id: "suspense", titleKey: "narration.styles.suspense.title", descriptionKey: "narration.styles.suspense.description", icon: ChatCircleDots, tone: "orange" },
++  { id: "emotion", titleKey: "narration.styles.emotion.title", descriptionKey: "narration.styles.emotion.description", icon: Heart, tone: "pink" },
++  { id: "casual", titleKey: "narration.styles.casual.title", descriptionKey: "narration.styles.casual.description", icon: Smiley, tone: "cyan" },
+ ];
+ 
+ export const narrationRatios = [
+-  { id: "original", label: "跟随首个视频 9:16", glyph: "portrait" },
+-  { id: "landscape", label: "16:9", glyph: "landscape" },
+-  { id: "square", label: "1:1", glyph: "square" },
++  { id: "original", labelKey: "narration.ratios.original", glyph: "portrait" },
++  { id: "landscape", labelKey: "narration.ratios.landscape", glyph: "landscape" },
++  { id: "square", labelKey: "narration.ratios.square", glyph: "square" },
+ ];
+ 
+ export const subtitleStyles = [
+-  { id: "glow", label: "霓虹描边", className: "narration-subtitle--glow" },
+-  { id: "classic", label: "经典白字", className: "narration-subtitle--classic" },
+-  { id: "shadow", label: "黑底描边", className: "narration-subtitle--shadow" },
++  { id: "glow", labelKey: "narration.subtitleStyles.glow", className: "narration-subtitle--glow" },
++  { id: "classic", labelKey: "narration.subtitleStyles.classic", className: "narration-subtitle--classic" },
++  { id: "shadow", labelKey: "narration.subtitleStyles.shadow", className: "narration-subtitle--shadow" },
+ ];
+diff -ruN /tmp/narrato-i18n/task5-before/src/data/projectResultData.js docs/web/homepage-prototype/src/data/projectResultData.js
+--- /tmp/narrato-i18n/task5-before/src/data/projectResultData.js	2026-07-15 22:29:22
++++ docs/web/homepage-prototype/src/data/projectResultData.js	2026-07-15 22:50:07
+@@ -9,26 +9,26 @@
+   video: "/media/project-result/overlord-narration-result-85s.mp4",
+   poster: "/media/narration-editor/episode-1-poster.jpg",
+   subtitle: "/media/project-result/overlord-narration-result-85s.vtt",
+-  status: "生成完成",
+-  steps: ["识别视频内容", "提取高光片段", "生成解说文案", "配音字幕合成", "导出视频"],
++  statusKey: "projectResult.status.generated",
++  steps: ["recognize", "highlights", "script", "synthesis", "export"].map((id) => ({ id, labelKey: `projectResult.steps.${id}` })),
+   logs: [
+-    ["14:30:25", "开始识别视频内容"],
+-    ["14:31:12", "AI 已提取 8 个高光片段"],
+-    ["14:31:48", "解说文案生成完成"],
+-    ["14:32:20", "配音与字幕合成完成"],
+-    ["14:33:05", "视频导出完成"],
++    { time: "14:30:25", messageKey: "projectResult.logs.recognize" },
++    { time: "14:31:12", messageKey: "projectResult.logs.highlights" },
++    { time: "14:31:48", messageKey: "projectResult.logs.script" },
++    { time: "14:32:20", messageKey: "projectResult.logs.synthesis" },
++    { time: "14:33:05", messageKey: "projectResult.logs.export" },
+   ],
+   costs: [
+-    { label: "AI 分析", value: 22, icon: Brain, tone: "violet" },
+-    { label: "文案生成", value: 15, icon: FileText, tone: "blue" },
+-    { label: "配音合成", value: 20, icon: Microphone, tone: "cyan" },
+-    { label: "视频渲染", value: 30, icon: FilmStrip, tone: "orange" },
++    { id: "analysis", labelKey: "projectResult.costs.analysis", value: 22, icon: Brain, tone: "violet" },
++    { id: "script", labelKey: "projectResult.costs.script", value: 15, icon: FileText, tone: "blue" },
++    { id: "voice", labelKey: "projectResult.costs.voice", value: 20, icon: Microphone, tone: "cyan" },
++    { id: "render", labelKey: "projectResult.costs.render", value: 30, icon: FilmStrip, tone: "orange" },
+   ],
+   totalCredits: 87,
+   summary: {
+-    source: "源视频 3 集 · 08:42",
+-    output: "成片 01:25",
++    sourceKey: "projectResult.summary.source",
++    outputKey: "projectResult.summary.output",
+     createdAt: "2024-05-30 14:30",
+-    type: "短剧解说",
++    typeKey: "projectResult.summary.type",
+   },
+ };
+diff -ruN /tmp/narrato-i18n/task5-before/src/i18n/locales/en.js docs/web/homepage-prototype/src/i18n/locales/en.js
+--- /tmp/narrato-i18n/task5-before/src/i18n/locales/en.js	2026-07-15 22:29:22
++++ docs/web/homepage-prototype/src/i18n/locales/en.js	2026-07-15 22:50:33
+@@ -35,6 +35,136 @@
+   ["影创工坊｜AI 出片工作台", "Narrato | AI Video Workspace"], ["工作台概览｜影创工坊", "Workspace overview | Narrato"], ["新建创作｜影创工坊", "New creation | Narrato"], ["我的项目｜影创工坊", "My projects | Narrato"], ["霸总短剧解说 01｜影创工坊", "CEO short-drama narration 01 | Narrato"], ["短剧解说设置｜影创工坊", "Narration settings | Narrato"], ["AI 分析｜影创工坊", "AI analysis | Narrato"], ["解说编辑器｜影创工坊", "Narration editor | Narrato"], ["页面未找到｜影创工坊", "Page not found | Narrato"],
+ ]);
+ 
++translations.set('{title} · 项目结果', '{title} · Project result');
++translations.set('生成完成', 'Generated');
++translations.set('识别视频内容', 'Recognize video content');
++translations.set('开始识别视频内容', 'Started recognizing video content');
++translations.set('AI 已提取 8 个高光片段', 'AI extracted 8 highlights');
++translations.set('解说文案生成完成', 'Narration script generated');
++translations.set('配音与字幕合成完成', 'Voice and captions synthesized');
++translations.set('视频导出完成', 'Video export completed');
++translations.set('AI 分析', 'AI analysis');
++translations.set('文案生成', 'Script generation');
++translations.set('配音合成', 'Voice synthesis');
++translations.set('视频渲染', 'Video rendering');
++translations.set('源视频 3 集 · 08:42', '3 source episodes · 08:42');
++translations.set('成片 01:25', 'Final video 01:25');
++translations.set('面包屑', 'Breadcrumb');
++translations.set('导出视频', 'Export video');
++translations.set('下载字幕', 'Download subtitles');
++translations.set('分享项目', 'Share project');
++translations.set('再次编辑', 'Edit again');
++translations.set('任务步骤', 'Task steps');
++translations.set('全部完成', 'All complete');
++translations.set('操作日志', 'Operation log');
++translations.set('创作点消耗', 'Credits used');
++translations.set('总计 {count} 创作点', '{count} credits total');
++translations.set('项目摘要', 'Project summary');
++translations.set('项目类型', 'Project type');
++translations.set('{title} 成片', 'Final video for {title}');
++translations.set('播放视频', 'Play video');
++translations.set('暂停视频', 'Pause video');
++translations.set('视频播放进度', 'Video playback progress');
++translations.set('静音', 'Mute');
++translations.set('取消静音', 'Unmute');
++translations.set('全屏播放', 'Play fullscreen');
++translations.set('当前浏览器暂不支持全屏播放', 'Fullscreen playback is not supported in this browser');
++translations.set('分享链接已准备（原型）', 'Share link is ready (prototype)');
++translations.set('再次编辑流程建设中', 'Editing again is coming soon');
++translations.set('短剧解说设置参数', 'Short-drama narration settings');
++translations.set('返回短剧解说', 'Back to short-drama narration');
++translations.set('重命名项目', 'Rename project');
++translations.set('已自动保存', 'Autosaved');
++translations.set('短剧解说制作进度', 'Short-drama narration progress');
++translations.set('设置参数', 'Set parameters');
++translations.set('编辑片段', 'Edit clips');
++translations.set('配音字幕', 'Voice and captions');
++translations.set('高能反转', 'High-impact twists');
++translations.set('节奏紧凑，反转不断\n抓住观众注意力', 'Fast-paced with constant twists\nKeep viewers engaged');
++translations.set('悬疑推进', 'Building suspense');
++translations.set('层层递进，悬念引导\n保持观众好奇心', 'Layered suspense and intrigue\nKeep viewers curious');
++translations.set('情感共鸣', 'Emotional resonance');
++translations.set('情感饱满，代入共情\n引发观众共鸣', 'Rich emotion and empathy\nConnect with viewers');
++translations.set('轻松吐槽', 'Casual commentary');
++translations.set('幽默解说，轻松有趣\n适合休闲观看', 'Humorous, light, and fun\nGreat for casual viewing');
++translations.set('跟随首个视频 9:16', 'Follow first video 9:16');
++translations.set('霓虹描边', 'Neon outline');
++translations.set('经典白字', 'Classic white');
++translations.set('黑底描边', 'Dark outline');
++translations.set('解说设置', 'Narration settings');
++translations.set('选择解说风格', 'Choose narration style');
++translations.set('视频比例', 'Video ratio');
++translations.set('配音角色', 'Voice character');
++translations.set('沉稳男声 · 顾言', 'Calm male voice · Gu Yan');
++translations.set('试听', 'Preview');
++translations.set('更换', 'Change');
++translations.set('字幕样式', 'Caption style');
++translations.set('更多要求（可选）', 'More requirements (optional)');
++translations.set('更多要求', 'More requirements');
++translations.set('例如：开头 3 秒直接抛出反转，全程不要拖沓', 'Example: Open with the twist in the first 3 seconds and keep the pacing tight');
++translations.set('效果预览', 'Effect preview');
++translations.set('旁白配音中', 'Voice-over active');
++translations.set('字幕已开启', 'Captions on');
++translations.set('安全区', 'Safe area');
++translations.set('短剧画面预览', 'Short-drama scene preview');
++translations.set('他一步步', 'Step by step, he rose');
++translations.set('走向权力的巅峰', 'to the pinnacle of power');
++translations.set('预览轮播', 'Preview carousel');
++translations.set('源视频', 'Source video');
++translations.set('预计成片约', 'Estimated final video');
++translations.set('预计消耗', 'Estimated usage');
++translations.set('{count} 创作点', '{count} credits');
++translations.set('上一步', 'Previous');
++translations.set('使用当前设置，开始 AI 分析', 'Start AI analysis with current settings');
++translations.set('重命名功能建设中', 'Renaming is coming soon');
++translations.set('正在试听沉稳男声', 'Previewing the calm male voice');
++translations.set('配音角色选择功能建设中', 'Voice selection is coming soon');
++translations.set('短剧解说 AI 分析', 'Short-drama narration AI analysis');
++translations.set('返回短剧解说设置', 'Back to narration settings');
++translations.set('正在理解剧情并提取高光', 'Understanding the story and extracting highlights');
++translations.set('AI 分析进度 {progress}%', 'AI analysis progress: {progress}%');
++translations.set('预计还需约 45 秒', 'About 45 seconds remaining');
++translations.set('整体进度', 'Overall progress');
++translations.set('持续分析中', 'Analysis continuing');
++translations.set('字幕识别', 'Caption recognition');
++translations.set('剧情结构理解', 'Story structure');
++translations.set('冲突与爽点定位', 'Conflict and payoff detection');
++translations.set('高光片段评分', 'Highlight scoring');
++translations.set('进行中', 'In progress');
++translations.set('等待中', 'Waiting');
++translations.set('素材概览', 'Footage overview');
++translations.set('{count} 集视频', '{count} episodes');
++translations.set('总时长', 'Total duration');
++translations.set('视频素材列表', 'Video footage list');
++translations.set('向左滚动素材', 'Scroll footage left');
++translations.set('向右滚动素材', 'Scroll footage right');
++translations.set('全屏播放 {episode}', 'Play {episode} fullscreen');
++translations.set('已发现', 'Discovered');
++translations.set('人物', 'Characters');
++translations.set('剧情转折', 'Plot turns');
++translations.set('候选高光', 'Highlight candidates');
++translations.set('任务日志', 'Task log');
++translations.set('开始读取视频素材', 'Started reading video footage');
++translations.set('字幕识别完成', 'Caption recognition completed');
++translations.set('已合并 3 集剧情时间线', 'Merged the timeline for 3 episodes');
++translations.set('已识别主要人物关系', 'Identified main character relationships');
++translations.set('正在定位剧情冲突与爽点', 'Locating story conflicts and payoffs');
++translations.set('返回项目列表', 'Back to projects');
++translations.set('下一步：编辑片段 →', 'Next: Edit clips →');
++translations.set('{episode} 全屏播放', 'Fullscreen playback: {episode}');
++translations.set('关闭全屏播放', 'Close fullscreen playback');
++translations.set('播放上一个视频', 'Play previous video');
++translations.set('播放下一个视频', 'Play next video');
++translations.set('播放或暂停', 'Play or pause');
++translations.set('{current} / {total} · 使用左右按钮切换视频', '{current} / {total} · Use the left and right buttons to switch videos');
++
++translations.set('霸总短剧解说 01｜影创工坊', '霸总短剧解说 01 | Narrato');
++
++translations.set('我的项目', 'My projects');
++translations.set('创建时间', 'Created');
++translations.set('导出', 'Export');
++translations.set('已完成', 'Complete');
++
+ function localize(value) {
+   if (typeof value === "string") return translations.get(value) ?? value;
+   return Object.fromEntries(Object.entries(value).map(([key, child]) => [key, localize(child)]));
+diff -ruN /tmp/narrato-i18n/task5-before/src/i18n/locales/ja.js docs/web/homepage-prototype/src/i18n/locales/ja.js
+--- /tmp/narrato-i18n/task5-before/src/i18n/locales/ja.js	2026-07-15 22:29:22
++++ docs/web/homepage-prototype/src/i18n/locales/ja.js	2026-07-15 22:50:33
+@@ -25,6 +25,138 @@
+   ["影创工坊｜AI 出片工作台", "影创工坊｜AI 動画制作ワークスペース"], ["工作台概览｜影创工坊", "ワークスペース概要｜影创工坊"], ["新建创作｜影创工坊", "新規制作｜影创工坊"], ["我的项目｜影创工坊", "マイプロジェクト｜影创工坊"], ["霸总短剧解说 01｜影创工坊", "CEOショートドラマ解説 01｜影创工坊"], ["短剧解说设置｜影创工坊", "ショートドラマ解説設定｜影创工坊"], ["AI 分析｜影创工坊", "AI分析｜影创工坊"], ["解说编辑器｜影创工坊", "解説エディター｜影创工坊"], ["页面未找到｜影创工坊", "ページが見つかりません｜影创工坊"],
+ ]);
+ 
++translations.set('{title} · 项目结果', '{title} · プロジェクト結果');
++translations.set('生成完成', '生成完了');
++translations.set('识别视频内容', '動画内容を認識');
++translations.set('开始识别视频内容', '動画内容の認識を開始');
++translations.set('AI 已提取 8 个高光片段', 'AI が 8 件のハイライトを抽出');
++translations.set('解说文案生成完成', '解説台本の生成が完了');
++translations.set('配音与字幕合成完成', '音声と字幕の合成が完了');
++translations.set('视频导出完成', '動画の書き出しが完了');
++translations.set('文案生成', '台本生成');
++translations.set('配音合成', '音声合成');
++translations.set('视频渲染', '動画レンダリング');
++translations.set('源视频 3 集 · 08:42', '元動画 3 話 · 08:42');
++translations.set('成片 01:25', '完成動画 01:25');
++translations.set('面包屑', 'パンくずリスト');
++translations.set('导出视频', '動画を書き出す');
++translations.set('下载字幕', '字幕をダウンロード');
++translations.set('分享项目', 'プロジェクトを共有');
++translations.set('再次编辑', '再編集');
++translations.set('任务步骤', 'タスク手順');
++translations.set('全部完成', 'すべて完了');
++translations.set('操作日志', '操作ログ');
++translations.set('创作点消耗', 'クレジット使用量');
++translations.set('总计 {count} 创作点', '合計 {count} クレジット');
++translations.set('项目摘要', 'プロジェクト概要');
++translations.set('项目类型', 'プロジェクト種類');
++translations.set('{title} 成片', '{title} の完成動画');
++translations.set('播放视频', '動画を再生');
++translations.set('暂停视频', '動画を一時停止');
++translations.set('视频播放进度', '動画の再生進捗');
++translations.set('静音', 'ミュート');
++translations.set('取消静音', 'ミュート解除');
++translations.set('全屏播放', '全画面再生');
++translations.set('当前浏览器暂不支持全屏播放', 'このブラウザは全画面再生に対応していません');
++translations.set('分享链接已准备（原型）', '共有リンクを準備しました（プロトタイプ）');
++translations.set('再次编辑流程建设中', '再編集フローは準備中です');
++translations.set('短剧解说设置参数', 'ショートドラマ解説の設定');
++translations.set('短剧解说', 'ショートドラマ解説');
++translations.set('返回短剧解说', 'ショートドラマ解説に戻る');
++translations.set('重命名项目', 'プロジェクト名を変更');
++translations.set('已自动保存', '自動保存済み');
++translations.set('短剧解说制作进度', 'ショートドラマ解説の制作進捗');
++translations.set('设置参数', 'パラメーター設定');
++translations.set('编辑片段', 'クリップ編集');
++translations.set('解说文案', '解説台本');
++translations.set('配音字幕', '音声と字幕');
++translations.set('导出', '書き出し');
++translations.set('高能反转', '高インパクトな逆転');
++translations.set('节奏紧凑，反转不断\n抓住观众注意力', 'テンポよく逆転を重ね\n視聴者を引きつけます');
++translations.set('悬疑推进', 'サスペンス展開');
++translations.set('层层递进，悬念引导\n保持观众好奇心', '段階的に謎を深め\n好奇心を維持します');
++translations.set('情感共鸣', '感情への共鳴');
++translations.set('情感饱满，代入共情\n引发观众共鸣', '豊かな感情と没入感で\n共感を生みます');
++translations.set('轻松吐槽', '気軽なツッコミ');
++translations.set('幽默解说，轻松有趣\n适合休闲观看', 'ユーモラスで楽しく\n気軽な視聴に最適です');
++translations.set('跟随首个视频 9:16', '最初の動画に合わせる 9:16');
++translations.set('霓虹描边', 'ネオン縁取り');
++translations.set('经典白字', 'クラシック白文字');
++translations.set('黑底描边', '黒背景の縁取り');
++translations.set('解说设置', '解説設定');
++translations.set('选择解说风格', '解説スタイルを選択');
++translations.set('视频比例', '動画比率');
++translations.set('配音角色', 'ナレーター');
++translations.set('沉稳男声 · 顾言', '落ち着いた男性音声 · 顧言');
++translations.set('试听', '試聴');
++translations.set('更换', '変更');
++translations.set('字幕样式', '字幕スタイル');
++translations.set('更多要求（可选）', '追加要件（任意）');
++translations.set('更多要求', '追加要件');
++translations.set('例如：开头 3 秒直接抛出反转，全程不要拖沓', '例：冒頭 3 秒で逆転を提示し、全編をテンポよくする');
++translations.set('效果预览', '効果プレビュー');
++translations.set('旁白配音中', 'ナレーション再生中');
++translations.set('字幕已开启', '字幕オン');
++translations.set('安全区', 'セーフエリア');
++translations.set('短剧画面预览', 'ショートドラマ画面プレビュー');
++translations.set('他一步步', '彼は一歩ずつ');
++translations.set('走向权力的巅峰', '権力の頂点へ向かった');
++translations.set('预览轮播', 'プレビューカルーセル');
++translations.set('源视频', '元動画');
++translations.set('预计成片约', '完成動画の目安');
++translations.set('预计消耗', '推定消費量');
++translations.set('{count} 创作点', '{count} クレジット');
++translations.set('上一步', '前へ');
++translations.set('使用当前设置，开始 AI 分析', '現在の設定で AI 分析を開始');
++translations.set('重命名功能建设中', '名前変更機能は準備中です');
++translations.set('正在试听沉稳男声', '落ち着いた男性音声を試聴中');
++translations.set('配音角色选择功能建设中', 'ナレーター選択機能は準備中です');
++translations.set('短剧解说 AI 分析', 'ショートドラマ解説 AI 分析');
++translations.set('返回短剧解说设置', '解説設定に戻る');
++translations.set('正在理解剧情并提取高光', 'ストーリーを理解してハイライトを抽出中');
++translations.set('AI 分析进度 {progress}%', 'AI 分析進捗 {progress}%');
++translations.set('预计还需约 45 秒', '残り約 45 秒');
++translations.set('整体进度', '全体進捗');
++translations.set('持续分析中', '分析を継続中');
++translations.set('字幕识别', '字幕認識');
++translations.set('剧情结构理解', 'ストーリー構造の理解');
++translations.set('冲突与爽点定位', '対立と見せ場の特定');
++translations.set('高光片段评分', 'ハイライト評価');
++translations.set('已完成', '完了');
++translations.set('进行中', '進行中');
++translations.set('等待中', '待機中');
++translations.set('素材概览', '素材概要');
++translations.set('{count} 集视频', '動画 {count} 話');
++translations.set('总时长', '合計時間');
++translations.set('视频素材列表', '動画素材リスト');
++translations.set('向左滚动素材', '素材を左へスクロール');
++translations.set('向右滚动素材', '素材を右へスクロール');
++translations.set('全屏播放 {episode}', '{episode} を全画面再生');
++translations.set('已发现', '検出済み');
++translations.set('人物', '登場人物');
++translations.set('剧情转折', 'ストーリー転換');
++translations.set('候选高光', 'ハイライト候補');
++translations.set('任务日志', 'タスクログ');
++translations.set('开始读取视频素材', '動画素材の読み込みを開始');
++translations.set('字幕识别完成', '字幕認識が完了');
++translations.set('已合并 3 集剧情时间线', '3 話のストーリータイムラインを統合');
++translations.set('已识别主要人物关系', '主な人物関係を特定');
++translations.set('正在定位剧情冲突与爽点', 'ストーリーの対立と見せ場を特定中');
++translations.set('返回项目列表', 'プロジェクト一覧に戻る');
++translations.set('下一步：编辑片段 →', '次へ：クリップ編集 →');
++translations.set('{episode} 全屏播放', '{episode} の全画面再生');
++translations.set('关闭全屏播放', '全画面再生を閉じる');
++translations.set('播放上一个视频', '前の動画を再生');
++translations.set('播放下一个视频', '次の動画を再生');
++translations.set('播放或暂停', '再生または一時停止');
++translations.set('{current} / {total} · 使用左右按钮切换视频', '{current} / {total} · 左右のボタンで動画を切り替え');
++
++translations.set('霸总短剧解说 01｜影创工坊', '霸总短剧解说 01｜影创工坊');
++translations.set('AI 分析｜影创工坊', 'AI 分析｜影创工坊');
++
++translations.set('我的项目', 'マイプロジェクト');
++translations.set('创建时间', '作成日時');
++
+ function localize(value) {
+   if (typeof value === "string") return translations.get(value) ?? value;
+   return Object.fromEntries(Object.entries(value).map(([key, child]) => [key, localize(child)]));
+diff -ruN /tmp/narrato-i18n/task5-before/src/i18n/locales/zh-CN.js docs/web/homepage-prototype/src/i18n/locales/zh-CN.js
+--- /tmp/narrato-i18n/task5-before/src/i18n/locales/zh-CN.js	2026-07-15 22:29:22
++++ docs/web/homepage-prototype/src/i18n/locales/zh-CN.js	2026-07-15 22:34:23
+@@ -150,6 +150,32 @@
+     pagination: { ariaLabel: "项目分页", previous: "上一页", next: "下一页", page: "第 {page} 页", perPage: "{count} 条/页" },
+     messages: { unavailable: "{name}：{action}功能建设中", pageChanged: "已切换至第 {page} 页" },
+   },
++  projectResult: {
++    routeHeading: "{title} · 项目结果", status: { generated: "生成完成" }, steps: { recognize: "识别视频内容", highlights: "提取高光片段", script: "生成解说文案", synthesis: "配音字幕合成", export: "导出视频" },
++    logs: { recognize: "开始识别视频内容", highlights: "AI 已提取 8 个高光片段", script: "解说文案生成完成", synthesis: "配音与字幕合成完成", export: "视频导出完成" },
++    costs: { analysis: "AI 分析", script: "文案生成", voice: "配音合成", render: "视频渲染" }, summary: { source: "源视频 3 集 · 08:42", output: "成片 01:25", type: "短剧解说" },
++    breadcrumb: { label: "面包屑", projects: "我的项目" }, actions: { exportVideo: "导出视频", downloadSubtitles: "下载字幕", share: "分享项目", editAgain: "再次编辑" },
++    details: { taskSteps: "任务步骤", allComplete: "全部完成", operationLog: "操作日志", creditCost: "创作点消耗", totalCredits: "总计 {count} 创作点", summary: "项目摘要", createdAt: "创建时间", projectType: "项目类型" },
++    player: { video: "{title} 成片", play: "播放视频", pause: "暂停视频", progress: "视频播放进度", mute: "静音", unmute: "取消静音", fullscreen: "全屏播放" },
++    messages: { fullscreenUnsupported: "当前浏览器暂不支持全屏播放", shareReady: "分享链接已准备（原型）", editUnavailable: "再次编辑流程建设中" },
++  },
++  narration: {
++    routeHeading: "短剧解说设置参数", name: "短剧解说", back: "返回短剧解说", rename: "重命名项目", autosaved: "已自动保存", stepperLabel: "短剧解说制作进度",
++    steps: { upload: "上传素材", settings: "设置参数", analysis: "AI 分析", edit: "编辑片段", script: "解说文案", voice: "配音字幕", export: "导出" },
++    styles: { reversal: { title: "高能反转", description: "节奏紧凑，反转不断\n抓住观众注意力" }, suspense: { title: "悬疑推进", description: "层层递进，悬念引导\n保持观众好奇心" }, emotion: { title: "情感共鸣", description: "情感饱满，代入共情\n引发观众共鸣" }, casual: { title: "轻松吐槽", description: "幽默解说，轻松有趣\n适合休闲观看" } },
++    ratios: { original: "跟随首个视频 9:16", landscape: "16:9", square: "1:1" }, subtitleStyles: { glow: "霓虹描边", classic: "经典白字", shadow: "黑底描边" },
++    form: { label: "解说设置", style: "选择解说风格", ratio: "视频比例", voice: "配音角色", voiceName: "沉稳男声 · 顾言", previewVoice: "试听", changeVoice: "更换", subtitle: "字幕样式", moreRequirements: "更多要求（可选）", requirements: "更多要求", placeholder: "例如：开头 3 秒直接抛出反转，全程不要拖沓" },
++    preview: { title: "效果预览", voicing: "旁白配音中", captionsOn: "字幕已开启", safeArea: "安全区", sceneLabel: "短剧画面预览", captionLine1: "他一步步", captionLine2: "走向权力的巅峰", carousel: "预览轮播", source: "源视频", estimatedOutput: "预计成片约", estimatedCost: "预计消耗", credits: "{count} 创作点" },
++    actions: { previous: "上一步", startAnalysis: "使用当前设置，开始 AI 分析" }, messages: { renameUnavailable: "重命名功能建设中", previewingVoice: "正在试听沉稳男声", voiceUnavailable: "配音角色选择功能建设中" },
++  },
++  analysis: {
++    routeHeading: "短剧解说 AI 分析", back: "返回短剧解说设置", stepsLabel: "短剧解说制作进度", title: "正在理解剧情并提取高光", progress: "AI 分析进度 {progress}%", estimate: "预计还需约 45 秒", overall: "整体进度", holding: "持续分析中",
++    stages: { caption: "字幕识别", story: "剧情结构理解", conflict: "冲突与爽点定位", highlights: "高光片段评分" }, status: { done: "已完成", active: "进行中", waiting: "等待中" },
++    materials: { title: "素材概览", summary: "{count} 集视频", totalDuration: "总时长", list: "视频素材列表", scrollLeft: "向左滚动素材", scrollRight: "向右滚动素材", fullscreen: "全屏播放 {episode}" },
++    discovered: { title: "已发现", characters: "人物", turns: "剧情转折", highlights: "候选高光" }, taskLog: "任务日志",
++    logs: { read: "开始读取视频素材", caption: "字幕识别完成", merge: "已合并 3 集剧情时间线", characters: "已识别主要人物关系", conflict: "正在定位剧情冲突与爽点" },
++    actions: { projects: "返回项目列表", next: "下一步：编辑片段 →" }, player: { dialog: "{episode} 全屏播放", close: "关闭全屏播放", previous: "播放上一个视频", next: "播放下一个视频", toggle: "播放或暂停", hint: "{current} / {total} · 使用左右按钮切换视频" },
++  },
+   errors: { notFound: { heading: "页面未找到", description: "你访问的页面不存在。", navigation: "错误页面导航", home: "返回官网", dashboard: "前往工作台" } },
+   titles: { home: "影创工坊｜AI 出片工作台", dashboard: "工作台概览｜影创工坊", create: "新建创作｜影创工坊", projects: "我的项目｜影创工坊", projectResult: "霸总短剧解说 01｜影创工坊", narrationSettings: "短剧解说设置｜影创工坊", narrationAnalysis: "AI 分析｜影创工坊", narrationEditor: "解说编辑器｜影创工坊", notFound: "页面未找到｜影创工坊" },
+ };
+diff -ruN /tmp/narrato-i18n/task5-before/src/pages/NarrationAnalysisPage.jsx docs/web/homepage-prototype/src/pages/NarrationAnalysisPage.jsx
+--- /tmp/narrato-i18n/task5-before/src/pages/NarrationAnalysisPage.jsx	2026-07-15 22:29:22
++++ docs/web/homepage-prototype/src/pages/NarrationAnalysisPage.jsx	2026-07-15 22:33:59
+@@ -10,10 +10,13 @@
+ import { NarrationFullscreenPlayer } from "../components/narration/NarrationFullscreenPlayer.jsx";
+ import { dashboardCredits, dashboardNavItems } from "../data/dashboardData.js";
+ import { analysisLogs, analysisStages, analysisVideos } from "../data/narrationAnalysisData.js";
++import { narrationSteps } from "../data/narrationData.js";
++import { useI18n } from "../i18n/useI18n.js";
+ 
+ const ANALYSIS_PROGRESS = 100;
+ 
+ export function NarrationAnalysisPage() {
++  const { t } = useI18n();
+   const navigate = useNavigate();
+   const [selectedIndex, setSelectedIndex] = useState(0); const [playerOpen, setPlayerOpen] = useState(false); const [analysisProgress, setAnalysisProgress] = useState(ANALYSIS_PROGRESS); const [barGlowPosition, setBarGlowPosition] = useState(-4); const [barGlowOpacity, setBarGlowOpacity] = useState(0); const [isAnalysisHolding, setIsAnalysisHolding] = useState(false); const [toast, setToast] = useState({ id: 0, message: "" }); const railRef = useRef(null); const ringRef = useRef(null); const pulseRef = useRef(null); const gemRef = useRef(null); const haloRef = useRef(null); const barRef = useRef(null);
+   const showToast = useCallback((message) => setToast(({ id }) => ({ id: id + 1, message })), []);
+@@ -39,5 +42,5 @@
+     return () => { animation.cancel(); pulseTimeline.cancel(); settleTimeline?.cancel(); glowAnimation?.cancel(); };
+   }, []);
+   const scrollRail = (direction) => railRef.current?.scrollBy({ left: direction * 180, behavior: "smooth" });
+-  return <div className="dashboard-shell analysis-shell" data-page="narration-analysis"><h1 className="sr-only" data-route-heading tabIndex="-1">短剧解说 AI 分析</h1><DashboardSidebar items={dashboardNavItems} onUnavailable={showToast} /><div className="dashboard-workspace"><DashboardHeader credits={dashboardCredits} onUnavailable={showToast} /><main className="analysis-main"><header className="analysis-heading"><div><Link to="/dashboard/narration/settings" aria-label="返回短剧解说设置"><ArrowLeft /></Link><span>短剧解说</span><i /><strong>霸总短剧解说 01</strong></div><p><Check /> 已自动保存</p></header><ol className="analysis-steps">{["上传素材", "设置参数", "AI 分析", "编辑片段", "解说文案", "配音字幕", "导出"].map((step, index) => <li className={index < 2 ? "is-done" : index === 2 ? "is-current" : ""} key={step}><b>{index < 2 ? <Check /> : index + 1}</b><span>{step}</span></li>)}</ol><NarrationAnalysisBoard videos={analysisVideos} stages={analysisStages} logs={analysisLogs} progress={analysisProgress} barGlowPosition={barGlowPosition} barGlowOpacity={barGlowOpacity} isHolding={isAnalysisHolding} animationRefs={{ ring: ringRef, pulse: pulseRef, gem: gemRef, halo: haloRef, bar: barRef }} selectedIndex={selectedIndex} onSelect={setSelectedIndex} onOpen={() => setPlayerOpen(true)} onScroll={scrollRail} railRef={railRef} /></main><footer className="analysis-footer"><Link to="/dashboard/projects"><FileArrowDown /> 返回项目列表</Link><button type="button" onClick={() => navigate("/dashboard/narration/editor")}>下一步：编辑片段 →</button></footer></div><DashboardMobileNav items={dashboardNavItems} onUnavailable={showToast} />{playerOpen && <NarrationFullscreenPlayer videos={analysisVideos} activeIndex={selectedIndex} onChange={setSelectedIndex} onClose={() => setPlayerOpen(false)} />}{toast.message && <DashboardToast key={toast.id} message={toast.message} onClose={() => setToast(({ id }) => ({ id, message: "" }))} />}</div>;
++  return <div className="dashboard-shell analysis-shell" data-page="narration-analysis"><h1 className="sr-only" data-route-heading tabIndex="-1">{t("analysis.routeHeading")}</h1><DashboardSidebar items={dashboardNavItems} onUnavailable={showToast} /><div className="dashboard-workspace"><DashboardHeader credits={dashboardCredits} onUnavailable={showToast} /><main className="analysis-main"><header className="analysis-heading"><div><Link to="/dashboard/narration/settings" aria-label={t("analysis.back")}><ArrowLeft /></Link><span>{t("narration.name")}</span><i /><strong>霸总短剧解说 01</strong></div><p><Check /> {t("narration.autosaved")}</p></header><ol className="analysis-steps" aria-label={t("analysis.stepsLabel")}>{narrationSteps.map((step, index) => <li className={index < 2 ? "is-done" : index === 2 ? "is-current" : ""} key={step.id}><b>{index < 2 ? <Check /> : index + 1}</b><span>{t(step.labelKey)}</span></li>)}</ol><NarrationAnalysisBoard videos={analysisVideos} stages={analysisStages} logs={analysisLogs} progress={analysisProgress} barGlowPosition={barGlowPosition} barGlowOpacity={barGlowOpacity} isHolding={isAnalysisHolding} animationRefs={{ ring: ringRef, pulse: pulseRef, gem: gemRef, halo: haloRef, bar: barRef }} selectedIndex={selectedIndex} onSelect={setSelectedIndex} onOpen={() => setPlayerOpen(true)} onScroll={scrollRail} railRef={railRef} /></main><footer className="analysis-footer"><Link to="/dashboard/projects"><FileArrowDown /> {t("analysis.actions.projects")}</Link><button type="button" onClick={() => navigate("/dashboard/narration/editor")}>{t("analysis.actions.next")}</button></footer></div><DashboardMobileNav items={dashboardNavItems} onUnavailable={showToast} />{playerOpen && <NarrationFullscreenPlayer videos={analysisVideos} activeIndex={selectedIndex} onChange={setSelectedIndex} onClose={() => setPlayerOpen(false)} />}{toast.message && <DashboardToast key={toast.id} message={toast.message} onClose={() => setToast(({ id }) => ({ id, message: "" }))} />}</div>;
+ }
+diff -ruN /tmp/narrato-i18n/task5-before/src/pages/NarrationSettingsPage.jsx docs/web/homepage-prototype/src/pages/NarrationSettingsPage.jsx
+--- /tmp/narrato-i18n/task5-before/src/pages/NarrationSettingsPage.jsx	2026-07-15 22:29:22
++++ docs/web/homepage-prototype/src/pages/NarrationSettingsPage.jsx	2026-07-15 22:33:59
+@@ -10,10 +10,12 @@
+ import { NarrationStepper } from "../components/narration/NarrationStepper.jsx";
+ import { dashboardCredits, dashboardNavItems } from "../data/dashboardData.js";
+ import { narrationRatios, narrationSteps, narrationStyles, subtitleStyles } from "../data/narrationData.js";
++import { useI18n } from "../i18n/useI18n.js";
+ 
+ export function NarrationSettingsPage() {
++  const { t } = useI18n();
+   const [style, setStyle] = useState("reversal"); const [ratio, setRatio] = useState("original"); const [subtitle, setSubtitle] = useState("glow"); const [requirements, setRequirements] = useState(""); const [toast, setToast] = useState({ id: 0, message: "" });
+   const showToast = useCallback((message) => setToast(({ id }) => ({ id: id + 1, message })), []);
+   useEffect(() => { if (!toast.message) return undefined; const timer = window.setTimeout(() => setToast(({ id }) => ({ id, message: "" })), 3200); return () => window.clearTimeout(timer); }, [toast]);
+-  return <div className="narration-shell" data-page="narration-settings"><h1 className="sr-only" data-route-heading tabIndex="-1">短剧解说设置参数</h1><DashboardSidebar items={dashboardNavItems} onUnavailable={showToast} /><div className="narration-workspace"><DashboardHeader credits={dashboardCredits} onUnavailable={showToast} /><main className="narration-main"><header className="narration-topbar"><Link to="/dashboard" aria-label="返回短剧解说"><ArrowLeft aria-hidden="true" /></Link><strong>短剧解说</strong><i /><h2>霸总短剧解说 01</h2><button type="button" aria-label="重命名项目" onClick={() => showToast("重命名功能建设中")}>⌑</button><p><span>✓</span> 已自动保存</p></header><NarrationStepper steps={narrationSteps} /><div className="narration-content"><NarrationSettingsForm styles={narrationStyles} ratios={narrationRatios} subtitleStyles={subtitleStyles} selectedStyle={style} selectedRatio={ratio} selectedSubtitle={subtitle} requirements={requirements} onStyleChange={setStyle} onRatioChange={setRatio} onSubtitleChange={setSubtitle} onRequirementsChange={setRequirements} onUnavailable={showToast} /><div className="narration-right"><NarrationPreview style={subtitle} /><footer className="narration-actions"><Link to="/dashboard">上一步</Link><Link to="/dashboard/narration/analysis">使用当前设置，开始 AI 分析</Link></footer></div></div></main></div><DashboardMobileNav items={dashboardNavItems} onUnavailable={showToast} />{toast.message && <DashboardToast key={toast.id} message={toast.message} onClose={() => setToast(({ id }) => ({ id, message: "" }))} />}</div>;
++  return <div className="narration-shell" data-page="narration-settings"><h1 className="sr-only" data-route-heading tabIndex="-1">{t("narration.routeHeading")}</h1><DashboardSidebar items={dashboardNavItems} onUnavailable={showToast} /><div className="narration-workspace"><DashboardHeader credits={dashboardCredits} onUnavailable={showToast} /><main className="narration-main"><header className="narration-topbar"><Link to="/dashboard" aria-label={t("narration.back")}><ArrowLeft aria-hidden="true" /></Link><strong>{t("narration.name")}</strong><i /><h2>霸总短剧解说 01</h2><button type="button" aria-label={t("narration.rename")} onClick={() => showToast(t("narration.messages.renameUnavailable"))}>⌑</button><p><span>✓</span> {t("narration.autosaved")}</p></header><NarrationStepper steps={narrationSteps} /><div className="narration-content"><NarrationSettingsForm styles={narrationStyles} ratios={narrationRatios} subtitleStyles={subtitleStyles} selectedStyle={style} selectedRatio={ratio} selectedSubtitle={subtitle} requirements={requirements} onStyleChange={setStyle} onRatioChange={setRatio} onSubtitleChange={setSubtitle} onRequirementsChange={setRequirements} onUnavailable={showToast} /><div className="narration-right"><NarrationPreview style={subtitle} /><footer className="narration-actions"><Link to="/dashboard">{t("narration.actions.previous")}</Link><Link to="/dashboard/narration/analysis">{t("narration.actions.startAnalysis")}</Link></footer></div></div></main></div><DashboardMobileNav items={dashboardNavItems} onUnavailable={showToast} />{toast.message && <DashboardToast key={toast.id} message={toast.message} onClose={() => setToast(({ id }) => ({ id, message: "" }))} />}</div>;
+ }
+diff -ruN /tmp/narrato-i18n/task5-before/src/pages/ProjectResultPage.jsx docs/web/homepage-prototype/src/pages/ProjectResultPage.jsx
+--- /tmp/narrato-i18n/task5-before/src/pages/ProjectResultPage.jsx	2026-07-15 22:29:22
++++ docs/web/homepage-prototype/src/pages/ProjectResultPage.jsx	2026-07-15 22:33:58
+@@ -9,8 +9,10 @@
+ import { ProjectResultPlayer } from "../components/projects/ProjectResultPlayer.jsx";
+ import { dashboardCredits, dashboardNavItems } from "../data/dashboardData.js";
+ import { projectResult } from "../data/projectResultData.js";
++import { useI18n } from "../i18n/useI18n.js";
+ 
+ export function ProjectResultPage() {
++  const { t } = useI18n();
+   const videoRef = useRef(null);
+   const [isPlaying, setIsPlaying] = useState(false);
+   const [isMuted, setIsMuted] = useState(false);
+@@ -41,21 +43,21 @@
+   };
+   const enterFullscreen = async () => {
+     if (videoRef.current?.requestFullscreen) await videoRef.current.requestFullscreen();
+-    else showToast("当前浏览器暂不支持全屏播放");
++    else showToast(t("projectResult.messages.fullscreenUnsupported"));
+   };
+ 
+   return (
+     <div className="dashboard-shell project-result-shell" data-page="project-result">
+-      <h1 className="sr-only" data-route-heading tabIndex="-1">霸总短剧解说 01 · 项目结果</h1>
++      <h1 className="sr-only" data-route-heading tabIndex="-1">{t("projectResult.routeHeading", { title: projectResult.title })}</h1>
+       <DashboardSidebar items={dashboardNavItems} onUnavailable={showToast} />
+       <div className="dashboard-workspace">
+         <DashboardHeader credits={dashboardCredits} onUnavailable={showToast} />
+         <main className="project-result-main">
+-          <nav className="project-result-breadcrumb" aria-label="面包屑"><Link to="/dashboard/projects">我的项目</Link><span>/</span><strong>{projectResult.title}</strong></nav>
++          <nav className="project-result-breadcrumb" aria-label={t("projectResult.breadcrumb.label")}><Link to="/dashboard/projects">{t("projectResult.breadcrumb.projects")}</Link><span>/</span><strong>{projectResult.title}</strong></nav>
+           <section className="project-result-card" aria-labelledby="project-result-title">
+             <header className="project-result-card__header">
+               <div><h2 id="project-result-title">{projectResult.title}</h2><p>{projectResult.format} · {projectResult.resolution} · {projectResult.duration}</p></div>
+-              <div className="project-result-card__header-actions"><span className="project-result-status"><CheckCircle weight="bold" aria-hidden="true" />{projectResult.status}</span><a className="project-result-primary-action" href={projectResult.video} download><DownloadSimple aria-hidden="true" />导出视频</a></div>
++              <div className="project-result-card__header-actions"><span className="project-result-status"><CheckCircle weight="bold" aria-hidden="true" />{t(projectResult.statusKey)}</span><a className="project-result-primary-action" href={projectResult.video} download><DownloadSimple aria-hidden="true" />{t("projectResult.actions.exportVideo")}</a></div>
+             </header>
+             <div className="project-result-card__body">
+               <div className="project-result-primary">
+@@ -75,10 +77,10 @@
+                   onFullscreen={enterFullscreen}
+                 />
+                 <div className="project-result-actions">
+-                  <a className="project-result-actions__primary" href={projectResult.video} download><DownloadSimple aria-hidden="true" />导出视频</a>
+-                  <a href={projectResult.subtitle} download data-subtitle-download><ClosedCaptioning aria-hidden="true" />下载字幕</a>
+-                  <button type="button" onClick={() => showToast("分享链接已准备（原型）")}><ShareNetwork aria-hidden="true" />分享项目</button>
+-                  <button type="button" onClick={() => showToast("再次编辑流程建设中")}><NotePencil aria-hidden="true" />再次编辑</button>
++                  <a className="project-result-actions__primary" href={projectResult.video} download><DownloadSimple aria-hidden="true" />{t("projectResult.actions.exportVideo")}</a>
++                  <a href={projectResult.subtitle} download data-subtitle-download><ClosedCaptioning aria-hidden="true" />{t("projectResult.actions.downloadSubtitles")}</a>
++                  <button type="button" onClick={() => showToast(t("projectResult.messages.shareReady"))}><ShareNetwork aria-hidden="true" />{t("projectResult.actions.share")}</button>
++                  <button type="button" onClick={() => showToast(t("projectResult.messages.editUnavailable"))}><NotePencil aria-hidden="true" />{t("projectResult.actions.editAgain")}</button>
+                 </div>
+               </div>
+               <aside className="project-result-side"><ProjectTaskSteps steps={projectResult.steps} /><ProjectOperationLog logs={projectResult.logs} /></aside>
+diff -ruN /tmp/narrato-i18n/task5-before/scripts/verify-i18n.mjs docs/web/homepage-prototype/scripts/verify-i18n.mjs
+--- /tmp/narrato-i18n/task5-before/scripts/verify-i18n.mjs	2026-07-15 22:29:22
++++ docs/web/homepage-prototype/scripts/verify-i18n.mjs	2026-07-15 22:49:31
+@@ -25,6 +25,7 @@
+     projectsTitle: "管理全部创作任务与生成结果",
+     accountActions: "账户快捷操作",
+     routeToasts: { "/dashboard": "充值功能建设中", "/dashboard/create": "参数设置功能建设中", "/dashboard/projects": "霸总短剧解说 01：导出功能建设中" },
++    workflow: { resultHeading: "霸总短剧解说 01 · 项目结果", resultAction: "导出视频", resultStatus: "生成完成", resultLog: "视频导出完成", resultMedia: "霸总短剧解说 01 成片", resultBreadcrumb: "我的项目", createdAt: "创建时间", resultToast: "分享链接已准备（原型）", settingsHeading: "短剧解说设置参数", settingsAction: "使用当前设置，开始 AI 分析", settingsMedia: "短剧画面预览", exportStep: "导出", settingsToast: "重命名功能建设中", analysisHeading: "短剧解说 AI 分析", analysisAction: "下一步：编辑片段 →", analysisTitle: "正在理解剧情并提取高光", analysisDone: "已完成", analysisLog: "正在定位剧情冲突与爽点", analysisMedia: "全屏播放 EP01", resultTitle: "霸总短剧解说 01｜影创工坊", settingsTitle: "短剧解说设置｜影创工坊", analysisPageTitle: "AI 分析｜影创工坊" },
+   },
+   en: {
+     language: "English",
+@@ -38,6 +39,7 @@
+     projectsTitle: "Manage every creation task and result",
+     accountActions: "Account quick actions",
+     routeToasts: { "/dashboard": "Top-up is coming soon", "/dashboard/create": "Parameter settings are coming soon", "/dashboard/projects": "霸总短剧解说 01: Export is coming soon" },
++    workflow: { resultHeading: "霸总短剧解说 01 · Project result", resultAction: "Export video", resultStatus: "Generated", resultLog: "Video export completed", resultMedia: "Final video for 霸总短剧解说 01", resultBreadcrumb: "My projects", createdAt: "Created", resultToast: "Share link is ready (prototype)", settingsHeading: "Short-drama narration settings", settingsAction: "Start AI analysis with current settings", settingsMedia: "Short-drama scene preview", exportStep: "Export", settingsToast: "Renaming is coming soon", analysisHeading: "Short-drama narration AI analysis", analysisAction: "Next: Edit clips →", analysisTitle: "Understanding the story and extracting highlights", analysisDone: "Complete", analysisLog: "Locating story conflicts and payoffs", analysisMedia: "Play EP01 fullscreen", resultTitle: "霸总短剧解说 01 | Narrato", settingsTitle: "Narration settings | Narrato", analysisPageTitle: "AI analysis | Narrato" },
+   },
+   ja: {
+     language: "日本語",
+@@ -51,6 +53,7 @@
+     projectsTitle: "すべての制作タスクと生成結果を管理",
+     accountActions: "アカウントのクイック操作",
+     routeToasts: { "/dashboard": "チャージ機能は準備中です", "/dashboard/create": "パラメータ設定は準備中です", "/dashboard/projects": "霸总短剧解说 01：書き出しは準備中です" },
++    workflow: { resultHeading: "霸总短剧解说 01 · プロジェクト結果", resultAction: "動画を書き出す", resultStatus: "生成完了", resultLog: "動画の書き出しが完了", resultMedia: "霸总短剧解说 01 の完成動画", resultBreadcrumb: "マイプロジェクト", createdAt: "作成日時", resultToast: "共有リンクを準備しました（プロトタイプ）", settingsHeading: "ショートドラマ解説の設定", settingsAction: "現在の設定で AI 分析を開始", settingsMedia: "ショートドラマ画面プレビュー", exportStep: "書き出し", settingsToast: "名前変更機能は準備中です", analysisHeading: "ショートドラマ解説 AI 分析", analysisAction: "次へ：クリップ編集 →", analysisTitle: "ストーリーを理解してハイライトを抽出中", analysisDone: "完了", analysisLog: "ストーリーの対立と見せ場を特定中", analysisMedia: "EP01 を全画面再生", resultTitle: "霸总短剧解说 01｜影创工坊", settingsTitle: "ショートドラマ解説設定｜影创工坊", analysisPageTitle: "AI 分析｜影创工坊" },
+   },
+ };
+ 
+@@ -59,6 +62,25 @@
+   assert.equal(resources.home.demo.kicker, "CASE DEMO", `${locale} demo kicker must come from resources`);
+ }
+ 
++const task5ResourceRoots = ["projectResult", "narration", "analysis"];
++const task5EqualContentBoundaries = new Set(["narration.ratios.landscape", "narration.ratios.square"]);
++const readResourceLeaves = (value, prefix = "", leaves = new Map()) => {
++  for (const [key, child] of Object.entries(value)) {
++    const resourcePath = prefix ? `${prefix}.${key}` : key;
++    if (typeof child === "string") leaves.set(resourcePath, child);
++    else readResourceLeaves(child, resourcePath, leaves);
++  }
++  return leaves;
++};
++const zhTask5Leaves = readResourceLeaves(Object.fromEntries(task5ResourceRoots.map((root) => [root, zhCN[root]])));
++for (const [locale, resources] of Object.entries({ en, ja })) {
++  const localizedLeaves = readResourceLeaves(Object.fromEntries(task5ResourceRoots.map((root) => [root, resources[root]])));
++  for (const [key, zhValue] of zhTask5Leaves) {
++    assert.equal(typeof localizedLeaves.get(key), "string", `${locale} must define Task 5 resource ${key}`);
++    if (!task5EqualContentBoundaries.has(key)) assert.notEqual(localizedLeaves.get(key), zhValue, `${locale} Task 5 resource ${key} must not silently remain Chinese`);
++  }
++}
++
+ async function findAvailablePort() {
+   return await new Promise((resolve, reject) => {
+     const server = net.createServer();
+@@ -166,6 +188,46 @@
+     await page.getByRole("heading", { level: 1 }).waitFor();
+     assert.equal((await page.getByRole("heading", { level: 1 }).textContent()).trim(), EXPECTED_COPY[locale].notFoundHeading);
+     assert.equal(await page.title(), EXPECTED_COPY[locale].notFoundTitle);
++  }
++
++  for (const locale of ["zh-CN", "en", "ja"]) {
++    const expected = EXPECTED_COPY[locale].workflow;
++    await page.goto(`${baseUrl}/dashboard/projects/overlord/result`);
++    await selectLocale(locale);
++    assert.equal((await page.locator("[data-route-heading]").textContent()).trim(), expected.resultHeading);
++    assert.equal(await page.title(), expected.resultTitle);
++    await page.getByText(expected.resultStatus, { exact: true }).waitFor();
++    await page.getByText(expected.resultLog, { exact: true }).waitFor();
++    await page.getByLabel(expected.resultMedia).waitFor();
++    await page.locator(".project-result-breadcrumb").getByText(expected.resultBreadcrumb, { exact: true }).waitFor();
++    await page.locator(".project-result-summary dt").getByText(expected.createdAt, { exact: true }).waitFor();
++    await page.getByRole("link", { name: expected.resultAction, exact: true }).first().waitFor();
++    await page.getByRole("button", { name: /分享项目|Share project|プロジェクトを共有/ }).click();
++    assert.equal((await page.locator(".dashboard-toast > span").innerText()).trim(), expected.resultToast);
++    for (const literal of ["霸总短剧解说 01", "1080 × 1920", "01:25"]) await page.getByText(literal, { exact: false }).first().waitFor();
++
++    await page.goto(`${baseUrl}/dashboard/narration/settings`);
++    await selectLocale(locale);
++    assert.equal((await page.locator("[data-route-heading]").textContent()).trim(), expected.settingsHeading);
++    assert.equal(await page.title(), expected.settingsTitle);
++    await page.getByRole("link", { name: expected.settingsAction }).waitFor();
++    await page.getByLabel(expected.settingsMedia).waitFor();
++    await page.locator(".narration-stepper").getByText(expected.exportStep, { exact: true }).waitFor();
++    await page.locator(".narration-topbar button").click();
++    assert.equal((await page.locator(".dashboard-toast > span").innerText()).trim(), expected.settingsToast);
++    await page.getByText("霸总短剧解说 01", { exact: true }).waitFor();
++    await page.getByText("01:25", { exact: true }).waitFor();
++
++    await page.goto(`${baseUrl}/dashboard/narration/analysis`);
++    await selectLocale(locale);
++    assert.equal((await page.locator("[data-route-heading]").textContent()).trim(), expected.analysisHeading);
++    assert.equal(await page.title(), expected.analysisPageTitle);
++    await page.getByRole("heading", { name: expected.analysisTitle }).waitFor();
++    await page.getByText(expected.analysisLog, { exact: true }).waitFor();
++    assert.equal(await page.locator(".analysis-stage small").filter({ hasText: expected.analysisDone }).count(), 2);
++    await page.getByRole("button", { name: expected.analysisMedia, exact: true }).waitFor();
++    await page.getByRole("button", { name: expected.analysisAction }).waitFor();
++    for (const literal of ["EP01", "EP02", "EP03", "EP04", "08:42", "03:21"]) await page.getByText(literal, { exact: true }).first().waitFor();
+   }
+ 
+   await page.goto(`${baseUrl}/`);

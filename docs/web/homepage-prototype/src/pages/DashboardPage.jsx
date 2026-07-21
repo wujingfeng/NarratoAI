@@ -1,25 +1,24 @@
 import { useCallback, useEffect, useState } from "react";
-import { CreationEntryCard } from "../components/dashboard/CreationEntryCard.jsx";
-import { CreditsOverview } from "../components/dashboard/CreditsOverview.jsx";
+import { CaseMasonry } from "../components/dashboard/CaseMasonry.jsx";
+import { CreationStudio } from "../components/dashboard/CreationStudio.jsx";
 import { DashboardHeader } from "../components/dashboard/DashboardHeader.jsx";
 import { DashboardMobileNav } from "../components/dashboard/DashboardMobileNav.jsx";
 import { DashboardSidebar } from "../components/dashboard/DashboardSidebar.jsx";
 import { DashboardToast } from "../components/dashboard/DashboardToast.jsx";
-import { InspirationPanel } from "../components/dashboard/InspirationPanel.jsx";
-import { PromotionBanner } from "../components/dashboard/PromotionBanner.jsx";
-import { RecentProjects } from "../components/dashboard/RecentProjects.jsx";
-import { ToolQuickStart } from "../components/dashboard/ToolQuickStart.jsx";
+import { FeaturedTools } from "../components/dashboard/FeaturedTools.jsx";
+import { MarketingCarousel } from "../components/dashboard/MarketingCarousel.jsx";
 import {
   dashboardCredits,
   dashboardNavItems,
-  dashboardPrimaryAction,
+  dashboardCases,
+  dashboardCreationEntries,
+  dashboardPromotions,
   dashboardTools,
-  inspirations,
-  recentProjects,
 } from "../data/dashboardData.js";
+import { useI18n } from "../i18n/useI18n.js";
 
 export function DashboardPage() {
-  const [bannerVisible, setBannerVisible] = useState(true);
+  const { t } = useI18n();
   const [toast, setToast] = useState({ id: 0, message: "" });
   const showUnavailable = useCallback((message) => {
     setToast(({ id }) => ({ id: id + 1, message }));
@@ -33,25 +32,19 @@ export function DashboardPage() {
 
   return (
     <div className="dashboard-shell" data-page="dashboard">
-      <h1 className="sr-only" data-route-heading tabIndex="-1">工作台概览</h1>
+      <h1 className="sr-only" data-route-heading tabIndex="-1">{t("dashboard.routeHeading")}</h1>
       <DashboardSidebar items={dashboardNavItems} onUnavailable={showUnavailable} />
       <div className="dashboard-workspace">
         <DashboardHeader credits={dashboardCredits} onUnavailable={showUnavailable} />
         <main className="dashboard-main">
-          {bannerVisible && <PromotionBanner onClose={() => setBannerVisible(false)} onUnavailable={showUnavailable} />}
-          <div className="dashboard-primary-grid">
-            <CreationEntryCard action={dashboardPrimaryAction} onUnavailable={showUnavailable} />
-            <ToolQuickStart tools={dashboardTools} onUnavailable={showUnavailable} />
+          <div className="dashboard-launch-grid">
+            <MarketingCarousel promotions={dashboardPromotions} onUnavailable={showUnavailable} />
+            <CreationStudio entries={dashboardCreationEntries} onUnavailable={showUnavailable} compact />
           </div>
-          <div className="dashboard-content-grid">
-            <RecentProjects projects={recentProjects} onUnavailable={showUnavailable} />
-            <div className="dashboard-content-grid__side">
-              <CreditsOverview credits={dashboardCredits} onUnavailable={showUnavailable} />
-              <InspirationPanel inspirations={inspirations} onUnavailable={showUnavailable} />
-            </div>
-          </div>
+          <FeaturedTools tools={dashboardTools} onUnavailable={showUnavailable} />
+          <CaseMasonry cases={dashboardCases} onUnavailable={showUnavailable} />
         </main>
-        <footer className="dashboard-footer">影创工坊 · 让 AI 创作更简单</footer>
+        <footer className="dashboard-footer">{t("dashboard.footer")}</footer>
       </div>
       <DashboardMobileNav items={dashboardNavItems} onUnavailable={showUnavailable} />
       {toast.message && <DashboardToast key={toast.id} message={toast.message} onClose={() => setToast(({ id }) => ({ id, message: "" }))} />}

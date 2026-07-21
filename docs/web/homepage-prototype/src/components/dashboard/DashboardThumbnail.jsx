@@ -1,6 +1,8 @@
 import { useState } from "react";
+import { useI18n } from "../../i18n/useI18n.js";
 
-export function DashboardThumbnail({ src, alt, fallbackLabel }) {
+export function DashboardThumbnail({ src, alt, fallbackLabel, loading = "lazy" }) {
+  const { t } = useI18n();
   const [failed, setFailed] = useState(false);
 
   return (
@@ -9,7 +11,7 @@ export function DashboardThumbnail({ src, alt, fallbackLabel }) {
         <img
           src={src}
           alt={alt}
-          loading="lazy"
+          loading={loading}
           decoding="async"
           onError={() => setFailed(true)}
         />
@@ -18,7 +20,7 @@ export function DashboardThumbnail({ src, alt, fallbackLabel }) {
         <span
           className="dashboard-thumbnail__fallback"
           role="img"
-          aria-label={`${fallbackLabel}缩略图不可用`}
+          aria-label={t("dashboard.thumbnailUnavailable", { name: fallbackLabel })}
         >
           {fallbackLabel}
         </span>

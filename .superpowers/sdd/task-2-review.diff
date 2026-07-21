@@ -1,0 +1,571 @@
+--- /tmp/narrato-i18n/task2-before/package.json	2026-07-15 21:46:01
++++ docs/web/homepage-prototype/package.json	2026-07-15 21:46:50
+@@ -7,6 +7,7 @@
+     "dev": "vite",
+     "build": "vite build",
+     "test:i18n": "node --test src/i18n/locale.test.js",
++    "verify:i18n": "node scripts/verify-i18n.mjs",
+     "preview": "vite preview",
+     "screenshot": "node scripts/capture-home.mjs",
+     "verify:hero": "node scripts/verify-hero.mjs",
+--- /tmp/narrato-i18n/task2-before/src/components/SiteHeader.jsx	2026-07-15 21:46:01
++++ docs/web/homepage-prototype/src/components/SiteHeader.jsx	2026-07-15 21:48:31
+@@ -1,8 +1,11 @@
+ import { useEffect, useRef } from "react";
+ import { List, X } from "@phosphor-icons/react";
+ import { BrandMark } from "./BrandMark.jsx";
++import { LanguageSwitcher } from "./i18n/LanguageSwitcher.jsx";
++import { useI18n } from "../i18n/useI18n.js";
+ 
+ export function SiteHeader({ activeSection, menuOpen, onMenuChange, onNavigate, onFeedback, isInert = false }) {
++  const { t } = useI18n();
+   const menuPanelRef = useRef(null);
+   const restoreFocusRef = useRef(null);
+ 
+@@ -46,8 +49,8 @@
+   }, [menuOpen, onMenuChange]);
+ 
+   const navItems = [
+-    { id: "capabilities", label: "产品能力" },
+-    { id: "demo", label: "案例 Demo" },
++    { id: "capabilities", label: t("home.header.capabilities") },
++    { id: "demo", label: t("home.header.demo") },
+   ];
+ 
+   return (
+@@ -57,10 +60,10 @@
+         inert={menuOpen ? true : undefined}
+         aria-hidden={menuOpen ? "true" : undefined}
+       >
+-        <button className="brand-button" type="button" onClick={() => onNavigate("hero")}>
++        <button className="brand-button" type="button" aria-label={t("home.header.home")} onClick={() => onNavigate("hero")}>
+           <BrandMark />
+         </button>
+-        <nav className="desktop-nav" aria-label="主导航">
++        <nav className="desktop-nav" aria-label={t("home.header.primaryNavigation")}>
+           {navItems.map((item) => (
+             <button
+               key={item.id}
+@@ -71,16 +74,17 @@
+               {item.label}
+             </button>
+           ))}
+-          <button type="button" onClick={() => onFeedback("价格页待接入")}>价格</button>
++          <button type="button" onClick={() => onFeedback(t("home.header.pricingFeedback"))}>{t("home.header.pricing")}</button>
+         </nav>
+         <div className="header-actions">
+-          <button className="login-button" type="button" onClick={() => onFeedback("登录流程待接入")}>
+-            登录
++          <LanguageSwitcher />
++          <button className="login-button" type="button" onClick={() => onFeedback(t("home.header.loginFeedback"))}>
++            {t("common.login")}
+           </button>
+           <button
+             className="menu-button"
+             type="button"
+-            aria-label={menuOpen ? "关闭菜单" : "打开菜单"}
++            aria-label={menuOpen ? t("common.closeMenu") : t("common.openMenu")}
+             aria-expanded={menuOpen}
+             onClick={() => onMenuChange(!menuOpen)}
+           >
+@@ -89,22 +93,23 @@
+         </div>
+       </div>
+       <div className={`mobile-menu ${menuOpen ? "is-open" : ""}`} aria-hidden={!menuOpen} inert={!menuOpen ? true : undefined}>
+-        <button className="mobile-menu__backdrop" type="button" aria-label="关闭菜单" onClick={() => onMenuChange(false)} />
+-        <nav ref={menuPanelRef} className="mobile-menu__panel" aria-label="移动端导航">
++        <button className="mobile-menu__backdrop" type="button" aria-label={t("common.closeMenu")} onClick={() => onMenuChange(false)} />
++        <nav ref={menuPanelRef} className="mobile-menu__panel" aria-label={t("home.header.mobileNavigation")}>
+           <div className="mobile-menu__top">
+             <BrandMark compact />
+-            <button type="button" aria-label="关闭菜单" onClick={() => onMenuChange(false)}><X size={26} /></button>
++            <button type="button" aria-label={t("common.closeMenu")} onClick={() => onMenuChange(false)}><X size={26} /></button>
+           </div>
+           {navItems.map((item, index) => (
+             <button key={item.id} type="button" onClick={() => onNavigate(item.id)}>
+               <span>0{index + 1}</span>{item.label}
+             </button>
+           ))}
+-          <button type="button" onClick={() => { onMenuChange(false); onFeedback("价格页待接入"); }}>
+-            <span>03</span>价格
++          <button type="button" onClick={() => { onMenuChange(false); onFeedback(t("home.header.pricingFeedback")); }}>
++            <span>03</span>{t("home.header.pricing")}
+           </button>
+-          <button className="mobile-menu__login" type="button" onClick={() => { onMenuChange(false); onFeedback("登录流程待接入"); }}>
+-            登录影创工坊
++          <LanguageSwitcher inline />
++          <button className="mobile-menu__login" type="button" onClick={() => { onMenuChange(false); onFeedback(t("home.header.loginFeedback")); }}>
++            {t("home.header.loginFull")}
+           </button>
+         </nav>
+       </div>
+--- /tmp/narrato-i18n/task2-before/src/styles/home.css	2026-07-15 21:46:01
++++ docs/web/homepage-prototype/src/styles/home.css	2026-07-15 21:48:53
+@@ -138,6 +138,129 @@
+   gap: 13px;
+ }
+ 
++.language-switcher {
++  position: relative;
++  flex: 0 0 auto;
++}
++
++.language-switcher__trigger {
++  min-width: 82px;
++  min-height: 44px;
++  display: inline-flex;
++  align-items: center;
++  justify-content: center;
++  gap: 7px;
++  padding: 8px 11px;
++  border: 1px solid rgba(131, 173, 226, 0.28);
++  border-radius: 10px;
++  background: rgba(6, 11, 21, 0.5);
++  color: #e8effc;
++  font: inherit;
++  cursor: pointer;
++  transition: border-color 180ms ease, background 180ms ease;
++}
++
++.language-switcher__trigger:hover,
++.language-switcher__trigger[aria-expanded="true"] {
++  border-color: rgba(91, 194, 255, 0.72);
++  background: rgba(37, 98, 181, 0.15);
++}
++
++.language-switcher__caret {
++  transition: transform 180ms ease;
++}
++
++.language-switcher__trigger[aria-expanded="true"] .language-switcher__caret {
++  transform: rotate(180deg);
++}
++
++.language-switcher__menu {
++  position: absolute;
++  z-index: 160;
++  top: calc(100% + 9px);
++  right: 0;
++  width: 172px;
++  padding: 7px;
++  border: 1px solid rgba(83, 167, 255, 0.36);
++  border-radius: 12px;
++  background: rgba(8, 15, 29, 0.98);
++  box-shadow: 0 18px 42px rgba(0, 0, 0, 0.46), 0 0 24px rgba(64, 150, 255, 0.12);
++}
++
++.language-switcher__option {
++  width: 100%;
++  min-height: 44px;
++  display: flex;
++  align-items: center;
++  justify-content: space-between;
++  gap: 12px;
++  padding: 9px 11px;
++  border: 0;
++  border-radius: 8px;
++  background: transparent;
++  color: #dfe8f8;
++  font: inherit;
++  text-align: left;
++  cursor: pointer;
++}
++
++.language-switcher__option:hover,
++.language-switcher__option:focus-visible,
++.language-switcher__option[aria-current="true"] {
++  background: rgba(64, 150, 255, 0.13);
++  color: #fff;
++}
++
++.language-switcher__option svg {
++  flex: 0 0 auto;
++  color: var(--cyan);
++  opacity: 0;
++}
++
++.language-switcher__option[aria-current="true"] svg {
++  opacity: 1;
++}
++
++.language-switcher__trigger:focus-visible,
++.language-switcher__option:focus-visible,
++.language-switcher__inline-option:focus-visible {
++  outline: 2px solid var(--cyan);
++  outline-offset: 2px;
++}
++
++.language-switcher--compact .language-switcher__trigger {
++  min-width: 44px;
++  padding-inline: 8px;
++}
++
++.language-switcher--inline {
++  width: 100%;
++  display: grid;
++  grid-template-columns: repeat(3, minmax(0, 1fr));
++  gap: 7px;
++  margin-top: 24px;
++}
++
++.language-switcher__inline-option {
++  min-width: 0;
++  min-height: 44px;
++  padding: 8px 4px;
++  border: 1px solid rgba(131, 173, 226, 0.25);
++  border-radius: 9px;
++  background: rgba(255, 255, 255, 0.03);
++  color: #dfe8f8;
++  font: inherit;
++  font-size: 13px;
++  cursor: pointer;
++}
++
++.language-switcher__inline-option:hover,
++.language-switcher__inline-option[aria-pressed="true"] {
++  border-color: rgba(91, 194, 255, 0.72);
++  background: rgba(64, 150, 255, 0.14);
++  color: #fff;
++}
++
+ .login-button {
+   min-width: 90px;
+   height: 38px;
+@@ -2184,6 +2307,10 @@
+     display: none;
+   }
+ 
++  .header-actions > .language-switcher:not(.language-switcher--inline) {
++    display: none;
++  }
++
+   .login-button {
+     min-width: 82px;
+     height: 42px;
+--- /tmp/narrato-i18n/task2-before/src/i18n/locales/zh-CN.js	2026-07-15 21:46:01
++++ docs/web/homepage-prototype/src/i18n/locales/zh-CN.js	2026-07-15 21:48:31
+@@ -2,6 +2,22 @@
+   common: {
+     language: "语言",
+     localeName: "简体中文",
++    login: "登录",
++    openMenu: "打开菜单",
++    closeMenu: "关闭菜单",
+   },
++  home: {
++    header: {
++      home: "返回首页",
++      primaryNavigation: "主导航",
++      mobileNavigation: "移动端导航",
++      capabilities: "产品能力",
++      demo: "案例 Demo",
++      pricing: "价格",
++      pricingFeedback: "价格页待接入",
++      loginFeedback: "登录流程待接入",
++      loginFull: "登录影创工坊",
++    },
++  },
+   titles: {},
+ };
+--- /tmp/narrato-i18n/task2-before/src/i18n/locales/en.js	2026-07-15 21:46:01
++++ docs/web/homepage-prototype/src/i18n/locales/en.js	2026-07-15 21:48:31
+@@ -2,6 +2,22 @@
+   common: {
+     language: "Language",
+     localeName: "English",
++    login: "Log in",
++    openMenu: "Open menu",
++    closeMenu: "Close menu",
+   },
++  home: {
++    header: {
++      home: "Back to home",
++      primaryNavigation: "Primary navigation",
++      mobileNavigation: "Mobile navigation",
++      capabilities: "Capabilities",
++      demo: "Demo",
++      pricing: "Pricing",
++      pricingFeedback: "Pricing page coming soon",
++      loginFeedback: "Login flow coming soon",
++      loginFull: "Log in to Narrato",
++    },
++  },
+   titles: {},
+ };
+--- /tmp/narrato-i18n/task2-before/src/i18n/locales/ja.js	2026-07-15 21:46:01
++++ docs/web/homepage-prototype/src/i18n/locales/ja.js	2026-07-15 21:48:33
+@@ -2,6 +2,22 @@
+   common: {
+     language: "言語",
+     localeName: "日本語",
++    login: "ログイン",
++    openMenu: "メニューを開く",
++    closeMenu: "メニューを閉じる",
+   },
++  home: {
++    header: {
++      home: "ホームに戻る",
++      primaryNavigation: "メインナビゲーション",
++      mobileNavigation: "モバイルナビゲーション",
++      capabilities: "製品機能",
++      demo: "事例 Demo",
++      pricing: "料金",
++      pricingFeedback: "料金ページは準備中です",
++      loginFeedback: "ログイン機能は準備中です",
++      loginFull: "Narrato にログイン",
++    },
++  },
+   titles: {},
+ };
+--- /dev/null	2026-07-15 21:50:44
++++ docs/web/homepage-prototype/src/components/i18n/LanguageSwitcher.jsx	2026-07-15 21:48:31
+@@ -0,0 +1,128 @@
++import { useEffect, useRef, useState } from "react";
++import { CaretDown, Check, Globe } from "@phosphor-icons/react";
++import { useI18n } from "../../i18n/useI18n.js";
++
++const LANGUAGES = [
++  { id: "zh-CN", short: "简中", selfName: "简体中文" },
++  { id: "en", short: "EN", selfName: "English" },
++  { id: "ja", short: "日本語", selfName: "日本語" },
++];
++
++export function LanguageSwitcher({ compact = false, inline = false, className = "" }) {
++  const { locale, setLocale, t } = useI18n();
++  const [open, setOpen] = useState(false);
++  const buttonRef = useRef(null);
++  const menuRef = useRef(null);
++  const currentLanguage = LANGUAGES.find((language) => language.id === locale) ?? LANGUAGES[0];
++
++  useEffect(() => {
++    if (!open) return undefined;
++
++    const currentItem = menuRef.current?.querySelector(`[data-locale="${locale}"]`);
++    (currentItem ?? menuRef.current?.querySelector('[role="menuitem"]'))?.focus();
++
++    const handlePointerDown = (event) => {
++      if (buttonRef.current?.contains(event.target) || menuRef.current?.contains(event.target)) return;
++      setOpen(false);
++    };
++    document.addEventListener("pointerdown", handlePointerDown);
++    return () => document.removeEventListener("pointerdown", handlePointerDown);
++  }, [locale, open]);
++
++  const closeAndRestoreFocus = () => {
++    setOpen(false);
++    buttonRef.current?.focus();
++  };
++
++  const selectLanguage = (nextLocale) => {
++    setLocale(nextLocale);
++    if (!inline) closeAndRestoreFocus();
++  };
++
++  const handleMenuKeyDown = (event) => {
++    const items = [...(menuRef.current?.querySelectorAll('[role="menuitem"]') ?? [])];
++    const currentIndex = items.indexOf(document.activeElement);
++    let nextIndex;
++
++    if (event.key === "Escape") {
++      event.preventDefault();
++      closeAndRestoreFocus();
++      return;
++    }
++    if (event.key === "ArrowDown") nextIndex = (currentIndex + 1) % items.length;
++    else if (event.key === "ArrowUp") nextIndex = (currentIndex - 1 + items.length) % items.length;
++    else if (event.key === "Home") nextIndex = 0;
++    else if (event.key === "End") nextIndex = items.length - 1;
++    else return;
++
++    event.preventDefault();
++    items[nextIndex]?.focus();
++  };
++
++  const classes = [
++    "language-switcher",
++    compact ? "language-switcher--compact" : "",
++    inline ? "language-switcher--inline" : "",
++    className,
++  ].filter(Boolean).join(" ");
++
++  if (inline) {
++    return (
++      <div className={classes} role="group" aria-label={t("common.language")}>
++        {LANGUAGES.map((language) => (
++          <button
++            key={language.id}
++            className="language-switcher__inline-option"
++            type="button"
++            aria-pressed={locale === language.id}
++            onClick={() => selectLanguage(language.id)}
++          >
++            {language.selfName}
++          </button>
++        ))}
++      </div>
++    );
++  }
++
++  return (
++    <div className={classes}>
++      <button
++        ref={buttonRef}
++        className="language-switcher__trigger"
++        type="button"
++        aria-label={`${t("common.language")}: ${currentLanguage.selfName}`}
++        aria-haspopup="menu"
++        aria-expanded={open}
++        data-testid="language-switcher-trigger"
++        onClick={() => setOpen((value) => !value)}
++        onKeyDown={(event) => {
++          if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
++          event.preventDefault();
++          setOpen(true);
++        }}
++      >
++        <Globe size={19} aria-hidden="true" />
++        {!compact && <span>{currentLanguage.short}</span>}
++        <CaretDown className="language-switcher__caret" size={15} aria-hidden="true" />
++      </button>
++      {open && (
++        <div ref={menuRef} className="language-switcher__menu" role="menu" onKeyDown={handleMenuKeyDown}>
++          {LANGUAGES.map((language) => (
++            <button
++              key={language.id}
++              className="language-switcher__option"
++              type="button"
++              role="menuitem"
++              aria-current={locale === language.id ? "true" : undefined}
++              data-locale={language.id}
++              onClick={() => selectLanguage(language.id)}
++            >
++              <span>{language.selfName}</span>
++              <Check size={17} weight="bold" aria-hidden="true" />
++            </button>
++          ))}
++        </div>
++      )}
++    </div>
++  );
++}
+--- /dev/null	2026-07-15 21:50:44
++++ docs/web/homepage-prototype/scripts/verify-i18n.mjs	2026-07-15 21:47:51
+@@ -0,0 +1,118 @@
++import assert from "node:assert/strict";
++import { spawn } from "node:child_process";
++import net from "node:net";
++import path from "node:path";
++import { fileURLToPath } from "node:url";
++import { chromium } from "playwright";
++
++const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
++const executablePath =
++  process.env.CHROME_PATH || "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
++
++async function findAvailablePort() {
++  return await new Promise((resolve, reject) => {
++    const server = net.createServer();
++    server.once("error", reject);
++    server.listen(0, "127.0.0.1", () => {
++      const { port } = server.address();
++      server.close((error) => (error ? reject(error) : resolve(port)));
++    });
++  });
++}
++
++async function waitForPreview(url, preview, getOutput) {
++  const deadline = Date.now() + 15_000;
++  while (Date.now() < deadline) {
++    if (preview.exitCode !== null) {
++      throw new Error(`Vite preview exited early (${preview.exitCode}).\n${getOutput()}`);
++    }
++    try {
++      const response = await fetch(url);
++      if (response.ok) return;
++    } catch {}
++    await new Promise((resolve) => setTimeout(resolve, 100));
++  }
++  throw new Error(`Timed out waiting for Vite preview at ${url}.\n${getOutput()}`);
++}
++
++async function stopPreview(preview) {
++  if (preview.exitCode !== null) return;
++  try {
++    process.kill(-preview.pid, "SIGTERM");
++  } catch {
++    preview.kill("SIGTERM");
++  }
++  await Promise.race([
++    new Promise((resolve) => preview.once("exit", resolve)),
++    new Promise((resolve) => setTimeout(resolve, 2_000)),
++  ]);
++  if (preview.exitCode === null) {
++    try {
++      process.kill(-preview.pid, "SIGKILL");
++    } catch {
++      preview.kill("SIGKILL");
++    }
++  }
++}
++
++const port = Number(process.env.I18N_PREVIEW_PORT) || await findAvailablePort();
++const baseUrl = `http://127.0.0.1:${port}`;
++const viteBin = path.join(projectRoot, "node_modules", "vite", "bin", "vite.js");
++const preview = spawn(process.execPath, [viteBin, "preview", "--host", "127.0.0.1", "--port", String(port), "--strictPort"], {
++  cwd: projectRoot,
++  detached: true,
++  stdio: ["ignore", "pipe", "pipe"],
++});
++let previewOutput = "";
++preview.stdout.on("data", (chunk) => { previewOutput += chunk; });
++preview.stderr.on("data", (chunk) => { previewOutput += chunk; });
++
++let browser;
++try {
++  await waitForPreview(baseUrl, preview, () => previewOutput);
++  browser = await chromium.launch({ executablePath, headless: true });
++  const context = await browser.newContext({ locale: "en-US", viewport: { width: 1280, height: 900 } });
++  await context.addInitScript(() => window.localStorage.clear());
++  const page = await context.newPage();
++  page.setDefaultTimeout(5_000);
++
++  await page.goto(`${baseUrl}/`);
++  await page.getByTestId("language-switcher-trigger").waitFor();
++  assert.equal(await page.locator("html").getAttribute("lang"), "en");
++  assert.equal(await page.getByTestId("language-switcher-trigger").getAttribute("aria-haspopup"), "menu");
++  await page.getByTestId("language-switcher-trigger").click();
++  await page.getByRole("menuitem", { name: "日本語" }).click();
++  assert.equal(new URL(page.url()).pathname, "/");
++  assert.equal(await page.locator("html").getAttribute("lang"), "ja");
++  assert.equal(await page.evaluate(() => localStorage.getItem("narrato.locale")), "ja");
++
++  const trigger = page.getByTestId("language-switcher-trigger");
++  await trigger.focus();
++  await trigger.press("Enter");
++  const japaneseMenuItem = page.getByRole("menuitem", { name: "日本語" });
++  await japaneseMenuItem.waitFor();
++  await japaneseMenuItem.press("ArrowDown");
++  assert.equal(await page.getByRole("menuitem", { name: "简体中文" }).evaluate((node) => node === document.activeElement), true);
++  await page.keyboard.press("Escape");
++  await page.getByRole("menu").waitFor({ state: "detached" });
++  assert.equal(await trigger.evaluate((node) => node === document.activeElement), true);
++
++  await trigger.click();
++  await page.getByRole("menu").waitFor();
++  await page.locator(".hero-section").click({ position: { x: 20, y: 300 } });
++  await page.getByRole("menu").waitFor({ state: "detached" });
++
++  await page.setViewportSize({ width: 390, height: 844 });
++  await page.locator(".menu-button").click();
++  const inlineSwitcher = page.locator(".language-switcher--inline");
++  await inlineSwitcher.waitFor();
++  for (const language of ["简体中文", "English", "日本語"]) {
++    await inlineSwitcher.getByRole("button", { name: language, exact: true }).waitFor();
++  }
++
++  await context.close();
++  console.log("i18n public header verification passed");
++} finally {
++  await browser?.close();
++  await stopPreview(preview);
++}

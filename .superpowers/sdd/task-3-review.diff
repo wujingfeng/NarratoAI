@@ -1,0 +1,1387 @@
+diff -ruN /tmp/narrato-i18n/task3-before/src/components/CapabilitySection.jsx docs/web/homepage-prototype/src/components/CapabilitySection.jsx
+--- /tmp/narrato-i18n/task3-before/src/components/CapabilitySection.jsx	2026-07-15 21:52:21
++++ docs/web/homepage-prototype/src/components/CapabilitySection.jsx	2026-07-15 22:07:54
+@@ -11,52 +11,44 @@
+   UserFocus,
+   VideoCamera,
+ } from "@phosphor-icons/react";
++import { useI18n } from "../i18n/useI18n.js";
+ 
+-const capabilities = [
++const capabilityMeta = [
+   {
+     id: "narration",
+     tone: "violet",
+     icon: FilmSlate,
+-    title: "短剧解说",
+-    subtitle: "小白也能做短剧号",
+-    features: "高光片段 · 解说文案 · AI 配音 · 字幕 · BGM",
+   },
+   {
+     id: "translation",
+     tone: "cyan",
+     icon: Translate,
+-    title: "视频翻译",
+-    subtitle: "让内容跨越语言",
+-    features: "字幕翻译 · 重新配音 · 双语字幕",
+   },
+   {
+     id: "remix",
+     tone: "orange",
+     icon: Scissors,
+-    title: "短剧混剪",
+-    subtitle: "不用懂剪辑",
+-    features: "高光片段 · 保留原声 · BGM",
+   },
+ ];
+ 
+-const processSteps = [
+-  { icon: CloudArrowUp, label: "上传素材" },
+-  { icon: Cpu, label: "AI 分析" },
+-  { icon: UserFocus, label: "用户审核" },
+-  { icon: VideoCamera, label: "自动合成" },
+-  { icon: DownloadSimple, label: "导出发布" },
++const processStepMeta = [
++  { id: "upload", icon: CloudArrowUp },
++  { id: "analysis", icon: Cpu },
++  { id: "review", icon: UserFocus },
++  { id: "compose", icon: VideoCamera },
++  { id: "export", icon: DownloadSimple },
+ ];
+ 
+-function CapabilityCard({ item, selected, onChoose }) {
++function CapabilityCard({ item, selected, onChoose, t }) {
+   const Icon = item.icon;
+   return (
+     <article className={`capability-card capability-card--${item.tone} ${selected ? "is-selected" : ""}`}>
+       <div className="capability-card__copy">
+         <span className="capability-card__icon"><Icon size={35} weight="duotone" /></span>
+-        <h3>{item.title}</h3>
+-        <p>{item.subtitle}</p>
+-        <small>{item.features}</small>
+-        <button type="button" onClick={() => onChoose(item.id)}>立即体验 <ArrowRight size={17} /></button>
++        <h3>{t(`home.capabilities.items.${item.id}.title`)}</h3>
++        <p>{t(`home.capabilities.items.${item.id}.subtitle`)}</p>
++        <small>{t(`home.capabilities.items.${item.id}.features`)}</small>
++        <button type="button" onClick={() => onChoose(item.id)}>{t("home.capabilities.tryNow")} <ArrowRight size={17} /></button>
+       </div>
+       <div className="capability-orbit" aria-hidden="true">
+         <span className="capability-orbit__halo" />
+@@ -67,37 +59,38 @@
+   );
+ }
+ 
+-function ProcessStepper() {
++function ProcessStepper({ t }) {
+   return (
+     <div className="process-panel">
+       <div className="process-steps">
+-        {processSteps.map(({ icon: Icon, label }, index) => (
+-          <div className="process-step" key={label}>
++        {processStepMeta.map(({ id, icon: Icon }, index) => (
++          <div className="process-step" key={id}>
+             <div className="process-step__node"><Icon size={28} weight="duotone" /></div>
+-            <span><b>{index + 1}</b>{label}</span>
+-            {index < processSteps.length - 1 && <i className="process-step__connector" />}
++            <span><b>{index + 1}</b>{t(`home.capabilities.process.${id}`)}</span>
++            {index < processStepMeta.length - 1 && <i className="process-step__connector" />}
+           </div>
+         ))}
+       </div>
+-      <div className="process-note"><Sparkle size={30} weight="duotone" /><p>小白可以沿用 AI 推荐，<br />有经验也能逐步调整</p></div>
++      <div className="process-note"><Sparkle size={30} weight="duotone" /><p>{t("home.capabilities.processNoteLine1")}<br />{t("home.capabilities.processNoteLine2")}</p></div>
+     </div>
+   );
+ }
+ 
+ export function CapabilitySection({ activeTool, onChooseTool }) {
++  const { t } = useI18n();
+   return (
+     <section id="capabilities" className="capability-section section-anchor page-container">
+       <div className="capability-heading">
+-        <span className="section-kicker">ALL-IN-ONE WORKSPACE</span>
+-        <h2>一个工作台，搞定<span className="gradient-text">三种视频创作</span></h2>
+-        <p><MagicWand size={18} weight="duotone" /> 选择目标，剩下的交给 AI 流程</p>
++        <span className="section-kicker">{t("home.capabilities.kicker")}</span>
++        <h2>{t("home.capabilities.headingPrefix")}<span className="gradient-text">{t("home.capabilities.headingAccent")}</span></h2>
++        <p><MagicWand size={18} weight="duotone" /> {t("home.capabilities.description")}</p>
+       </div>
+       <div className="capability-grid">
+-        {capabilities.map((item) => (
+-          <CapabilityCard key={item.id} item={item} selected={activeTool === item.id} onChoose={onChooseTool} />
++        {capabilityMeta.map((item) => (
++          <CapabilityCard key={item.id} item={item} selected={activeTool === item.id} onChoose={onChooseTool} t={t} />
+         ))}
+       </div>
+-      <ProcessStepper />
++      <ProcessStepper t={t} />
+     </section>
+   );
+ }
+diff -ruN /tmp/narrato-i18n/task3-before/src/components/DemoSection.jsx docs/web/homepage-prototype/src/components/DemoSection.jsx
+--- /tmp/narrato-i18n/task3-before/src/components/DemoSection.jsx	2026-07-15 21:52:21
++++ docs/web/homepage-prototype/src/components/DemoSection.jsx	2026-07-15 22:07:54
+@@ -16,118 +16,94 @@
+   Translate,
+   Waveform,
+ } from "@phosphor-icons/react";
++import { useI18n } from "../i18n/useI18n.js";
+ 
+ export const TOOL_DATA = {
+   narration: {
+-    label: "短剧解说",
+     icon: FilmSlate,
+     tone: "violet",
+     duration: "01:25",
+     elapsed: "00:12",
+-    summaryBadge: "00:00–00:03",
+     preview: {
+-      beforeLabel: "原始素材",
+-      afterLabel: "最终成片",
+-      beforeAlt: "原始剧情素材",
+-      afterAlt: "AI 生成的短剧解说成片",
+       titleLines: ["命运的", "反转"],
+       detailLines: ["这一刻，他终于", "发现自己爱上了她"],
+     },
+-    steps: [
+-      { title: "上传剧集", text: "3 集素材已进入队列" },
+-      { title: "ASR/剧情拆解", text: "识别人物、对白与剧情冲突" },
+-      { title: "筛选高光", text: "按反转与情绪强度选出 8 段" },
+-      { title: "生成/润色解说词", text: "口语化重写并校准叙事节奏" },
+-      { title: "配音字幕合成", text: "配音、字幕与画面自动对齐" },
+-    ],
+-    stats: [
+-      [AnchorSimple, "前 3 秒强钩子", "抓人开场，提升完播率"],
+-      [Star, "8 个高光片段", "反转 / 冲突 / 情绪高点全覆盖"],
+-      [FileText, "解说文案 312 字", "这一刻，他终于发现自己爱上了她…"],
+-      [Microphone, "配音字幕已同步", "自然配音 + 精准字幕对齐"],
+-    ],
+-    cta: "播放完整案例",
++    stepCount: 5,
+   },
+   translation: {
+-    label: "视频翻译",
+     icon: Translate,
+     tone: "cyan",
+     duration: "01:08",
+     elapsed: "00:18",
+-    summaryBadge: "中文 → EN",
+     preview: {
+-      beforeLabel: "中文原片",
+-      afterLabel: "英文成片",
+-      beforeAlt: "待翻译的中文原片",
+-      afterAlt: "完成英语本地化的视频成片",
+       titleLines: ["跨越语言", "自然表达"],
+       detailLines: ["保留人物语气", "英文对白自然流畅"],
+     },
+-    steps: [
+-      { title: "识别中文对白", text: "区分角色并还原对白时间轴" },
+-      { title: "翻译与本地化", text: "优化称谓、语气与文化表达" },
+-      { title: "角色声线映射", text: "为每位角色匹配目标语音色" },
+-      { title: "英文配音+双语字幕", text: "配音与双语字幕自动对齐" },
+-    ],
+-    stats: [
+-      [Translate, "6 种目标语言", "英语 / 日语 / 韩语等常用语种"],
+-      [Waveform, "3 位角色声线", "角色音色与情绪保持一致"],
+-      [FileText, "双语字幕 86 条", "时间轴已自动校准"],
+-      [CheckCircle, "本地化检查完成", "专有名词与文化表达已优化"],
+-    ],
+-    cta: "播放翻译案例",
++    stepCount: 4,
+   },
+   remix: {
+-    label: "短剧混剪",
+     icon: Scissors,
+     tone: "orange",
+     duration: "00:45",
+     elapsed: "00:09",
+-    summaryBadge: "12 个片段",
+     preview: {
+-      beforeLabel: "原始剧集",
+-      afterLabel: "高光混剪",
+-      beforeAlt: "待处理的原始短剧片段",
+-      afterAlt: "保留原声并完成节奏转场的高光混剪",
+       titleLines: ["高能", "混剪"],
+       detailLines: ["保留原声 · 卡点转场", "节奏与 BGM 自动匹配"],
+     },
+-    steps: [
+-      { title: "导入多集", text: "12 集素材已建立镜头索引" },
+-      { title: "选择高光", text: "按冲突、反转与情绪强度排序" },
+-      { title: "卡点拼接与混音", text: "保留原声并匹配节拍与 BGM" },
+-    ],
+-    stats: [
+-      [Star, "12 个高光片段", "高能剧情自动筛选"],
+-      [Waveform, "原声完整保留", "关键对白不被音乐遮盖"],
+-      [Scissors, "节奏点 18 处", "卡点转场与情绪峰值匹配"],
+-      [CheckCircle, "BGM 已完成混音", "动态音量平衡已应用"],
+-    ],
+-    cta: "播放混剪案例",
++    stepCount: 3,
+   },
+ };
+ 
+ const CASE_SETS = {
+   narration: [
+-    { id: "reversal", title: "霸总反转", toolName: "短剧解说", image: "/assets/short-drama-thumb.webp", duration: "01:25", playingElapsed: "00:18", progress: 34, tags: ["反转密集", "情绪拉满", "高完播"] },
+-    { id: "suspense", title: "悬疑真相局", toolName: "短剧解说", image: "/assets/documentary-thumb.webp", duration: "01:10", playingElapsed: "00:16", progress: 29, tags: ["强钩子", "层层递进", "沉浸旁白"] },
+-    { id: "counterattack", title: "都市逆袭录", toolName: "短剧解说", image: "/assets/film-action-thumb.webp", duration: "01:18", playingElapsed: "00:17", progress: 31, tags: ["冲突前置", "节奏紧凑", "反转收尾"] },
++    { id: "reversal", image: "/assets/short-drama-thumb.webp", duration: "01:25", playingElapsed: "00:18", progress: 34 },
++    { id: "suspense", image: "/assets/documentary-thumb.webp", duration: "01:10", playingElapsed: "00:16", progress: 29 },
++    { id: "counterattack", image: "/assets/film-action-thumb.webp", duration: "01:18", playingElapsed: "00:17", progress: 31 },
+   ],
+   translation: [
+-    { id: "global", title: "多语言出海", toolName: "视频翻译", image: "/assets/documentary-thumb.webp", duration: "01:08", playingElapsed: "00:18", progress: 36, tags: ["多语翻译", "本地配音", "全球发行"] },
+-    { id: "drama-en", title: "短剧英语版", toolName: "视频翻译", image: "/assets/short-drama-thumb.webp", duration: "00:58", playingElapsed: "00:14", progress: 30, tags: ["英语配音", "双语字幕", "角色声线"] },
+-    { id: "urban-jp", title: "都市剧日语版", toolName: "视频翻译", image: "/assets/film-action-thumb.webp", duration: "01:12", playingElapsed: "00:19", progress: 33, tags: ["日语本地化", "口型节奏", "字幕校准"] },
++    { id: "global", image: "/assets/documentary-thumb.webp", duration: "01:08", playingElapsed: "00:18", progress: 36 },
++    { id: "dramaEn", image: "/assets/short-drama-thumb.webp", duration: "00:58", playingElapsed: "00:14", progress: 30 },
++    { id: "urbanJp", image: "/assets/film-action-thumb.webp", duration: "01:12", playingElapsed: "00:19", progress: 33 },
+   ],
+   remix: [
+-    { id: "urban", title: "都市逆袭混剪", toolName: "短剧混剪", image: "/assets/film-action-thumb.webp", duration: "00:45", playingElapsed: "00:09", progress: 24, tags: ["节奏紧凑", "燃点爆发", "高能混剪"] },
+-    { id: "romance-remix", title: "心动名场面", toolName: "短剧混剪", image: "/assets/short-drama-thumb.webp", duration: "00:45", playingElapsed: "00:11", progress: 28, tags: ["情绪峰值", "保留原声", "氛围 BGM"] },
+-    { id: "cinema-remix", title: "电影感卡点", toolName: "短剧混剪", image: "/assets/documentary-thumb.webp", duration: "00:45", playingElapsed: "00:10", progress: 26, tags: ["镜头卡点", "节奏转场", "高光合集"] },
++    { id: "urban", image: "/assets/film-action-thumb.webp", duration: "00:45", playingElapsed: "00:09", progress: 24 },
++    { id: "romanceRemix", image: "/assets/short-drama-thumb.webp", duration: "00:45", playingElapsed: "00:11", progress: 28 },
++    { id: "cinemaRemix", image: "/assets/documentary-thumb.webp", duration: "00:45", playingElapsed: "00:10", progress: 26 },
+   ],
+ };
+ 
+-function ToolTabs({ activeTool, onToolChange }) {
++function localizeToolData(t) {
++  return Object.fromEntries(Object.entries(TOOL_DATA).map(([id, tool]) => [id, {
++    ...tool,
++    label: t(`home.demo.tools.${id}.label`),
++    summaryBadge: t(`home.demo.tools.${id}.summaryBadge`),
++    preview: {
++      ...tool.preview,
++      beforeLabel: t(`home.demo.tools.${id}.preview.beforeLabel`),
++      afterLabel: t(`home.demo.tools.${id}.preview.afterLabel`),
++      beforeAlt: t(`home.demo.tools.${id}.preview.beforeAlt`),
++      afterAlt: t(`home.demo.tools.${id}.preview.afterAlt`),
++    },
++    steps: Array.from({ length: tool.stepCount }, (_, index) => ({
++      title: t(`home.demo.tools.${id}.steps.step${index + 1}.title`),
++      text: t(`home.demo.tools.${id}.steps.step${index + 1}.text`),
++    })),
++    cta: t(`home.demo.tools.${id}.cta`),
++  }]));
++}
++
++function localizeCaseSets(t, tools) {
++  return Object.fromEntries(Object.entries(CASE_SETS).map(([toolId, cases]) => [toolId, cases.map((item) => ({
++    ...item,
++    title: t(`home.demo.cases.${item.id}.title`),
++    toolName: tools[toolId].label,
++    tags: [1, 2, 3].map((index) => t(`home.demo.cases.${item.id}.tag${index}`)),
++  }))]));
++}
++
++function ToolTabs({ activeTool, onToolChange, tools, t }) {
+   const tabRefs = useRef(new Map());
+-  const toolIds = Object.keys(TOOL_DATA);
++  const toolIds = Object.keys(tools);
+ 
+   const activateAndFocus = (nextIndex) => {
+     const nextId = toolIds[(nextIndex + toolIds.length) % toolIds.length];
+@@ -152,8 +128,8 @@
+   };
+ 
+   return (
+-    <div className="tool-tabs" role="tablist" aria-label="选择创作工具">
+-      {Object.entries(TOOL_DATA).map(([id, tool], index) => {
++    <div className="tool-tabs" role="tablist" aria-label={t("home.demo.toolTabsLabel")}>
++      {Object.entries(tools).map(([id, tool], index) => {
+         const Icon = tool.icon;
+         return (
+           <button
+@@ -181,6 +157,7 @@
+ }
+ 
+ function NarrationComparePreview({ tool, value, onChange }) {
++  const { t } = useI18n();
+   const rangeId = useId();
+   const { preview } = tool;
+   return (
+@@ -199,21 +176,22 @@
+         </div>
+         <div className="compare-player"><Play size={15} weight="fill" /><span>{tool.elapsed} / {tool.duration}</span><i /><ArrowsOut size={15} /></div>
+       </div>
+-      <label className="sr-only" htmlFor={rangeId}>拖动查看{preview.beforeLabel}与{preview.afterLabel}</label>
++      <label className="sr-only" htmlFor={rangeId}>{t("home.demo.compareLabel", { before: preview.beforeLabel, after: preview.afterLabel })}</label>
+       <input id={rangeId} className="compare-range" type="range" min="18" max="82" value={value} onChange={(event) => onChange(Number(event.target.value))} />
+     </div>
+   );
+ }
+ 
+ function NarrationStudio({ tool, onPlay }) {
++  const { t } = useI18n();
+   const [compareValue, setCompareValue] = useState(52);
+ 
+   return (
+     <div className="narration-studio">
+       <div className="narration-studio__pipeline">
+         <div className="narration-studio__pipeline-heading">
+-          <span>解说创作流程</span>
+-          <small>剧情理解完成 · 正在润色文案</small>
++          <span>{t("home.demo.narration.pipelineTitle")}</span>
++          <small>{t("home.demo.narration.pipelineStatus")}</small>
+         </div>
+         <ol>
+           {tool.steps.map((step, index) => {
+@@ -234,47 +212,49 @@
+       </div>
+ 
+       <div className="narration-studio__workspace">
+-        <aside className="narration-assets" aria-label="已上传素材队列">
+-          <header><span>素材队列</span><small>3 集 · 08:46</small></header>
++        <aside className="narration-assets" aria-label={t("home.demo.narration.assetQueueAria")}>
++          <header><span>{t("home.demo.narration.assetQueue")}</span><small>{t("home.demo.narration.assetSummary")}</small></header>
+           <div className="narration-assets__list">
+             {[
+-              ["第 01 集", "03:02", "/assets/d01/sample-urban.png", "已分析"],
+-              ["第 02 集", "02:51", "/assets/d06/romance.png", "已分析"],
+-              ["第 03 集", "02:53", "/assets/short-drama-thumb.webp", "已分析"],
+-            ].map(([name, duration, image, status], index) => (
++              [1, "03:02", "/assets/d01/sample-urban.png"],
++              [2, "02:51", "/assets/d06/romance.png"],
++              [3, "02:53", "/assets/short-drama-thumb.webp"],
++            ].map(([episode, duration, image], index) => (
++              (() => {
++                const name = t("home.demo.narration.episode", { number: String(episode).padStart(2, "0") });
++                return (
+               <article className={index === 1 ? "is-selected" : ""} key={name}>
+                 <img src={image} alt="" loading="lazy" decoding="async" />
+-                <span><strong>{name}</strong><small>{duration} · {status}</small></span>
++                <span><strong>{name}</strong><small>{duration} · {t("home.demo.narration.analyzed")}</small></span>
+                 <CheckCircle size={17} weight="fill" />
+               </article>
++                );
++              })()
+             ))}
+           </div>
+           <div className="narration-assets__insight">
+             <Star size={18} weight="duotone" />
+-            <span><strong>剧情高点已定位</strong><small>反转 3 · 冲突 4 · 情绪峰值 5</small></span>
++            <span><strong>{t("home.demo.narration.insightTitle")}</strong><small>{t("home.demo.narration.insightSummary")}</small></span>
+           </div>
+         </aside>
+ 
+         <main className="narration-editor">
+           <NarrationComparePreview tool={tool} value={compareValue} onChange={setCompareValue} />
+-          <section className="narration-script" aria-label="剧情与解说文案编辑">
+-            <div className="narration-script__tabs"><button type="button">剧情理解</button><button className="is-active" type="button">解说文案</button></div>
+-            <div className="narration-script__hook"><span>强钩子 · 00:00–00:03</span><em>推荐</em></div>
+-            <textarea aria-label="解说文案" defaultValue="婚礼当天，她亲手撕碎了所有人的谎言。谁也没想到，那个被赶出家门的女孩，才是真正掌控全局的人……" />
+-            <footer><span>96 字 · 预计 23 秒</span><button type="button"><FileText size={15} />AI 润色</button></footer>
++          <section className="narration-script" aria-label={t("home.demo.narration.scriptEditorAria")}>
++            <div className="narration-script__tabs"><button type="button">{t("home.demo.narration.storyUnderstanding")}</button><button className="is-active" type="button">{t("home.demo.narration.script")}</button></div>
++            <div className="narration-script__hook"><span>{t("home.demo.narration.strongHook")}</span><em>{t("home.demo.narration.recommended")}</em></div>
++            <textarea aria-label={t("home.demo.narration.script")} defaultValue="婚礼当天，她亲手撕碎了所有人的谎言。谁也没想到，那个被赶出家门的女孩，才是真正掌控全局的人……" />
++            <footer><span>{t("home.demo.narration.scriptMeta")}</span><button type="button"><FileText size={15} />{t("home.demo.narration.polish")}</button></footer>
+           </section>
+         </main>
+ 
+-        <aside className="narration-output" aria-label="视频输出摘要">
+-          <header><span>视频输出</span><em>接近完成</em></header>
+-          <div className="narration-output__score"><strong>92</strong><span>专业度评分<small>节奏与钩子表现优秀</small></span></div>
++        <aside className="narration-output" aria-label={t("home.demo.narration.outputAria")}>
++          <header><span>{t("home.demo.narration.output")}</span><em>{t("home.demo.narration.almostDone")}</em></header>
++          <div className="narration-output__score"><strong>92</strong><span>{t("home.demo.narration.scoreLabel")}<small>{t("home.demo.narration.scoreDetail")}</small></span></div>
+           <ul>
+-            <li><AnchorSimple size={18} weight="duotone" /><span><strong>前 3 秒强钩子</strong><small>冲突信息已前置</small></span><Check size={15} /></li>
+-            <li><Microphone size={18} weight="duotone" /><span><strong>自然女声 · 1.05x</strong><small>情绪强度已匹配</small></span><Check size={15} /></li>
+-            <li><FileText size={18} weight="duotone" /><span><strong>动态高亮字幕</strong><small>安全区与断句已校准</small></span><Check size={15} /></li>
+-            <li><Waveform size={18} weight="duotone" /><span><strong>BGM 自动闪避</strong><small>对白区域降低 8dB</small></span><Check size={15} /></li>
++            {[AnchorSimple, Microphone, FileText, Waveform].map((Icon, index) => <li key={index}><Icon size={18} weight="duotone" /><span><strong>{t(`home.demo.narration.outputItems.item${index + 1}.title`)}</strong><small>{t(`home.demo.narration.outputItems.item${index + 1}.detail`)}</small></span><Check size={15} /></li>)}
+           </ul>
+-          <button className="narration-output__play" type="button" onClick={onPlay}><Play size={17} weight="fill" />播放解说案例</button>
++          <button className="narration-output__play" type="button" onClick={onPlay}><Play size={17} weight="fill" />{tool.cta}</button>
+         </aside>
+       </div>
+     </div>
+@@ -282,24 +262,25 @@
+ }
+ 
+ function TranslationLocalizer({ tool, onPlay }) {
++  const { t } = useI18n();
+   const dialogueRows = [
+-    ["林夏", "我不会再替任何人承担错误。", "I won't take the blame for anyone again.", "Ava · 冷静女声"],
+-    ["顾言", "你早就知道真相，对吗？", "You knew the truth all along, didn't you?", "Ethan · 低沉男声"],
+-    ["林夏", "从你签下那份协议开始。", "Since the moment you signed that agreement.", "Ava · 冷静女声"],
++    ["林夏", "我不会再替任何人承担错误。", "I won't take the blame for anyone again.", `Ava · ${t("home.demo.translation.calmFemaleVoice")}`],
++    ["顾言", "你早就知道真相，对吗？", "You knew the truth all along, didn't you?", `Ethan · ${t("home.demo.translation.deepMaleVoice")}`],
++    ["林夏", "从你签下那份协议开始。", "Since the moment you signed that agreement.", `Ava · ${t("home.demo.translation.calmFemaleVoice")}`],
+   ];
+ 
+   return (
+     <div className="translation-localizer">
+       <header className="translation-localizer__header">
+-        <div><strong>多语言本地化</strong><small>已识别 3 位角色 · 86 条对白</small></div>
+-        <div className="translation-language-pair" aria-label="翻译语言设置">
+-          <label>源语言<select aria-label="源语言" defaultValue="zh"><option value="zh">简体中文</option></select></label>
++        <div><strong>{t("home.demo.translation.title")}</strong><small>{t("home.demo.translation.summary")}</small></div>
++        <div className="translation-language-pair" aria-label={t("home.demo.translation.languageSettingsAria")}>
++          <label>{t("home.demo.translation.sourceLanguage")}<select aria-label={t("home.demo.translation.sourceLanguage")} defaultValue="zh"><option value="zh">简体中文</option></select></label>
+           <ArrowsHorizontal size={20} weight="bold" />
+-          <label>目标语言<select aria-label="目标语言" defaultValue="en"><option value="en">English</option><option value="ja">日本語</option></select></label>
++          <label>{t("home.demo.translation.targetLanguage")}<select aria-label={t("home.demo.translation.targetLanguage")} defaultValue="en"><option value="en">English</option><option value="ja">日本語</option></select></label>
+         </div>
+       </header>
+ 
+-      <ol className="translation-localizer__flow" aria-label="视频翻译流程">
++      <ol className="translation-localizer__flow" aria-label={t("home.demo.translation.flowAria")}>
+         {tool.steps.map((step, index) => (
+           <li className={index < 2 ? "is-complete" : index === 2 ? "is-active" : ""} data-flow-step={index + 1} key={step.title}>
+             <span>{index < 2 ? <Check size={13} weight="bold" /> : index + 1}</span>
+@@ -309,40 +290,40 @@
+       </ol>
+ 
+       <div className="translation-localizer__workspace">
+-        <section className="translation-preview" aria-label="双语视频预览">
++        <section className="translation-preview" aria-label={t("home.demo.translation.previewAria")}>
+           <div className="translation-preview__screen">
+-            <img src="/assets/short-drama-thumb.webp" alt="中文短剧英文配音预览" loading="lazy" decoding="async" />
+-            <span className="translation-preview__badge">中文 → EN</span>
++            <img src="/assets/short-drama-thumb.webp" alt={t("home.demo.translation.previewAlt")} loading="lazy" decoding="async" />
++            <span className="translation-preview__badge">{tool.summaryBadge}</span>
+             <div className="bilingual-subtitles">
+               <p className="bilingual-subtitles__source" lang="zh-CN">你早就知道真相，对吗？</p>
+               <p className="bilingual-subtitles__target" lang="en">You knew the truth all along, didn't you?</p>
+             </div>
+             <div className="translation-preview__player"><Play size={14} weight="fill" /><span>{tool.elapsed} / {tool.duration}</span><i /></div>
+           </div>
+-          <div className="translation-dialogues" aria-label="双语对白编辑">
++          <div className="translation-dialogues" aria-label={t("home.demo.translation.dialogueEditorAria")}>
+             {dialogueRows.map(([role, source, target]) => (
+               <article key={`${role}-${source}`}>
+                 <span>{role}</span>
+                 <div><p lang="zh-CN">{source}</p><p lang="en">{target}</p></div>
+-                <button type="button" aria-label={`编辑${role}的译文`}><FileText size={16} /></button>
++                <button type="button" aria-label={t("home.demo.translation.editTranslation", { role })}><FileText size={16} /></button>
+               </article>
+             ))}
+           </div>
+         </section>
+ 
+-        <aside className="voice-mapping" aria-label="角色声线映射">
+-          <header><span>角色声线映射</span><em>3 / 3 已匹配</em></header>
++        <aside className="voice-mapping" aria-label={t("home.demo.translation.voiceMappingAria")}>
++          <header><span>{t("home.demo.translation.voiceMapping")}</span><em>{t("home.demo.translation.matched")}</em></header>
+           <div className="voice-mapping__list">
+             {dialogueRows.map(([role, , , voice], index) => (
+               <article key={`${role}-${index}`}>
+                 <span className="voice-mapping__avatar">{role.slice(0, 1)}</span>
+                 <div><strong>{role}</strong><small>{voice}</small></div>
+-                <button type="button" aria-label={`试听${role}的英文声线`}><Play size={13} weight="fill" /></button>
++                <button type="button" aria-label={t("home.demo.translation.previewVoice", { role })}><Play size={13} weight="fill" /></button>
+               </article>
+             ))}
+           </div>
+-          <div className="voice-mapping__check"><CheckCircle size={20} weight="fill" /><span><strong>本地化检查完成</strong><small>专有名词、称谓和语气已优化</small></span></div>
+-          <button className="voice-mapping__play" type="button" onClick={onPlay}><Play size={17} weight="fill" />播放翻译案例</button>
++          <div className="voice-mapping__check"><CheckCircle size={20} weight="fill" /><span><strong>{t("home.demo.translation.checkComplete")}</strong><small>{t("home.demo.translation.checkDetail")}</small></span></div>
++          <button className="voice-mapping__play" type="button" onClick={onPlay}><Play size={17} weight="fill" />{tool.cta}</button>
+         </aside>
+       </div>
+     </div>
+@@ -350,18 +331,19 @@
+ }
+ 
+ function RemixConsole({ tool, onPlay }) {
++  const { t } = useI18n();
+   const clips = [
+-    ["冲突爆发", "00:03.2", "/assets/film-action-thumb.webp", "98"],
+-    ["身份揭晓", "00:04.8", "/assets/d06/romance.png", "94"],
+-    ["绝地反击", "00:05.1", "/assets/short-drama-thumb.webp", "91"],
+-    ["情绪顶点", "00:03.9", "/assets/documentary-thumb.webp", "89"],
++    [t("home.demo.remix.clips.clip1"), "00:03.2", "/assets/film-action-thumb.webp", "98"],
++    [t("home.demo.remix.clips.clip2"), "00:04.8", "/assets/d06/romance.png", "94"],
++    [t("home.demo.remix.clips.clip3"), "00:05.1", "/assets/short-drama-thumb.webp", "91"],
++    [t("home.demo.remix.clips.clip4"), "00:03.9", "/assets/documentary-thumb.webp", "89"],
+   ];
+ 
+   return (
+     <div className="remix-console">
+       <header className="remix-console__header">
+-        <div><strong>高光混剪控制台</strong><small>12 集 · 36:40 · 已选 8 个高能镜头</small></div>
+-        <ol aria-label="短剧混剪流程">
++        <div><strong>{t("home.demo.remix.title")}</strong><small>{t("home.demo.remix.summary")}</small></div>
++        <ol aria-label={t("home.demo.remix.flowAria")}>
+           {tool.steps.map((step, index) => (
+             <li className={index < 2 ? "is-complete" : "is-active"} data-flow-step={index + 1} key={step.title}>
+               <span>{index < 2 ? <Check size={13} weight="bold" /> : index + 1}</span>
+@@ -372,8 +354,8 @@
+       </header>
+ 
+       <div className="remix-console__workspace">
+-        <aside className="clip-pool" aria-label="高光片段池">
+-          <header><span>高光片段池</span><small>按强度排序</small></header>
++        <aside className="clip-pool" aria-label={t("home.demo.remix.clipPoolAria")}>
++          <header><span>{t("home.demo.remix.clipPool")}</span><small>{t("home.demo.remix.sortedByIntensity")}</small></header>
+           <div className="clip-pool__list">
+             {clips.map(([title, duration, image, score], index) => (
+               <button className={index < 3 ? "is-selected" : ""} type="button" key={title}>
+@@ -387,28 +369,28 @@
+ 
+         <main className="remix-monitor">
+           <div className="remix-monitor__screen">
+-            <img src="/assets/film-action-thumb.webp" alt="高光混剪成片预览" loading="lazy" decoding="async" />
+-            <span>高光混剪 · 9:16</span>
+-            <button type="button" aria-label="播放高光混剪"><Play size={22} weight="fill" /></button>
++            <img src="/assets/film-action-thumb.webp" alt={t("home.demo.remix.previewAlt")} loading="lazy" decoding="async" />
++            <span>{t("home.demo.remix.previewBadge")}</span>
++            <button type="button" aria-label={t("home.demo.remix.playPreview")}><Play size={22} weight="fill" /></button>
+             <div><small>{tool.elapsed}</small><i /><small>{tool.duration}</small></div>
+           </div>
+-          <section className="remix-timeline" aria-label="多轨混剪时间线">
++          <section className="remix-timeline" aria-label={t("home.demo.remix.timelineAria")}>
+             <div className="remix-timeline__ruler"><span>00:00</span><span>00:15</span><span>00:30</span><span>00:45</span></div>
+-            <div className="remix-track remix-track--video"><strong>画面</strong><div>{clips.map(([title], index) => <span className={`clip-${index + 1}`} key={title}>{title}</span>)}</div></div>
+-            <div className="remix-track remix-track--original"><strong>原声</strong><div><Waveform size={420} weight="fill" /></div></div>
++            <div className="remix-track remix-track--video"><strong>{t("home.demo.remix.videoTrack")}</strong><div>{clips.map(([title], index) => <span className={`clip-${index + 1}`} key={title}>{title}</span>)}</div></div>
++            <div className="remix-track remix-track--original"><strong>{t("home.demo.remix.originalAudio")}</strong><div><Waveform size={420} weight="fill" /></div></div>
+             <div className="remix-track remix-track--bgm"><strong>BGM</strong><div><Waveform size={420} weight="fill" /></div></div>
+             <span className="remix-timeline__playhead" />
+           </section>
+         </main>
+ 
+-        <aside className="beat-controls" aria-label="BGM 与节拍控制">
+-          <header><span>BGM / 节拍</span><em>已同步</em></header>
+-          <div className="beat-controls__track"><Waveform size={22} weight="duotone" /><span><strong>Neon Pulse</strong><small>电子氛围 · 128 BPM</small></span><button type="button"><Play size={13} weight="fill" /></button></div>
+-          <label><span>卡点强度<em>78%</em></span><input aria-label="卡点强度" type="range" min="0" max="100" defaultValue="78" /></label>
+-          <label><span>原声音量<em>82%</em></span><input aria-label="原声音量" type="range" min="0" max="100" defaultValue="82" /></label>
+-          <label><span>BGM 音量<em>36%</em></span><input aria-label="BGM 音量" type="range" min="0" max="100" defaultValue="36" /></label>
+-          <div className="beat-controls__markers"><span>18 个节拍点</span><span>6 处转场</span><span>0 空拍</span></div>
+-          <button className="beat-controls__play" type="button" onClick={onPlay}><Play size={17} weight="fill" />播放混剪案例</button>
++        <aside className="beat-controls" aria-label={t("home.demo.remix.beatControlsAria")}>
++          <header><span>{t("home.demo.remix.beatControls")}</span><em>{t("home.demo.remix.synced")}</em></header>
++          <div className="beat-controls__track"><Waveform size={22} weight="duotone" /><span><strong>Neon Pulse</strong><small>{t("home.demo.remix.musicStyle")}</small></span><button type="button" aria-label={t("home.demo.remix.playMusic")}><Play size={13} weight="fill" /></button></div>
++          <label><span>{t("home.demo.remix.beatIntensity")}<em>78%</em></span><input aria-label={t("home.demo.remix.beatIntensity")} type="range" min="0" max="100" defaultValue="78" /></label>
++          <label><span>{t("home.demo.remix.originalVolume")}<em>82%</em></span><input aria-label={t("home.demo.remix.originalVolume")} type="range" min="0" max="100" defaultValue="82" /></label>
++          <label><span>{t("home.demo.remix.bgmVolume")}<em>36%</em></span><input aria-label={t("home.demo.remix.bgmVolume")} type="range" min="0" max="100" defaultValue="36" /></label>
++          <div className="beat-controls__markers"><span>{t("home.demo.remix.beatPoints")}</span><span>{t("home.demo.remix.transitions")}</span><span>{t("home.demo.remix.emptyBeats")}</span></div>
++          <button className="beat-controls__play" type="button" onClick={onPlay}><Play size={17} weight="fill" />{tool.cta}</button>
+         </aside>
+       </div>
+     </div>
+@@ -416,35 +398,39 @@
+ }
+ 
+ function CaseCard({ item, onOpen, onTemplate }) {
++  const { t } = useI18n();
+   return (
+     <article className="case-card">
+-      <button className="case-card__image" type="button" onClick={() => onOpen(item)} aria-label={`播放案例：${item.title}`}>
+-        <img src={item.image} alt={`${item.title}案例封面`} loading="lazy" decoding="async" />
++      <button className="case-card__image" type="button" onClick={() => onOpen(item)} aria-label={t("home.demo.playCase", { title: item.title })}>
++        <img src={item.image} alt={t("home.demo.caseCoverAlt", { title: item.title })} loading="lazy" decoding="async" />
+         <span><Play size={17} weight="fill" /></span>
+       </button>
+       <div className="case-card__body">
+         <h3>{item.title}</h3>
+         <div className="case-card__tags">{item.tags.map((tag) => <span key={tag}>{tag}</span>)}</div>
+-        <button type="button" onClick={() => onTemplate(item)}>使用相同模板创作 <ArrowRight size={16} /></button>
++        <button type="button" onClick={() => onTemplate(item)}>{t("home.demo.useTemplate")} <ArrowRight size={16} /></button>
+       </div>
+     </article>
+   );
+ }
+ 
+ export function DemoSection({ activeTool, onToolChange, onOpenCase, onTemplate }) {
+-  const tool = TOOL_DATA[activeTool];
+-  const cases = CASE_SETS[activeTool];
++  const { t } = useI18n();
++  const tools = localizeToolData(t);
++  const caseSets = localizeCaseSets(t, tools);
++  const tool = tools[activeTool];
++  const cases = caseSets[activeTool];
+   const defaultCase = cases[0];
+ 
+   return (
+     <section id="demo" className="demo-section section-anchor">
+       <div className="section-heading page-container">
+-        <span className="section-kicker">CASE DEMO</span>
+-        <h2>看见 <span className="gradient-text">AI</span> 如何把素材变成成片</h2>
+-        <p>小白不用懂剪辑，跟着流程就能完成</p>
++        <span className="section-kicker">{t("home.demo.kicker")}</span>
++        <h2>{t("home.demo.headingPrefix")} <span className="gradient-text">AI</span> {t("home.demo.headingSuffix")}</h2>
++        <p>{t("home.demo.description")}</p>
+       </div>
+       <div className={`demo-shell demo-shell--${tool.tone} page-container`}>
+-        <ToolTabs activeTool={activeTool} onToolChange={onToolChange} />
++        <ToolTabs activeTool={activeTool} onToolChange={onToolChange} tools={tools} t={t} />
+         <div
+           id="tool-demo-panel"
+           className={`demo-workbench demo-workbench--${activeTool}`}
+diff -ruN /tmp/narrato-i18n/task3-before/src/components/FaqSection.jsx docs/web/homepage-prototype/src/components/FaqSection.jsx
+--- /tmp/narrato-i18n/task3-before/src/components/FaqSection.jsx	2026-07-15 21:52:21
++++ docs/web/homepage-prototype/src/components/FaqSection.jsx	2026-07-15 21:54:46
+@@ -1,20 +1,16 @@
+ import { useState } from "react";
+ import { CaretDown, ChatCenteredText } from "@phosphor-icons/react";
++import { useI18n } from "../i18n/useI18n.js";
+ 
+-const FAQS = [
+-  ["没有字幕文件也能用吗？", "可以。影创工坊会自动识别视频中的对白并生成时间轴字幕，你仍可在合成前校对。"],
+-  ["生成前可以修改片段和文案吗？", "可以。AI 先给出推荐片段、文案和节奏，你可以逐项替换、改写或调整顺序。"],
+-  ["创作点如何计费？", "原型中暂不接入真实计费；正式版本会在生成前透明展示预计创作点消耗。"],
+-  ["生成失败会扣费吗？", "失败任务不会按成功成片计费，正式规则会在任务记录中清晰展示。"],
+-];
+-
+ export function FaqSection() {
++  const { t } = useI18n();
+   const [openIndex, setOpenIndex] = useState(null);
++  const faqs = [1, 2, 3, 4].map((id) => [t(`home.faq.items.item${id}.question`), t(`home.faq.items.item${id}.answer`)]);
+   return (
+     <section className="faq-panel" aria-labelledby="faq-title">
+-      <div className="panel-title"><ChatCenteredText size={22} weight="duotone" /><h2 id="faq-title">常见问题</h2></div>
++      <div className="panel-title"><ChatCenteredText size={22} weight="duotone" /><h2 id="faq-title">{t("home.faq.title")}</h2></div>
+       <div className="faq-list">
+-        {FAQS.map(([question, answer], index) => {
++        {faqs.map(([question, answer], index) => {
+           const open = openIndex === index;
+           return (
+             <div className={`faq-item ${open ? "is-open" : ""}`} key={question}>
+diff -ruN /tmp/narrato-i18n/task3-before/src/components/FinalCtaSection.jsx docs/web/homepage-prototype/src/components/FinalCtaSection.jsx
+--- /tmp/narrato-i18n/task3-before/src/components/FinalCtaSection.jsx	2026-07-15 21:52:21
++++ docs/web/homepage-prototype/src/components/FinalCtaSection.jsx	2026-07-15 21:54:46
+@@ -1,13 +1,15 @@
+ import { ArrowRight, Sparkle } from "@phosphor-icons/react";
++import { useI18n } from "../i18n/useI18n.js";
+ 
+ export function FinalCtaSection({ onStart }) {
++  const { t } = useI18n();
+   return (
+     <section className="final-cta-panel" aria-labelledby="final-cta-title">
+       <div className="final-cta-orbit" aria-hidden="true"><span /><span /><span /></div>
+       <Sparkle className="final-cta-icon" size={42} weight="duotone" />
+-      <h2 id="final-cta-title">准备好完成你的第一条<span className="gradient-text">AI 成片</span>了吗？</h2>
+-      <button className="primary-button" type="button" onClick={onStart}>开始创作 <ArrowRight size={21} /></button>
+-      <p>真实生成前会透明展示预计消耗</p>
++      <h2 id="final-cta-title">{t("home.finalCta.headingPrefix")}<span className="gradient-text">{t("home.finalCta.headingAccent")}</span>{t("home.finalCta.headingSuffix")}</h2>
++      <button className="primary-button" type="button" onClick={onStart}>{t("home.finalCta.start")} <ArrowRight size={21} /></button>
++      <p>{t("home.finalCta.note")}</p>
+     </section>
+   );
+ }
+diff -ruN /tmp/narrato-i18n/task3-before/src/components/HeroSection.jsx docs/web/homepage-prototype/src/components/HeroSection.jsx
+--- /tmp/narrato-i18n/task3-before/src/components/HeroSection.jsx	2026-07-15 21:52:21
++++ docs/web/homepage-prototype/src/components/HeroSection.jsx	2026-07-15 21:55:25
+@@ -16,67 +16,71 @@
+ } from "@phosphor-icons/react";
+ import { ThreeHeroScene } from "./ThreeHeroScene";
+ import { getHeroPoseStyle, resolveHeroPose } from "./heroThreeScene";
++import { useI18n } from "../i18n/useI18n.js";
+ 
+ const analysisSteps = [
+-  { icon: MagnifyingGlass, title: "识别剧情冲突", text: "分析剧情与节奏点" },
+-  { icon: Microphone, title: "提取高光片段", text: "定位高能情绪瞬间" },
+-  { icon: CheckCircle, title: "生成解说文案", text: "匹配风格与配音" },
+-  { icon: Waveform, title: "配音字幕合成", text: "声音与字幕自动对齐" },
++  { id: "identify", icon: MagnifyingGlass },
++  { id: "highlights", icon: Microphone },
++  { id: "script", icon: CheckCircle },
++  { id: "synthesis", icon: Waveform },
+ ];
+ 
+ const shortcuts = [
+-  { icon: FilmSlate, tone: "violet", title: "短剧解说", text: "加旁白讲剧情" },
+-  { icon: Translate, tone: "cyan", title: "视频翻译", text: "多语言翻译配音" },
+-  { icon: Scissors, tone: "orange", title: "短剧混剪", text: "智能提取高能片段" },
++  { id: "narration", icon: FilmSlate, tone: "violet" },
++  { id: "translation", icon: Translate, tone: "cyan" },
++  { id: "remix", icon: Scissors, tone: "orange" },
+ ];
+ 
+ const benefits = [
+-  { icon: Lightning, title: "AI 智能提取", text: "高能片段" },
+-  { icon: Waveform, title: "自动配音字幕", text: "一键合成" },
+-  { icon: Gauge, title: "节奏快不拖沓", text: "适配平台算法" },
+-  { icon: ShieldCheck, title: "多格式导出", text: "高清无水印" },
++  { id: "extract", icon: Lightning },
++  { id: "synthesis", icon: Waveform },
++  { id: "pace", icon: Gauge },
++  { id: "export", icon: ShieldCheck },
+ ];
+ 
+ function AnalysisList() {
++  const { t } = useI18n();
+   return (
+     <div className="analysis-list">
+-      <div className="micro-heading">AI 处理流程</div>
+-      {analysisSteps.map(({ icon: Icon, title, text }, index) => (
+-        <div className="analysis-step" key={title}>
++      <div className="micro-heading">{t("home.hero.analysis.heading")}</div>
++      {analysisSteps.map(({ id, icon: Icon }, index) => (
++        <div className="analysis-step" key={id}>
+           <span className="analysis-step__icon"><Icon size={16} weight="bold" /></span>
+-          <span className="analysis-step__copy"><strong>{title}</strong><small>{text}</small></span>
++          <span className="analysis-step__copy"><strong>{t(`home.hero.analysis.steps.${id}.title`)}</strong><small>{t(`home.hero.analysis.steps.${id}.text`)}</small></span>
+           {index === analysisSteps.length - 1
+-            ? <span className="analysis-step__loader" aria-label="处理中" />
++            ? <span className="analysis-step__loader" aria-label={t("home.hero.analysis.processing")} />
+             : <CheckCircle className="analysis-step__check" size={17} weight="fill" />}
+           {index < analysisSteps.length - 1 && <span className="analysis-step__line" />}
+         </div>
+       ))}
+       <div className="analysis-progress"><span /></div>
+-      <small className="analysis-progress__label">预计还需 30 秒完成</small>
++      <small className="analysis-progress__label">{t("home.hero.analysis.eta")}</small>
+     </div>
+   );
+ }
+ 
+ function VideoPreview() {
++  const { t } = useI18n();
+   return (
+     <div className="video-preview">
+       <span className="video-preview__ratio">9:16</span>
+-      <img src="/assets/hero-drama-vertical.webp" alt="都市短剧成片预览" fetchPriority="high" decoding="async" />
++      <img src="/assets/hero-drama-vertical.webp" alt={t("home.hero.preview.alt")} fetchPriority="high" decoding="async" />
+       <div className="video-preview__shade" />
+-      <div className="video-preview__title">命运的<br />反转</div>
+-      <div className="video-preview__subtitle">这一刻，他终于<br />发现自己爱上了她</div>
++      <div className="video-preview__title">{t("home.hero.preview.titleLine1")}<br />{t("home.hero.preview.titleLine2")}</div>
++      <div className="video-preview__subtitle">{t("home.hero.preview.subtitleLine1")}<br />{t("home.hero.preview.subtitleLine2")}</div>
+       <div className="video-preview__controls"><Play size={13} weight="fill" /><span>00:12 / 00:30</span><span className="control-line" /></div>
+     </div>
+   );
+ }
+ 
+ function ShortcutCards() {
++  const { t } = useI18n();
+   return (
+     <div className="shortcut-stack">
+-      {shortcuts.map(({ icon: Icon, tone, title, text }) => (
+-        <div className={`shortcut-card shortcut-card--${tone}`} key={title}>
++      {shortcuts.map(({ id, icon: Icon, tone }) => (
++        <div className={`shortcut-card shortcut-card--${tone}`} key={id}>
+           <span className="shortcut-card__icon"><Icon size={27} weight="duotone" /></span>
+-          <span><strong>{title}</strong><small>{text}</small></span>
++          <span><strong>{t(`home.hero.shortcuts.${id}.title`)}</strong><small>{t(`home.hero.shortcuts.${id}.text`)}</small></span>
+           <ArrowRight size={17} />
+         </div>
+       ))}
+@@ -85,29 +89,31 @@
+ }
+ 
+ function Timeline() {
++  const { t } = useI18n();
+   const bars = [18, 38, 25, 52, 31, 47, 70, 43, 62, 28, 53, 76, 39, 56, 30, 68, 44, 58, 24, 50, 34, 64, 45, 30, 71, 42, 55, 26, 63, 39];
+   return (
+     <div className="timeline">
+       <div className="timeline__ruler"><span>00:00</span><span>00:05</span><span>00:10</span><span>00:15</span><span>00:20</span><span>00:25</span><span>00:30</span></div>
+       <div className="timeline__row timeline__row--clips">
+-        <span className="timeline__label">视频片段</span>
++        <span className="timeline__label">{t("home.hero.timeline.video")}</span>
+         <div className="timeline__clipstrip">
+           {[0, 1, 2, 3, 4, 5].map((item) => <img key={item} src="/assets/d01/sample-urban.png" alt="" decoding="async" />)}
+         </div>
+       </div>
+-      <div className="timeline__row timeline__row--captions"><span className="timeline__label">解说文案</span><div className="caption-blocks"><span>这场相遇…</span><span>命运的反转</span><span>真相揭开</span><span>新的开始</span></div></div>
+-      <div className="timeline__row"><span className="timeline__label">配音音频</span><div className="wave-track wave-track--blue">{bars.map((height, i) => <i key={i} style={{ height: `${height}%` }} />)}</div></div>
+-      <div className="timeline__row"><span className="timeline__label">背景音乐</span><div className="wave-track wave-track--orange">{[...bars].reverse().map((height, i) => <i key={i} style={{ height: `${Math.max(14, height - 10)}%` }} />)}</div></div>
++      <div className="timeline__row timeline__row--captions"><span className="timeline__label">{t("home.hero.timeline.captions")}</span><div className="caption-blocks">{[1, 2, 3, 4].map((id) => <span key={id}>{t(`home.hero.timeline.caption${id}`)}</span>)}</div></div>
++      <div className="timeline__row"><span className="timeline__label">{t("home.hero.timeline.voice")}</span><div className="wave-track wave-track--blue">{bars.map((height, i) => <i key={i} style={{ height: `${height}%` }} />)}</div></div>
++      <div className="timeline__row"><span className="timeline__label">{t("home.hero.timeline.bgm")}</span><div className="wave-track wave-track--orange">{[...bars].reverse().map((height, i) => <i key={i} style={{ height: `${Math.max(14, height - 10)}%` }} />)}</div></div>
+       <span className="timeline__playhead" />
+     </div>
+   );
+ }
+ 
+ function HeroWorkbench({ workbenchRef }) {
++  const { t } = useI18n();
+   return (
+-    <div ref={workbenchRef} className="hero-workbench-wrap" aria-label="AI 视频出片工作台预览">
++    <div ref={workbenchRef} className="hero-workbench-wrap" aria-label={t("home.hero.workbench.ariaLabel")}>
+       <div className="hero-workbench neon-frame">
+-        <div className="hero-workbench__topline"><span>创作点 <strong>1,280</strong></span><button type="button">充值</button></div>
++        <div className="hero-workbench__topline"><span>{t("home.hero.workbench.credits")} <strong>1,280</strong></span><button type="button">{t("home.hero.workbench.recharge")}</button></div>
+         <div className="hero-workbench__columns">
+           <AnalysisList />
+           <VideoPreview />
+@@ -121,6 +127,7 @@
+ }
+ 
+ export function HeroSection({ onStart, onViewDemo }) {
++  const { t } = useI18n();
+   const heroRef = useRef(null);
+   const workbenchRef = useRef(null);
+   const [poseName, setPoseName] = useState(() => (
+@@ -168,28 +175,28 @@
+       <ThreeHeroScene heroRef={heroRef} workbenchRef={workbenchRef} poseName={poseName} />
+       <div className="hero-main page-container">
+         <div className="hero-copy">
+-          <div className="eyebrow">AI 视频创作 · 小白也能做专业视频</div>
+-          <h1><span>专为自媒体小白打造的</span><strong>AI 出片工作台</strong></h1>
++          <div className="eyebrow">{t("home.hero.eyebrow")}</div>
++          <h1><span>{t("home.hero.headingPrefix")}</span><strong>{t("home.hero.headingAccent")}</strong></h1>
+           <p>
+-            <span className="hero-description--desktop">上传素材，AI 自动完成剪辑、文案、配音、字幕与合成。短剧解说、视频翻译、智能混剪，一个工作台搞定。</span>
+-            <span className="hero-description--mobile">上传素材，AI 自动完成剪辑、文案、配音、字幕与合成。</span>
++            <span className="hero-description--desktop">{t("home.hero.descriptionDesktop")}</span>
++            <span className="hero-description--mobile">{t("home.hero.descriptionMobile")}</span>
+           </p>
+           <div className="hero-actions">
+-            <button className="primary-button" type="button" onClick={onStart}>开始创作 <ArrowRight size={22} /></button>
+-            <button className="secondary-button" type="button" onClick={onViewDemo}><Play size={18} weight="fill" /> 查看案例</button>
++            <button className="primary-button" type="button" onClick={onStart}>{t("home.hero.start")} <ArrowRight size={22} /></button>
++            <button className="secondary-button" type="button" onClick={onViewDemo}><Play size={18} weight="fill" /> {t("home.hero.viewDemo")}</button>
+           </div>
+         </div>
+         <HeroWorkbench workbenchRef={workbenchRef} />
+       </div>
+       <div className="benefit-row page-container">
+-        {benefits.map(({ icon: Icon, title, text }, index) => (
+-          <div className={`benefit-item benefit-item--${index + 1}`} key={title}>
++        {benefits.map(({ id, icon: Icon }, index) => (
++          <div className={`benefit-item benefit-item--${index + 1}`} key={id}>
+             <Icon size={39} weight="duotone" />
+-            <span><strong>{title}</strong><small>{text}</small></span>
++            <span><strong>{t(`home.hero.benefits.${id}.title`)}</strong><small>{t(`home.hero.benefits.${id}.text`)}</small></span>
+           </div>
+         ))}
+       </div>
+-      <button className="hero-scroll-cue" type="button" aria-label="查看案例" onClick={onViewDemo}><ArrowDown size={26} /></button>
++      <button className="hero-scroll-cue" type="button" aria-label={t("home.hero.viewDemo")} onClick={onViewDemo}><ArrowDown size={26} /></button>
+     </section>
+   );
+ }
+diff -ruN /tmp/narrato-i18n/task3-before/src/components/RouteEffects.jsx docs/web/homepage-prototype/src/components/RouteEffects.jsx
+--- /tmp/narrato-i18n/task3-before/src/components/RouteEffects.jsx	2026-07-15 21:52:21
++++ docs/web/homepage-prototype/src/components/RouteEffects.jsx	2026-07-15 21:55:42
+@@ -1,22 +1,27 @@
+ import { useEffect } from "react";
+ import { useLocation } from "react-router-dom";
++import { useI18n } from "../i18n/useI18n.js";
+ 
+-const titles = {
+-  "/": "影创工坊｜AI 出片工作台",
+-  "/dashboard": "工作台概览｜影创工坊",
+-  "/dashboard/create": "新建创作｜影创工坊",
+-  "/dashboard/projects": "我的项目｜影创工坊",
+-  "/dashboard/projects/overlord/result": "霸总短剧解说 01｜影创工坊",
+-  "/dashboard/narration/settings": "短剧解说设置｜影创工坊",
+-  "/dashboard/narration/analysis": "AI 分析｜影创工坊",
+-  "/dashboard/narration/editor": "解说编辑器｜影创工坊",
++const titleKeys = {
++  "/": "titles.home",
++  "/dashboard": "titles.dashboard",
++  "/dashboard/create": "titles.create",
++  "/dashboard/projects": "titles.projects",
++  "/dashboard/projects/overlord/result": "titles.projectResult",
++  "/dashboard/narration/settings": "titles.narrationSettings",
++  "/dashboard/narration/analysis": "titles.narrationAnalysis",
++  "/dashboard/narration/editor": "titles.narrationEditor",
+ };
+ 
+ export function RouteEffects() {
+   const { pathname } = useLocation();
++  const { t } = useI18n();
+ 
+   useEffect(() => {
+-    document.title = titles[pathname] || "页面未找到｜影创工坊";
++    document.title = t(titleKeys[pathname] || "titles.notFound");
++  }, [pathname, t]);
++
++  useEffect(() => {
+     window.scrollTo({ top: 0, left: 0, behavior: "auto" });
+     requestAnimationFrame(() => document.querySelector("[data-route-heading]")?.focus());
+   }, [pathname]);
+diff -ruN /tmp/narrato-i18n/task3-before/src/components/SiteFooter.jsx docs/web/homepage-prototype/src/components/SiteFooter.jsx
+--- /tmp/narrato-i18n/task3-before/src/components/SiteFooter.jsx	2026-07-15 21:52:21
++++ docs/web/homepage-prototype/src/components/SiteFooter.jsx	2026-07-15 21:54:46
+@@ -1,16 +1,18 @@
+ import { BrandMark } from "./BrandMark.jsx";
++import { useI18n } from "../i18n/useI18n.js";
+ 
+ export function SiteFooter({ onNavigate, onFeedback, isInert = false }) {
++  const { t } = useI18n();
+   return (
+     <footer className="site-footer" inert={isInert ? true : undefined} aria-hidden={isInert ? "true" : undefined}>
+       <div className="page-container site-footer__inner">
+         <button className="brand-button" type="button" onClick={() => onNavigate("hero")}><BrandMark compact /></button>
+-        <nav aria-label="页脚导航">
+-          <button type="button" onClick={() => onNavigate("capabilities")}>产品能力</button>
+-          <button type="button" onClick={() => onNavigate("demo")}>案例 Demo</button>
+-          <button type="button" onClick={() => onFeedback("价格页待接入")}>价格</button>
++        <nav aria-label={t("home.footer.navigation")}>
++          <button type="button" onClick={() => onNavigate("capabilities")}>{t("home.header.capabilities")}</button>
++          <button type="button" onClick={() => onNavigate("demo")}>{t("home.header.demo")}</button>
++          <button type="button" onClick={() => onFeedback(t("home.header.pricingFeedback"))}>{t("home.header.pricing")}</button>
+         </nav>
+-        <div className="site-footer__legal"><button type="button" onClick={() => onFeedback("用户协议待接入")}>用户协议</button><button type="button" onClick={() => onFeedback("隐私政策待接入")}>隐私政策</button></div>
++        <div className="site-footer__legal"><button type="button" onClick={() => onFeedback(t("home.footer.termsFeedback"))}>{t("home.footer.terms")}</button><button type="button" onClick={() => onFeedback(t("home.footer.privacyFeedback"))}>{t("home.footer.privacy")}</button></div>
+       </div>
+     </footer>
+   );
+diff -ruN /tmp/narrato-i18n/task3-before/src/components/Toast.jsx docs/web/homepage-prototype/src/components/Toast.jsx
+--- /tmp/narrato-i18n/task3-before/src/components/Toast.jsx	2026-07-15 21:52:21
++++ docs/web/homepage-prototype/src/components/Toast.jsx	2026-07-15 21:54:46
+@@ -1,6 +1,8 @@
+ import { CheckCircle, X } from "@phosphor-icons/react";
++import { useI18n } from "../i18n/useI18n.js";
+ 
+ export function Toast({ message, onClose, isInert = false }) {
++  const { t } = useI18n();
+   if (!message) return null;
+ 
+   return (
+@@ -13,7 +15,7 @@
+     >
+       <CheckCircle size={22} weight="fill" />
+       <span>{message}</span>
+-      <button type="button" aria-label="关闭提示" onClick={onClose}><X size={17} /></button>
++      <button type="button" aria-label={t("home.toast.close")} onClick={onClose}><X size={17} /></button>
+     </div>
+   );
+ }
+diff -ruN /tmp/narrato-i18n/task3-before/src/components/VideoModal.jsx docs/web/homepage-prototype/src/components/VideoModal.jsx
+--- /tmp/narrato-i18n/task3-before/src/components/VideoModal.jsx	2026-07-15 21:52:21
++++ docs/web/homepage-prototype/src/components/VideoModal.jsx	2026-07-15 21:55:42
+@@ -1,7 +1,9 @@
+ import { useEffect, useRef, useState } from "react";
+ import { ArrowsOut, Pause, Play, SpeakerHigh, X } from "@phosphor-icons/react";
++import { useI18n } from "../i18n/useI18n.js";
+ 
+ export function VideoModal({ caseItem, onClose, returnFocusRef }) {
++  const { t } = useI18n();
+   const [playing, setPlaying] = useState(false);
+   const closeButtonRef = useRef(null);
+ 
+@@ -38,19 +40,19 @@
+ 
+   return (
+     <div className="video-modal" role="dialog" aria-modal="true" aria-labelledby="video-modal-title">
+-      <button className="video-modal__backdrop" type="button" aria-label="关闭案例播放" onClick={onClose} />
++      <button className="video-modal__backdrop" type="button" aria-label={t("home.modal.closePlayback")} onClick={onClose} />
+       <div className="video-modal__panel">
+         <div className="video-modal__header">
+           <span><small>{caseItem.toolName}</small><h2 id="video-modal-title">{caseItem.title}</h2></span>
+-          <button ref={closeButtonRef} type="button" aria-label="关闭案例" onClick={onClose}><X size={24} /></button>
++          <button ref={closeButtonRef} type="button" aria-label={t("home.modal.close")} onClick={onClose}><X size={24} /></button>
+         </div>
+         <div className={`video-modal__stage ${playing ? "is-playing" : ""}`}>
+-          <img src={caseItem.image} alt={`${caseItem.title}视频案例`} loading="eager" decoding="async" />
+-          <button className="video-modal__center-play" type="button" aria-label={playing ? "暂停" : "播放"} onClick={() => setPlaying(!playing)}>
++          <img src={caseItem.image} alt={t("home.modal.videoAlt", { title: caseItem.title })} loading="eager" decoding="async" />
++          <button className="video-modal__center-play" type="button" aria-label={playing ? t("home.modal.pause") : t("home.modal.play")} onClick={() => setPlaying(!playing)}>
+             {playing ? <Pause size={30} weight="fill" /> : <Play size={30} weight="fill" />}
+           </button>
+           <div className="video-modal__controls">
+-            <button type="button" aria-label={playing ? "暂停" : "播放"} onClick={() => setPlaying(!playing)}>{playing ? <Pause size={18} weight="fill" /> : <Play size={18} weight="fill" />}</button>
++            <button type="button" aria-label={playing ? t("home.modal.pause") : t("home.modal.play")} onClick={() => setPlaying(!playing)}>{playing ? <Pause size={18} weight="fill" /> : <Play size={18} weight="fill" />}</button>
+             <span>{playing ? caseItem.playingElapsed : "00:00"} / {caseItem.duration}</span>
+             <div className="video-modal__progress"><span style={{ width: playing ? `${caseItem.progress}%` : "4%" }} /></div>
+             <SpeakerHigh size={19} />
+diff -ruN /tmp/narrato-i18n/task3-before/src/i18n/locales/en.js docs/web/homepage-prototype/src/i18n/locales/en.js
+--- /tmp/narrato-i18n/task3-before/src/i18n/locales/en.js	2026-07-15 21:52:21
++++ docs/web/homepage-prototype/src/i18n/locales/en.js	2026-07-15 22:01:55
+@@ -1,23 +1,43 @@
+-export const en = {
+-  common: {
+-    language: "Language",
+-    localeName: "English",
+-    login: "Log in",
+-    openMenu: "Open menu",
+-    closeMenu: "Close menu",
+-  },
+-  home: {
+-    header: {
+-      home: "Back to home",
+-      primaryNavigation: "Primary navigation",
+-      mobileNavigation: "Mobile navigation",
+-      capabilities: "Capabilities",
+-      demo: "Demo",
+-      pricing: "Pricing",
+-      pricingFeedback: "Pricing page coming soon",
+-      loginFeedback: "Login flow coming soon",
+-      loginFull: "Log in to Narrato",
+-    },
+-  },
+-  titles: {},
+-};
++import { zhCN } from "./zh-CN.js";
++
++const translations = new Map([
++  ["语言", "Language"], ["简体中文", "English"], ["登录", "Log in"], ["打开菜单", "Open menu"], ["关闭菜单", "Close menu"],
++  ["返回首页", "Back to home"], ["主导航", "Primary navigation"], ["移动端导航", "Mobile navigation"], ["产品能力", "Capabilities"], ["案例 Demo", "Demo"], ["价格", "Pricing"],
++  ["价格页待接入", "Pricing page coming soon"], ["登录流程待接入", "Login flow coming soon"], ["登录影创工坊", "Log in to Narrato"],
++  ["AI 视频创作 · 小白也能做专业视频", "AI video creation · Professional results for beginners"], ["专为自媒体小白打造的", "Built for first-time creators"], ["AI 出片工作台", "AI Video Workspace"],
++  ["上传素材，AI 自动完成剪辑、文案、配音、字幕与合成。短剧解说、视频翻译、智能混剪，一个工作台搞定。", "Upload your footage and let AI handle editing, scripts, voice-over, subtitles, and production. Narration, translation, and remixing—all in one workspace."],
++  ["上传素材，AI 自动完成剪辑、文案、配音、字幕与合成。", "Upload footage and let AI handle editing, scripts, voice-over, subtitles, and production."], ["开始创作", "Start creating"], ["查看案例", "View demos"],
++  ["AI 处理流程", "AI workflow"], ["处理中", "Processing"], ["预计还需 30 秒完成", "About 30 seconds remaining"], ["识别剧情冲突", "Detect story conflicts"], ["分析剧情与节奏点", "Analyze plot and pacing"],
++  ["提取高光片段", "Extract highlights"], ["定位高能情绪瞬间", "Find emotional peaks"], ["生成解说文案", "Generate narration"], ["匹配风格与配音", "Match style and voice"], ["配音字幕合成", "Synthesize voice and captions"], ["声音与字幕自动对齐", "Auto-align voice and captions"],
++  ["都市短剧成片预览", "Urban short-drama preview"], ["命运的", "A Twist of"], ["反转", "Fate"], ["这一刻，他终于", "At this moment, he finally"], ["发现自己爱上了她", "realized he had fallen for her"],
++  ["短剧解说", "Short-drama narration"], ["加旁白讲剧情", "Tell the story with voice-over"], ["视频翻译", "Video translation"], ["多语言翻译配音", "Multilingual dubbing"], ["短剧混剪", "Short-drama remix"], ["智能提取高能片段", "Smart highlight extraction"],
++  ["AI 智能提取", "AI extraction"], ["高能片段", "Highlights"], ["自动配音字幕", "Auto voice and captions"], ["一键合成", "One-click production"], ["节奏快不拖沓", "Fast, focused pacing"], ["适配平台算法", "Optimized for platforms"], ["多格式导出", "Multi-format export"], ["高清无水印", "HD without watermarks"],
++  ["视频片段", "Video clips"], ["解说文案", "Narration script"], ["配音音频", "Voice-over"], ["背景音乐", "Background music"], ["这场相遇…", "This encounter…"], ["命运的反转", "A twist of fate"], ["真相揭开", "Truth revealed"], ["新的开始", "A new beginning"],
++  ["AI 视频出片工作台预览", "AI video workspace preview"], ["创作点", "Credits"], ["充值", "Top up"],
++  ["看见", "See"], ["如何把素材变成成片", "turn footage into finished video"], ["小白不用懂剪辑，跟着流程就能完成", "No editing experience needed—just follow the workflow"], ["选择创作工具", "Choose a creation tool"],
++  ["拖动查看{before}与{after}", "Drag to compare {before} and {after}"], ["播放案例：{title}", "Play demo: {title}"], ["{title}案例封面", "Cover for {title}"], ["使用相同模板创作", "Create with this template"],
++  ["00:00–00:03", "00:00–00:03"], ["播放解说案例", "Play narration demo"], ["原始素材", "Original footage"], ["最终成片", "Final video"], ["原始剧情素材", "Original story footage"], ["AI 生成的短剧解说成片", "AI-generated narrated short drama"],
++  ["上传剧集", "Upload episodes"], ["3 集素材已进入队列", "3 episodes added to the queue"], ["ASR/剧情拆解", "ASR / story analysis"], ["识别人物、对白与剧情冲突", "Identify characters, dialogue, and conflict"], ["筛选高光", "Select highlights"], ["按反转与情绪强度选出 8 段", "Select 8 clips by twists and emotion"], ["生成/润色解说词", "Generate / polish narration"], ["口语化重写并校准叙事节奏", "Rewrite naturally and refine pacing"], ["配音、字幕与画面自动对齐", "Auto-align voice, captions, and video"],
++  ["中文 → EN", "Chinese → EN"], ["播放翻译案例", "Play translation demo"], ["中文原片", "Chinese original"], ["英文成片", "English version"], ["待翻译的中文原片", "Chinese source video"], ["完成英语本地化的视频成片", "English-localized final video"],
++  ["识别中文对白", "Recognize Chinese dialogue"], ["区分角色并还原对白时间轴", "Identify speakers and restore timing"], ["翻译与本地化", "Translate and localize"], ["优化称谓、语气与文化表达", "Adapt names, tone, and cultural context"], ["角色声线映射", "Map character voices"], ["为每位角色匹配目标语音色", "Match each character to a target voice"], ["英文配音+双语字幕", "English dubbing + bilingual captions"], ["配音与双语字幕自动对齐", "Auto-align dubbing and bilingual captions"],
++  ["12 个片段", "12 clips"], ["播放混剪案例", "Play remix demo"], ["原始剧集", "Original episodes"], ["高光混剪", "Highlight remix"], ["待处理的原始短剧片段", "Original short-drama clips"], ["保留原声并完成节奏转场的高光混剪", "Highlight remix with original audio and rhythmic transitions"],
++  ["导入多集", "Import episodes"], ["12 集素材已建立镜头索引", "Shot index created for 12 episodes"], ["选择高光", "Choose highlights"], ["按冲突、反转与情绪强度排序", "Rank by conflict, twists, and emotion"], ["卡点拼接与混音", "Beat editing and mixing"], ["保留原声并匹配节拍与 BGM", "Keep original audio and match beats and BGM"],
++  ["解说创作流程", "Narration workflow"], ["剧情理解完成 · 正在润色文案", "Story analysis complete · Polishing narration"], ["已上传素材队列", "Uploaded footage queue"], ["素材队列", "Footage queue"], ["3 集 · 08:46", "3 episodes · 08:46"], ["第 {number} 集", "Episode {number}"], ["已分析", "Analyzed"],
++  ["剧情高点已定位", "Story peaks located"], ["反转 3 · 冲突 4 · 情绪峰值 5", "3 twists · 4 conflicts · 5 emotional peaks"], ["剧情与解说文案编辑", "Story and narration editor"], ["剧情理解", "Story analysis"], ["强钩子 · 00:00–00:03", "Strong hook · 00:00–00:03"], ["推荐", "Recommended"], ["96 字 · 预计 23 秒", "96 words · About 23 sec"], ["AI 润色", "AI polish"],
++  ["视频输出摘要", "Video output summary"], ["视频输出", "Video output"], ["接近完成", "Almost done"], ["专业度评分", "Quality score"], ["节奏与钩子表现优秀", "Excellent pacing and hook"], ["前 3 秒强钩子", "Strong first-3-second hook"], ["冲突信息已前置", "Conflict moved up front"], ["自然女声 · 1.05x", "Natural female voice · 1.05x"], ["情绪强度已匹配", "Emotional intensity matched"], ["动态高亮字幕", "Dynamic highlighted captions"], ["安全区与断句已校准", "Safe area and line breaks calibrated"], ["BGM 自动闪避", "Automatic BGM ducking"], ["对白区域降低 8dB", "Dialogue sections lowered by 8 dB"],
++  ["冷静女声", "Calm female voice"], ["低沉男声", "Deep male voice"], ["多语言本地化", "Multilingual localization"], ["已识别 3 位角色 · 86 条对白", "3 characters recognized · 86 lines"], ["翻译语言设置", "Translation language settings"], ["源语言", "Source language"], ["目标语言", "Target language"], ["视频翻译流程", "Video translation workflow"], ["双语视频预览", "Bilingual video preview"], ["中文短剧英文配音预览", "English-dubbed Chinese short-drama preview"], ["双语对白编辑", "Bilingual dialogue editor"], ["编辑{role}的译文", "Edit {role}'s translation"], ["3 / 3 已匹配", "3 / 3 matched"], ["试听{role}的英文声线", "Preview {role}'s English voice"], ["本地化检查完成", "Localization check complete"], ["专有名词、称谓和语气已优化", "Names, forms of address, and tone optimized"],
++  ["高光混剪控制台", "Highlight remix console"], ["12 集 · 36:40 · 已选 8 个高能镜头", "12 episodes · 36:40 · 8 highlights selected"], ["短剧混剪流程", "Short-drama remix workflow"], ["高光片段池", "Highlight pool"], ["按强度排序", "Sorted by intensity"], ["冲突爆发", "Conflict erupts"], ["身份揭晓", "Identity revealed"], ["绝地反击", "Comeback"], ["情绪顶点", "Emotional peak"], ["高光混剪成片预览", "Highlight remix preview"], ["高光混剪 · 9:16", "Highlight remix · 9:16"], ["播放高光混剪", "Play highlight remix"], ["多轨混剪时间线", "Multitrack remix timeline"], ["画面", "Video"], ["原声", "Original audio"], ["BGM 与节拍控制", "BGM and beat controls"], ["BGM / 节拍", "BGM / Beats"], ["已同步", "Synced"], ["电子氛围 · 128 BPM", "Electronic ambience · 128 BPM"], ["播放背景音乐", "Play background music"], ["卡点强度", "Beat intensity"], ["原声音量", "Original volume"], ["BGM 音量", "BGM volume"], ["18 个节拍点", "18 beat points"], ["6 处转场", "6 transitions"], ["0 空拍", "0 empty beats"],
++  ["霸总反转", "CEO twist"], ["反转密集", "Twist-packed"], ["情绪拉满", "High emotion"], ["高完播", "High completion"], ["悬疑真相局", "Suspense reveal"], ["强钩子", "Strong hook"], ["层层递进", "Rising tension"], ["沉浸旁白", "Immersive narration"], ["都市逆袭录", "Urban comeback"], ["冲突前置", "Conflict first"], ["节奏紧凑", "Tight pacing"], ["反转收尾", "Twist ending"], ["多语言出海", "Global multilingual launch"], ["多语翻译", "Multilingual"], ["本地配音", "Localized dubbing"], ["全球发行", "Global release"], ["短剧英语版", "English short drama"], ["英语配音", "English dubbing"], ["双语字幕", "Bilingual captions"], ["角色声线", "Character voices"], ["都市剧日语版", "Japanese urban drama"], ["日语本地化", "Japanese localization"], ["口型节奏", "Lip-sync timing"], ["字幕校准", "Caption calibration"], ["都市逆袭混剪", "Urban comeback remix"], ["燃点爆发", "Explosive energy"], ["高能混剪", "High-energy remix"], ["心动名场面", "Romantic highlights"], ["情绪峰值", "Emotional peaks"], ["保留原声", "Original audio"], ["氛围 BGM", "Atmospheric BGM"], ["电影感卡点", "Cinematic beat edit"], ["镜头卡点", "Beat-matched shots"], ["节奏转场", "Rhythmic transitions"], ["高光合集", "Highlight collection"],
++  ["一个工作台，搞定", "One workspace for"], ["三种视频创作", "three video workflows"], ["选择目标，剩下的交给 AI 流程", "Choose your goal and let AI handle the workflow"], ["立即体验", "Try now"], ["小白也能做短剧号", "Launch a short-drama channel with ease"], ["高光片段 · 解说文案 · AI 配音 · 字幕 · BGM", "Highlights · Narration · AI voice · Captions · BGM"], ["让内容跨越语言", "Take content across languages"], ["字幕翻译 · 重新配音 · 双语字幕", "Caption translation · Redubbing · Bilingual captions"], ["不用懂剪辑", "No editing skills needed"], ["高光片段 · 保留原声 · BGM", "Highlights · Original audio · BGM"], ["上传素材", "Upload footage"], ["AI 分析", "AI analysis"], ["用户审核", "Review"], ["自动合成", "Auto production"], ["导出发布", "Export and publish"], ["小白可以沿用 AI 推荐，", "Beginners can follow AI recommendations,"], ["有经验也能逐步调整", "while experts can fine-tune every step"],
++  ["常见问题", "Frequently asked questions"], ["没有字幕文件也能用吗？", "Can I use it without a subtitle file?"], ["可以。影创工坊会自动识别视频中的对白并生成时间轴字幕，你仍可在合成前校对。", "Yes. Narrato recognizes dialogue and builds timed captions automatically, and you can review them before rendering."], ["生成前可以修改片段和文案吗？", "Can I edit clips and scripts before generation?"], ["可以。AI 先给出推荐片段、文案和节奏，你可以逐项替换、改写或调整顺序。", "Yes. AI recommends clips, narration, and pacing, and you can replace, rewrite, or reorder each item."], ["创作点如何计费？", "How are credits charged?"], ["原型中暂不接入真实计费；正式版本会在生成前透明展示预计创作点消耗。", "This prototype does not charge real credits. The production version will show the estimated cost before generation."], ["生成失败会扣费吗？", "Will failed generations use credits?"], ["失败任务不会按成功成片计费，正式规则会在任务记录中清晰展示。", "Failed tasks will not be billed as completed videos. The final policy will appear clearly in task history."],
++  ["准备好完成你的第一条", "Ready to create your first"], ["AI 成片", "AI video"], ["了吗？", "?"], ["真实生成前会透明展示预计消耗", "Estimated usage is shown clearly before generation"], ["页脚导航", "Footer navigation"], ["用户协议", "Terms of service"], ["用户协议待接入", "Terms of service coming soon"], ["隐私政策", "Privacy policy"], ["隐私政策待接入", "Privacy policy coming soon"], ["关闭案例播放", "Close demo playback"], ["关闭案例", "Close demo"], ["播放", "Play"], ["暂停", "Pause"], ["{title}视频案例", "Video demo: {title}"], ["关闭提示", "Close notification"], ["常见问题与开始创作", "FAQ and start creating"],
++  ["页面未找到", "Page not found"], ["你访问的页面不存在。", "The page you requested does not exist."], ["错误页面导航", "Error page navigation"], ["返回官网", "Back to website"], ["前往工作台", "Go to workspace"],
++  ["影创工坊｜AI 出片工作台", "Narrato | AI Video Workspace"], ["工作台概览｜影创工坊", "Workspace overview | Narrato"], ["新建创作｜影创工坊", "New creation | Narrato"], ["我的项目｜影创工坊", "My projects | Narrato"], ["霸总短剧解说 01｜影创工坊", "CEO short-drama narration 01 | Narrato"], ["短剧解说设置｜影创工坊", "Narration settings | Narrato"], ["AI 分析｜影创工坊", "AI analysis | Narrato"], ["解说编辑器｜影创工坊", "Narration editor | Narrato"], ["页面未找到｜影创工坊", "Page not found | Narrato"],
++]);
++
++function localize(value) {
++  if (typeof value === "string") return translations.get(value) ?? value;
++  return Object.fromEntries(Object.entries(value).map(([key, child]) => [key, localize(child)]));
++}
++
++export const en = localize(zhCN);
+diff -ruN /tmp/narrato-i18n/task3-before/src/i18n/locales/ja.js docs/web/homepage-prototype/src/i18n/locales/ja.js
+--- /tmp/narrato-i18n/task3-before/src/i18n/locales/ja.js	2026-07-15 21:52:21
++++ docs/web/homepage-prototype/src/i18n/locales/ja.js	2026-07-15 22:03:06
+@@ -1,23 +1,33 @@
+-export const ja = {
+-  common: {
+-    language: "言語",
+-    localeName: "日本語",
+-    login: "ログイン",
+-    openMenu: "メニューを開く",
+-    closeMenu: "メニューを閉じる",
+-  },
+-  home: {
+-    header: {
+-      home: "ホームに戻る",
+-      primaryNavigation: "メインナビゲーション",
+-      mobileNavigation: "モバイルナビゲーション",
+-      capabilities: "製品機能",
+-      demo: "事例 Demo",
+-      pricing: "料金",
+-      pricingFeedback: "料金ページは準備中です",
+-      loginFeedback: "ログイン機能は準備中です",
+-      loginFull: "Narrato にログイン",
+-    },
+-  },
+-  titles: {},
+-};
++import { zhCN } from "./zh-CN.js";
++
++const translations = new Map([
++  ["语言", "言語"], ["简体中文", "日本語"], ["登录", "ログイン"], ["打开菜单", "メニューを開く"], ["关闭菜单", "メニューを閉じる"],
++  ["返回首页", "ホームに戻る"], ["主导航", "メインナビゲーション"], ["移动端导航", "モバイルナビゲーション"], ["产品能力", "製品機能"], ["案例 Demo", "事例 Demo"], ["价格", "料金"], ["价格页待接入", "料金ページは準備中です"], ["登录流程待接入", "ログイン機能は準備中です"], ["登录影创工坊", "影创工坊にログイン"],
++  ["AI 视频创作 · 小白也能做专业视频", "AI 動画制作 · 初心者でもプロ品質"], ["专为自媒体小白打造的", "動画制作初心者のための"], ["AI 出片工作台", "AI 動画制作ワークスペース"],
++  ["上传素材，AI 自动完成剪辑、文案、配音、字幕与合成。短剧解说、视频翻译、智能混剪，一个工作台搞定。", "素材をアップロードするだけで、AI が編集・台本・音声・字幕・合成を自動化。ショートドラマ解説、動画翻訳、スマートリミックスを一つのワークスペースで完結できます。"],
++  ["上传素材，AI 自动完成剪辑、文案、配音、字幕与合成。", "素材をアップロードするだけで、AI が編集・台本・音声・字幕・合成を自動化します。"], ["开始创作", "制作を始める"], ["查看案例", "事例を見る"],
++  ["AI 处理流程", "AI 処理フロー"], ["处理中", "処理中"], ["预计还需 30 秒完成", "完了まで約30秒"], ["识别剧情冲突", "物語の対立を検出"], ["分析剧情与节奏点", "物語とテンポを分析"], ["提取高光片段", "ハイライトを抽出"], ["定位高能情绪瞬间", "感情のピークを特定"], ["生成解说文案", "解説台本を生成"], ["匹配风格与配音", "スタイルと音声を最適化"], ["配音字幕合成", "音声と字幕を合成"], ["声音与字幕自动对齐", "音声と字幕を自動同期"],
++  ["都市短剧成片预览", "都市ショートドラマの完成プレビュー"], ["命运的", "運命の"], ["反转", "逆転"], ["这一刻，他终于", "この瞬間、彼はついに"], ["发现自己爱上了她", "彼女を愛していると気づいた"],
++  ["短剧解说", "ショートドラマ解説"], ["加旁白讲剧情", "ナレーションで物語を伝える"], ["视频翻译", "動画翻訳"], ["多语言翻译配音", "多言語翻訳と吹き替え"], ["短剧混剪", "ショートドラマリミックス"], ["智能提取高能片段", "見せ場をスマート抽出"], ["AI 智能提取", "AI スマート抽出"], ["高能片段", "ハイライト"], ["自动配音字幕", "音声・字幕を自動生成"], ["一键合成", "ワンクリック合成"], ["节奏快不拖沓", "無駄のないテンポ"], ["适配平台算法", "プラットフォームに最適化"], ["多格式导出", "多形式で書き出し"], ["高清无水印", "高画質・透かしなし"],
++  ["视频片段", "映像クリップ"], ["解说文案", "解説台本"], ["配音音频", "ナレーション音声"], ["背景音乐", "BGM"], ["这场相遇…", "この出会い…"], ["命运的反转", "運命の逆転"], ["真相揭开", "真実が明らかに"], ["新的开始", "新たな始まり"], ["AI 视频出片工作台预览", "AI 動画制作ワークスペースのプレビュー"], ["创作点", "制作クレジット"], ["充值", "チャージ"],
++  ["看见", "見る"], ["如何把素材变成成片", "が素材を完成動画に変える方法"], ["小白不用懂剪辑，跟着流程就能完成", "編集経験がなくても、フローに沿うだけで完成"], ["选择创作工具", "制作ツールを選択"], ["拖动查看{before}与{after}", "ドラッグして{before}と{after}を比較"], ["播放案例：{title}", "事例を再生：{title}"], ["{title}案例封面", "{title}の事例カバー"], ["使用相同模板创作", "同じテンプレートで制作"],
++  ["播放解说案例", "解説事例を再生"], ["原始素材", "元素材"], ["最终成片", "完成動画"], ["原始剧情素材", "元の物語素材"], ["AI 生成的短剧解说成片", "AI が生成したショートドラマ解説動画"], ["上传剧集", "エピソードをアップロード"], ["3 集素材已进入队列", "3話をキューに追加済み"], ["ASR/剧情拆解", "ASR / 物語分析"], ["识别人物、对白与剧情冲突", "登場人物・セリフ・対立を認識"], ["筛选高光", "ハイライトを選定"], ["按反转与情绪强度选出 8 段", "逆転と感情の強さから8クリップを選定"], ["生成/润色解说词", "解説を生成・推敲"], ["口语化重写并校准叙事节奏", "自然な話し言葉に直しテンポを調整"], ["配音、字幕与画面自动对齐", "音声・字幕・映像を自動同期"],
++  ["中文 → EN", "中国語 → EN"], ["播放翻译案例", "翻訳事例を再生"], ["中文原片", "中国語の元動画"], ["英文成片", "英語版"], ["待翻译的中文原片", "翻訳前の中国語動画"], ["完成英语本地化的视频成片", "英語ローカライズ済み動画"], ["识别中文对白", "中国語のセリフを認識"], ["区分角色并还原对白时间轴", "話者を判別しタイムラインを復元"], ["翻译与本地化", "翻訳とローカライズ"], ["优化称谓、语气与文化表达", "呼称・口調・文化表現を最適化"], ["角色声线映射", "キャラクター音声の割り当て"], ["为每位角色匹配目标语音色", "各キャラクターに対象音声を割り当て"], ["英文配音+双语字幕", "英語吹き替え＋二言語字幕"], ["配音与双语字幕自动对齐", "吹き替えと二言語字幕を自動同期"],
++  ["12 个片段", "12クリップ"], ["播放混剪案例", "リミックス事例を再生"], ["原始剧集", "元エピソード"], ["高光混剪", "ハイライトリミックス"], ["待处理的原始短剧片段", "処理前のショートドラマ素材"], ["保留原声并完成节奏转场的高光混剪", "原音を残しテンポよく切り替えるハイライトリミックス"], ["导入多集", "複数話を読み込む"], ["12 集素材已建立镜头索引", "12話のショット索引を作成済み"], ["选择高光", "ハイライトを選択"], ["按冲突、反转与情绪强度排序", "対立・逆転・感情の強さで並べ替え"], ["卡点拼接与混音", "ビート編集とミックス"], ["保留原声并匹配节拍与 BGM", "原音を残してビートとBGMに同期"],
++  ["解说创作流程", "解説制作フロー"], ["剧情理解完成 · 正在润色文案", "物語分析完了 · 台本を推敲中"], ["已上传素材队列", "アップロード済み素材キュー"], ["素材队列", "素材キュー"], ["3 集 · 08:46", "3話 · 08:46"], ["第 {number} 集", "第{number}話"], ["已分析", "分析済み"], ["剧情高点已定位", "物語のピークを特定済み"], ["反转 3 · 冲突 4 · 情绪峰值 5", "逆転 3 · 対立 4 · 感情ピーク 5"], ["剧情与解说文案编辑", "物語と解説台本の編集"], ["剧情理解", "物語分析"], ["强钩子 · 00:00–00:03", "強いフック · 00:00–00:03"], ["推荐", "おすすめ"], ["96 字 · 预计 23 秒", "96文字 · 約23秒"], ["AI 润色", "AI 推敲"], ["视频输出摘要", "動画出力サマリー"], ["视频输出", "動画出力"], ["接近完成", "まもなく完了"], ["专业度评分", "品質スコア"], ["节奏与钩子表现优秀", "テンポとフックが優秀"], ["前 3 秒强钩子", "冒頭3秒の強いフック"], ["冲突信息已前置", "対立情報を前方に配置"], ["自然女声 · 1.05x", "自然な女性音声 · 1.05x"], ["情绪强度已匹配", "感情の強さを調整済み"], ["动态高亮字幕", "動的ハイライト字幕"], ["安全区与断句已校准", "セーフエリアと改行を調整済み"], ["BGM 自动闪避", "BGM 自動ダッキング"], ["对白区域降低 8dB", "セリフ区間を8dB低減"],
++  ["冷静女声", "落ち着いた女性音声"], ["低沉男声", "低音の男性音声"], ["多语言本地化", "多言語ローカライズ"], ["已识别 3 位角色 · 86 条对白", "3人を認識 · 86行のセリフ"], ["翻译语言设置", "翻訳言語の設定"], ["源语言", "元の言語"], ["目标语言", "対象言語"], ["视频翻译流程", "動画翻訳フロー"], ["双语视频预览", "二言語動画プレビュー"], ["中文短剧英文配音预览", "中国語ショートドラマの英語吹き替えプレビュー"], ["双语对白编辑", "二言語セリフ編集"], ["编辑{role}的译文", "{role}の訳文を編集"], ["3 / 3 已匹配", "3 / 3 割り当て済み"], ["试听{role}的英文声线", "{role}の英語音声を試聴"], ["本地化检查完成", "ローカライズ確認完了"], ["专有名词、称谓和语气已优化", "固有名詞・呼称・口調を最適化済み"],
++  ["高光混剪控制台", "ハイライトリミックスコンソール"], ["12 集 · 36:40 · 已选 8 个高能镜头", "12話 · 36:40 · 8ショット選択済み"], ["短剧混剪流程", "ショートドラマリミックスフロー"], ["高光片段池", "ハイライトプール"], ["按强度排序", "強度順"], ["冲突爆发", "対立の勃発"], ["身份揭晓", "正体判明"], ["绝地反击", "逆転の反撃"], ["情绪顶点", "感情の頂点"], ["高光混剪成片预览", "ハイライトリミックスのプレビュー"], ["高光混剪 · 9:16", "ハイライトリミックス · 9:16"], ["播放高光混剪", "ハイライトリミックスを再生"], ["多轨混剪时间线", "マルチトラックリミックスタイムライン"], ["画面", "映像"], ["原声", "原音"], ["BGM 与节拍控制", "BGMとビートの調整"], ["BGM / 节拍", "BGM / ビート"], ["已同步", "同期済み"], ["电子氛围 · 128 BPM", "エレクトロニック · 128 BPM"], ["播放背景音乐", "BGMを再生"], ["卡点强度", "ビート強度"], ["原声音量", "原音音量"], ["BGM 音量", "BGM音量"], ["18 个节拍点", "18ビートポイント"], ["6 处转场", "6トランジション"], ["0 空拍", "空拍0"],
++  ["霸总反转", "CEOの逆転"], ["反转密集", "逆転満載"], ["情绪拉满", "感情全開"], ["高完播", "高い完視聴率"], ["悬疑真相局", "サスペンスの真相"], ["强钩子", "強いフック"], ["层层递进", "高まる緊張"], ["沉浸旁白", "没入感のある語り"], ["都市逆袭录", "都会の逆転劇"], ["冲突前置", "対立を冒頭に"], ["节奏紧凑", "引き締まったテンポ"], ["反转收尾", "逆転エンド"], ["多语言出海", "多言語グローバル展開"], ["多语翻译", "多言語翻訳"], ["本地配音", "現地向け吹き替え"], ["全球发行", "世界配信"], ["短剧英语版", "ショートドラマ英語版"], ["英语配音", "英語吹き替え"], ["双语字幕", "二言語字幕"], ["角色声线", "キャラクター音声"], ["都市剧日语版", "都市ドラマ日本語版"], ["日语本地化", "日本語ローカライズ"], ["口型节奏", "リップシンク"], ["字幕校准", "字幕調整"], ["都市逆袭混剪", "都会の逆転リミックス"], ["燃点爆发", "熱量全開"], ["高能混剪", "高エネルギーリミックス"], ["心动名场面", "胸キュン名場面"], ["情绪峰值", "感情のピーク"], ["保留原声", "原音を保持"], ["氛围 BGM", "雰囲気BGM"], ["电影感卡点", "シネマティックビート編集"], ["镜头卡点", "ショットをビート同期"], ["节奏转场", "リズミカルな切り替え"], ["高光合集", "ハイライト集"],
++  ["一个工作台，搞定", "一つのワークスペースで"], ["三种视频创作", "3つの動画制作"], ["选择目标，剩下的交给 AI 流程", "目的を選んだら、あとはAIフローにお任せ"], ["立即体验", "今すぐ試す"], ["小白也能做短剧号", "初心者でもショートドラマ運営"], ["高光片段 · 解说文案 · AI 配音 · 字幕 · BGM", "ハイライト · 解説台本 · AI音声 · 字幕 · BGM"], ["让内容跨越语言", "コンテンツを言語の壁の向こうへ"], ["字幕翻译 · 重新配音 · 双语字幕", "字幕翻訳 · 再吹き替え · 二言語字幕"], ["不用懂剪辑", "編集スキル不要"], ["高光片段 · 保留原声 · BGM", "ハイライト · 原音保持 · BGM"], ["上传素材", "素材をアップロード"], ["AI 分析", "AI分析"], ["用户审核", "ユーザー確認"], ["自动合成", "自動合成"], ["导出发布", "書き出して公開"], ["小白可以沿用 AI 推荐，", "初心者はAIのおすすめをそのまま使い、"], ["有经验也能逐步调整", "経験者は各工程を調整できます"],
++  ["常见问题", "よくある質問"], ["没有字幕文件也能用吗？", "字幕ファイルがなくても使えますか？"], ["可以。影创工坊会自动识别视频中的对白并生成时间轴字幕，你仍可在合成前校对。", "はい。影创工坊が動画内のセリフを認識してタイムライン字幕を生成し、合成前に確認できます。"], ["生成前可以修改片段和文案吗？", "生成前にクリップや台本を修正できますか？"], ["可以。AI 先给出推荐片段、文案和节奏，你可以逐项替换、改写或调整顺序。", "はい。AIが提案したクリップ、台本、テンポを個別に差し替え、書き換え、並べ替えできます。"], ["创作点如何计费？", "制作クレジットはどのように消費されますか？"], ["原型中暂不接入真实计费；正式版本会在生成前透明展示预计创作点消耗。", "このプロトタイプでは実際の課金は行いません。正式版では生成前に予想消費量を明示します。"], ["生成失败会扣费吗？", "生成に失敗した場合も課金されますか？"], ["失败任务不会按成功成片计费，正式规则会在任务记录中清晰展示。", "失敗したタスクは完成動画として課金されません。正式なルールはタスク履歴に明示されます。"],
++  ["准备好完成你的第一条", "最初の"], ["AI 成片", "AI動画"], ["了吗？", "を作る準備はできましたか？"], ["真实生成前会透明展示预计消耗", "生成前に予想消費量を明確に表示します"], ["页脚导航", "フッターナビゲーション"], ["用户协议", "利用規約"], ["用户协议待接入", "利用規約は準備中です"], ["隐私政策", "プライバシーポリシー"], ["隐私政策待接入", "プライバシーポリシーは準備中です"], ["关闭案例播放", "事例再生を閉じる"], ["关闭案例", "事例を閉じる"], ["播放", "再生"], ["暂停", "一時停止"], ["{title}视频案例", "{title}の動画事例"], ["关闭提示", "通知を閉じる"], ["常见问题与开始创作", "よくある質問と制作開始"],
++  ["页面未找到", "ページが見つかりません"], ["你访问的页面不存在。", "指定されたページは存在しません。"], ["错误页面导航", "エラーページナビゲーション"], ["返回官网", "公式サイトに戻る"], ["前往工作台", "ワークスペースへ"],
++  ["影创工坊｜AI 出片工作台", "影创工坊｜AI 動画制作ワークスペース"], ["工作台概览｜影创工坊", "ワークスペース概要｜影创工坊"], ["新建创作｜影创工坊", "新規制作｜影创工坊"], ["我的项目｜影创工坊", "マイプロジェクト｜影创工坊"], ["霸总短剧解说 01｜影创工坊", "CEOショートドラマ解説 01｜影创工坊"], ["短剧解说设置｜影创工坊", "ショートドラマ解説設定｜影创工坊"], ["AI 分析｜影创工坊", "AI分析｜影创工坊"], ["解说编辑器｜影创工坊", "解説エディター｜影创工坊"], ["页面未找到｜影创工坊", "ページが見つかりません｜影创工坊"],
++]);
++
++function localize(value) {
++  if (typeof value === "string") return translations.get(value) ?? value;
++  return Object.fromEntries(Object.entries(value).map(([key, child]) => [key, localize(child)]));
++}
++
++export const ja = localize(zhCN);
+diff -ruN /tmp/narrato-i18n/task3-before/src/i18n/locales/zh-CN.js docs/web/homepage-prototype/src/i18n/locales/zh-CN.js
+--- /tmp/narrato-i18n/task3-before/src/i18n/locales/zh-CN.js	2026-07-15 21:52:21
++++ docs/web/homepage-prototype/src/i18n/locales/zh-CN.js	2026-07-15 22:07:55
+@@ -1,23 +1,105 @@
+ export const zhCN = {
+-  common: {
+-    language: "语言",
+-    localeName: "简体中文",
+-    login: "登录",
+-    openMenu: "打开菜单",
+-    closeMenu: "关闭菜单",
+-  },
++  common: { language: "语言", localeName: "简体中文", login: "登录", openMenu: "打开菜单", closeMenu: "关闭菜单" },
+   home: {
+     header: {
+-      home: "返回首页",
+-      primaryNavigation: "主导航",
+-      mobileNavigation: "移动端导航",
+-      capabilities: "产品能力",
+-      demo: "案例 Demo",
+-      pricing: "价格",
+-      pricingFeedback: "价格页待接入",
+-      loginFeedback: "登录流程待接入",
+-      loginFull: "登录影创工坊",
++      home: "返回首页", primaryNavigation: "主导航", mobileNavigation: "移动端导航",
++      capabilities: "产品能力", demo: "案例 Demo", pricing: "价格", pricingFeedback: "价格页待接入",
++      loginFeedback: "登录流程待接入", loginFull: "登录影创工坊",
+     },
++    hero: {
++      eyebrow: "AI 视频创作 · 小白也能做专业视频", headingPrefix: "专为自媒体小白打造的", headingAccent: "AI 出片工作台",
++      descriptionDesktop: "上传素材，AI 自动完成剪辑、文案、配音、字幕与合成。短剧解说、视频翻译、智能混剪，一个工作台搞定。",
++      descriptionMobile: "上传素材，AI 自动完成剪辑、文案、配音、字幕与合成。", start: "开始创作", viewDemo: "查看案例",
++      analysis: {
++        heading: "AI 处理流程", processing: "处理中", eta: "预计还需 30 秒完成",
++        steps: {
++          identify: { title: "识别剧情冲突", text: "分析剧情与节奏点" },
++          highlights: { title: "提取高光片段", text: "定位高能情绪瞬间" },
++          script: { title: "生成解说文案", text: "匹配风格与配音" },
++          synthesis: { title: "配音字幕合成", text: "声音与字幕自动对齐" },
++        },
++      },
++      preview: { alt: "都市短剧成片预览", titleLine1: "命运的", titleLine2: "反转", subtitleLine1: "这一刻，他终于", subtitleLine2: "发现自己爱上了她" },
++      shortcuts: {
++        narration: { title: "短剧解说", text: "加旁白讲剧情" }, translation: { title: "视频翻译", text: "多语言翻译配音" }, remix: { title: "短剧混剪", text: "智能提取高能片段" },
++      },
++      benefits: {
++        extract: { title: "AI 智能提取", text: "高能片段" }, synthesis: { title: "自动配音字幕", text: "一键合成" },
++        pace: { title: "节奏快不拖沓", text: "适配平台算法" }, export: { title: "多格式导出", text: "高清无水印" },
++      },
++      timeline: { video: "视频片段", captions: "解说文案", voice: "配音音频", bgm: "背景音乐", caption1: "这场相遇…", caption2: "命运的反转", caption3: "真相揭开", caption4: "新的开始" },
++      workbench: { ariaLabel: "AI 视频出片工作台预览", credits: "创作点", recharge: "充值" },
++    },
++    demo: {
++      kicker: "CASE DEMO", headingPrefix: "看见", headingSuffix: "如何把素材变成成片", description: "小白不用懂剪辑，跟着流程就能完成", toolTabsLabel: "选择创作工具",
++      compareLabel: "拖动查看{before}与{after}", playCase: "播放案例：{title}", caseCoverAlt: "{title}案例封面", useTemplate: "使用相同模板创作",
++      tools: {
++        narration: {
++          label: "短剧解说", summaryBadge: "00:00–00:03", cta: "播放解说案例",
++          preview: { beforeLabel: "原始素材", afterLabel: "最终成片", beforeAlt: "原始剧情素材", afterAlt: "AI 生成的短剧解说成片" },
++          steps: {
++            step1: { title: "上传剧集", text: "3 集素材已进入队列" }, step2: { title: "ASR/剧情拆解", text: "识别人物、对白与剧情冲突" },
++            step3: { title: "筛选高光", text: "按反转与情绪强度选出 8 段" }, step4: { title: "生成/润色解说词", text: "口语化重写并校准叙事节奏" },
++            step5: { title: "配音字幕合成", text: "配音、字幕与画面自动对齐" },
++          },
++        },
++        translation: {
++          label: "视频翻译", summaryBadge: "中文 → EN", cta: "播放翻译案例",
++          preview: { beforeLabel: "中文原片", afterLabel: "英文成片", beforeAlt: "待翻译的中文原片", afterAlt: "完成英语本地化的视频成片" },
++          steps: {
++            step1: { title: "识别中文对白", text: "区分角色并还原对白时间轴" }, step2: { title: "翻译与本地化", text: "优化称谓、语气与文化表达" },
++            step3: { title: "角色声线映射", text: "为每位角色匹配目标语音色" }, step4: { title: "英文配音+双语字幕", text: "配音与双语字幕自动对齐" },
++          },
++        },
++        remix: {
++          label: "短剧混剪", summaryBadge: "12 个片段", cta: "播放混剪案例",
++          preview: { beforeLabel: "原始剧集", afterLabel: "高光混剪", beforeAlt: "待处理的原始短剧片段", afterAlt: "保留原声并完成节奏转场的高光混剪" },
++          steps: {
++            step1: { title: "导入多集", text: "12 集素材已建立镜头索引" }, step2: { title: "选择高光", text: "按冲突、反转与情绪强度排序" },
++            step3: { title: "卡点拼接与混音", text: "保留原声并匹配节拍与 BGM" },
++          },
++        },
++      },
++      narration: {
++        pipelineTitle: "解说创作流程", pipelineStatus: "剧情理解完成 · 正在润色文案", assetQueueAria: "已上传素材队列", assetQueue: "素材队列", assetSummary: "3 集 · 08:46",
++        episode: "第 {number} 集", analyzed: "已分析", insightTitle: "剧情高点已定位", insightSummary: "反转 3 · 冲突 4 · 情绪峰值 5",
++        scriptEditorAria: "剧情与解说文案编辑", storyUnderstanding: "剧情理解", script: "解说文案", strongHook: "强钩子 · 00:00–00:03", recommended: "推荐",
++        scriptMeta: "96 字 · 预计 23 秒", polish: "AI 润色", outputAria: "视频输出摘要", output: "视频输出", almostDone: "接近完成", scoreLabel: "专业度评分", scoreDetail: "节奏与钩子表现优秀",
++        outputItems: {
++          item1: { title: "前 3 秒强钩子", detail: "冲突信息已前置" }, item2: { title: "自然女声 · 1.05x", detail: "情绪强度已匹配" },
++          item3: { title: "动态高亮字幕", detail: "安全区与断句已校准" }, item4: { title: "BGM 自动闪避", detail: "对白区域降低 8dB" },
++        },
++      },
++      translation: {
++        calmFemaleVoice: "冷静女声", deepMaleVoice: "低沉男声", title: "多语言本地化", summary: "已识别 3 位角色 · 86 条对白", languageSettingsAria: "翻译语言设置",
++        sourceLanguage: "源语言", targetLanguage: "目标语言", flowAria: "视频翻译流程", previewAria: "双语视频预览", previewAlt: "中文短剧英文配音预览",
++        dialogueEditorAria: "双语对白编辑", editTranslation: "编辑{role}的译文", voiceMappingAria: "角色声线映射", voiceMapping: "角色声线映射", matched: "3 / 3 已匹配",
++        previewVoice: "试听{role}的英文声线", checkComplete: "本地化检查完成", checkDetail: "专有名词、称谓和语气已优化",
++      },
++      remix: {
++        title: "高光混剪控制台", summary: "12 集 · 36:40 · 已选 8 个高能镜头", flowAria: "短剧混剪流程", clipPoolAria: "高光片段池", clipPool: "高光片段池", sortedByIntensity: "按强度排序",
++        clips: { clip1: "冲突爆发", clip2: "身份揭晓", clip3: "绝地反击", clip4: "情绪顶点" }, previewAlt: "高光混剪成片预览", previewBadge: "高光混剪 · 9:16", playPreview: "播放高光混剪",
++        timelineAria: "多轨混剪时间线", videoTrack: "画面", originalAudio: "原声", beatControlsAria: "BGM 与节拍控制", beatControls: "BGM / 节拍", synced: "已同步", musicStyle: "电子氛围 · 128 BPM",
++        playMusic: "播放背景音乐", beatIntensity: "卡点强度", originalVolume: "原声音量", bgmVolume: "BGM 音量", beatPoints: "18 个节拍点", transitions: "6 处转场", emptyBeats: "0 空拍",
++      },
++      cases: {
++        reversal: { title: "霸总反转", tag1: "反转密集", tag2: "情绪拉满", tag3: "高完播" }, suspense: { title: "悬疑真相局", tag1: "强钩子", tag2: "层层递进", tag3: "沉浸旁白" },
++        counterattack: { title: "都市逆袭录", tag1: "冲突前置", tag2: "节奏紧凑", tag3: "反转收尾" }, global: { title: "多语言出海", tag1: "多语翻译", tag2: "本地配音", tag3: "全球发行" },
++        dramaEn: { title: "短剧英语版", tag1: "英语配音", tag2: "双语字幕", tag3: "角色声线" }, urbanJp: { title: "都市剧日语版", tag1: "日语本地化", tag2: "口型节奏", tag3: "字幕校准" },
++        urban: { title: "都市逆袭混剪", tag1: "节奏紧凑", tag2: "燃点爆发", tag3: "高能混剪" }, romanceRemix: { title: "心动名场面", tag1: "情绪峰值", tag2: "保留原声", tag3: "氛围 BGM" },
++        cinemaRemix: { title: "电影感卡点", tag1: "镜头卡点", tag2: "节奏转场", tag3: "高光合集" },
++      },
++    },
++    capabilities: {
++      kicker: "ALL-IN-ONE WORKSPACE", headingPrefix: "一个工作台，搞定", headingAccent: "三种视频创作", description: "选择目标，剩下的交给 AI 流程", tryNow: "立即体验",
++      items: { narration: { title: "短剧解说", subtitle: "小白也能做短剧号", features: "高光片段 · 解说文案 · AI 配音 · 字幕 · BGM" }, translation: { title: "视频翻译", subtitle: "让内容跨越语言", features: "字幕翻译 · 重新配音 · 双语字幕" }, remix: { title: "短剧混剪", subtitle: "不用懂剪辑", features: "高光片段 · 保留原声 · BGM" } },
++      process: { upload: "上传素材", analysis: "AI 分析", review: "用户审核", compose: "自动合成", export: "导出发布" }, processNoteLine1: "小白可以沿用 AI 推荐，", processNoteLine2: "有经验也能逐步调整",
++    },
++    faq: { title: "常见问题", items: { item1: { question: "没有字幕文件也能用吗？", answer: "可以。影创工坊会自动识别视频中的对白并生成时间轴字幕，你仍可在合成前校对。" }, item2: { question: "生成前可以修改片段和文案吗？", answer: "可以。AI 先给出推荐片段、文案和节奏，你可以逐项替换、改写或调整顺序。" }, item3: { question: "创作点如何计费？", answer: "原型中暂不接入真实计费；正式版本会在生成前透明展示预计创作点消耗。" }, item4: { question: "生成失败会扣费吗？", answer: "失败任务不会按成功成片计费，正式规则会在任务记录中清晰展示。" } } },
++    finalCta: { headingPrefix: "准备好完成你的第一条", headingAccent: "AI 成片", headingSuffix: "了吗？", start: "开始创作", note: "真实生成前会透明展示预计消耗" },
++    footer: { navigation: "页脚导航", terms: "用户协议", termsFeedback: "用户协议待接入", privacy: "隐私政策", privacyFeedback: "隐私政策待接入" },
++    modal: { closePlayback: "关闭案例播放", close: "关闭案例", play: "播放", pause: "暂停", videoAlt: "{title}视频案例" }, toast: { close: "关闭提示" }, lowerGridLabel: "常见问题与开始创作",
+   },
+-  titles: {},
++  errors: { notFound: { heading: "页面未找到", description: "你访问的页面不存在。", navigation: "错误页面导航", home: "返回官网", dashboard: "前往工作台" } },
++  titles: { home: "影创工坊｜AI 出片工作台", dashboard: "工作台概览｜影创工坊", create: "新建创作｜影创工坊", projects: "我的项目｜影创工坊", projectResult: "霸总短剧解说 01｜影创工坊", narrationSettings: "短剧解说设置｜影创工坊", narrationAnalysis: "AI 分析｜影创工坊", narrationEditor: "解说编辑器｜影创工坊", notFound: "页面未找到｜影创工坊" },
+ };
+diff -ruN /tmp/narrato-i18n/task3-before/src/pages/HomePage.jsx docs/web/homepage-prototype/src/pages/HomePage.jsx
+--- /tmp/narrato-i18n/task3-before/src/pages/HomePage.jsx	2026-07-15 21:52:21
++++ docs/web/homepage-prototype/src/pages/HomePage.jsx	2026-07-15 21:54:47
+@@ -9,8 +9,10 @@
+ import { SiteFooter } from "../components/SiteFooter.jsx";
+ import { VideoModal } from "../components/VideoModal.jsx";
+ import { Toast } from "../components/Toast.jsx";
++import { useI18n } from "../i18n/useI18n.js";
+ 
+ export function HomePage() {
++  const { t } = useI18n();
+   const navigate = useNavigate();
+   const [activeTool, setActiveTool] = useState("narration");
+   const [menuOpen, setMenuOpen] = useState(false);
+@@ -86,7 +88,7 @@
+           onTemplate={startCreation}
+         />
+         <CapabilitySection activeTool={activeTool} onChooseTool={startCreation} />
+-        <section className="lower-grid page-container" aria-label="常见问题与开始创作">
++        <section className="lower-grid page-container" aria-label={t("home.lowerGridLabel")}>
+           <FaqSection />
+           <FinalCtaSection onStart={startCreation} />
+         </section>
+diff -ruN /tmp/narrato-i18n/task3-before/src/pages/NotFoundPage.jsx docs/web/homepage-prototype/src/pages/NotFoundPage.jsx
+--- /tmp/narrato-i18n/task3-before/src/pages/NotFoundPage.jsx	2026-07-15 21:52:21
++++ docs/web/homepage-prototype/src/pages/NotFoundPage.jsx	2026-07-15 21:54:47
+@@ -1,15 +1,17 @@
+ import { Link } from "react-router-dom";
++import { useI18n } from "../i18n/useI18n.js";
+ 
+ export function NotFoundPage() {
++  const { t } = useI18n();
+   return (
+     <main>
+       <h1 data-route-heading tabIndex="-1">
+-        页面未找到
++        {t("errors.notFound.heading")}
+       </h1>
+-      <p>你访问的页面不存在。</p>
+-      <nav aria-label="错误页面导航">
+-        <Link to="/">返回官网</Link>
+-        <Link to="/dashboard">前往工作台</Link>
++      <p>{t("errors.notFound.description")}</p>
++      <nav aria-label={t("errors.notFound.navigation")}>
++        <Link to="/">{t("errors.notFound.home")}</Link>
++        <Link to="/dashboard">{t("errors.notFound.dashboard")}</Link>
+       </nav>
+     </main>
+   );
+diff -ruN /tmp/narrato-i18n/task3-before/scripts/verify-i18n.mjs docs/web/homepage-prototype/scripts/verify-i18n.mjs
+--- /tmp/narrato-i18n/task3-before/scripts/verify-i18n.mjs	2026-07-15 21:52:21
++++ docs/web/homepage-prototype/scripts/verify-i18n.mjs	2026-07-15 22:07:39
+@@ -4,11 +4,43 @@
+ import path from "node:path";
+ import { fileURLToPath } from "node:url";
+ import { chromium } from "playwright";
++import { zhCN } from "../src/i18n/locales/zh-CN.js";
++import { en } from "../src/i18n/locales/en.js";
++import { ja } from "../src/i18n/locales/ja.js";
+ 
+ const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+ const executablePath =
+   process.env.CHROME_PATH || "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
+ 
++const EXPECTED_COPY = {
++  "zh-CN": {
++    language: "简体中文",
++    homeTitle: "影创工坊｜AI 出片工作台",
++    heroHeading: "专为自媒体小白打造的AI 出片工作台",
++    notFoundHeading: "页面未找到",
++    notFoundTitle: "页面未找到｜影创工坊",
++  },
++  en: {
++    language: "English",
++    homeTitle: "Narrato | AI Video Workspace",
++    heroHeading: "Built for first-time creatorsAI Video Workspace",
++    notFoundHeading: "Page not found",
++    notFoundTitle: "Page not found | Narrato",
++  },
++  ja: {
++    language: "日本語",
++    homeTitle: "影创工坊｜AI 動画制作ワークスペース",
++    heroHeading: "動画制作初心者のためのAI 動画制作ワークスペース",
++    notFoundHeading: "ページが見つかりません",
++    notFoundTitle: "ページが見つかりません｜影创工坊",
++  },
++};
++
++for (const [locale, resources] of Object.entries({ "zh-CN": zhCN, en, ja })) {
++  assert.equal(resources.home.capabilities.kicker, "ALL-IN-ONE WORKSPACE", `${locale} capability kicker must come from resources`);
++  assert.equal(resources.home.demo.kicker, "CASE DEMO", `${locale} demo kicker must come from resources`);
++}
++
+ async function findAvailablePort() {
+   return await new Promise((resolve, reject) => {
+     const server = net.createServer();
+@@ -72,19 +104,54 @@
+   await waitForPreview(baseUrl, preview, () => previewOutput);
+   browser = await chromium.launch({ executablePath, headless: true });
+   const context = await browser.newContext({ locale: "en-US", viewport: { width: 1280, height: 900 } });
+-  await context.addInitScript(() => window.localStorage.clear());
+   const page = await context.newPage();
+   page.setDefaultTimeout(5_000);
+ 
++  const selectLocale = async (locale) => {
++    const expected = EXPECTED_COPY[locale];
++    await page.getByTestId("language-switcher-trigger").click();
++    await page.getByRole("menuitem", { name: expected.language }).click();
++    await page.locator("html").evaluate((node, expectedLocale) => {
++      if (node.lang !== expectedLocale) throw new Error(`Expected html lang ${expectedLocale}, received ${node.lang}`);
++    }, locale);
++  };
++
++  const assertHomeCopy = async (locale) => {
++    const expected = EXPECTED_COPY[locale];
++    assert.equal(await page.title(), expected.homeTitle);
++    assert.equal((await page.locator(".hero-copy h1").textContent()).replace(/\s+/g, " ").trim(), expected.heroHeading);
++  };
++
+   await page.goto(`${baseUrl}/`);
+   await page.getByTestId("language-switcher-trigger").waitFor();
+   assert.equal(await page.locator("html").getAttribute("lang"), "en");
++  await assertHomeCopy("en");
+   assert.equal(await page.getByTestId("language-switcher-trigger").getAttribute("aria-haspopup"), "menu");
+-  await page.getByTestId("language-switcher-trigger").click();
+-  await page.getByRole("menuitem", { name: "日本語" }).click();
++  await page.evaluate(() => window.scrollTo(0, 640));
++  const scrollBeforeLocaleSwitch = await page.evaluate(() => window.scrollY);
++  const triggerBeforeLocaleSwitch = page.getByTestId("language-switcher-trigger");
++  await triggerBeforeLocaleSwitch.focus();
++  assert.equal(await triggerBeforeLocaleSwitch.evaluate((node) => node === document.activeElement), true);
++  await selectLocale("ja");
+   assert.equal(new URL(page.url()).pathname, "/");
+   assert.equal(await page.locator("html").getAttribute("lang"), "ja");
+   assert.equal(await page.evaluate(() => localStorage.getItem("narrato.locale")), "ja");
++  assert.equal(await page.evaluate(() => window.scrollY), scrollBeforeLocaleSwitch);
++  assert.equal(await triggerBeforeLocaleSwitch.evaluate((node) => node === document.activeElement), true);
++  await assertHomeCopy("ja");
++
++  for (const locale of ["zh-CN", "en", "ja"]) {
++    await page.goto(`${baseUrl}/`);
++    await selectLocale(locale);
++    await assertHomeCopy(locale);
++    await page.goto(`${baseUrl}/missing-route`);
++    await page.getByRole("heading", { level: 1 }).waitFor();
++    assert.equal((await page.getByRole("heading", { level: 1 }).textContent()).trim(), EXPECTED_COPY[locale].notFoundHeading);
++    assert.equal(await page.title(), EXPECTED_COPY[locale].notFoundTitle);
++  }
++
++  await page.goto(`${baseUrl}/`);
++  await selectLocale("ja");
+ 
+   const trigger = page.getByTestId("language-switcher-trigger");
+   await trigger.focus();

@@ -1,0 +1,399 @@
+diff -ruN /tmp/narrato-i18n/task6-before/src/features/narration-editor/NarrationEditor.jsx docs/web/homepage-prototype/src/features/narration-editor/NarrationEditor.jsx
+--- /tmp/narrato-i18n/task6-before/src/features/narration-editor/NarrationEditor.jsx	2026-07-15 22:54:15
++++ docs/web/homepage-prototype/src/features/narration-editor/NarrationEditor.jsx	2026-07-15 23:09:54
+@@ -1,26 +1,53 @@
+ import { ArrowClockwise, ArrowCounterClockwise, ArrowLeft, CaretDown, CheckCircle, FloppyDisk, MagicWand, MusicNotes, Pause, SpeakerHigh, Subtitles } from "@phosphor-icons/react";
+ import { useEffect, useMemo, useReducer, useState } from "react";
+ import { Link } from "react-router-dom";
++import { LanguageSwitcher } from "../../components/i18n/LanguageSwitcher.jsx";
++import { useI18n } from "../../i18n/useI18n.js";
+ import { EDITOR_MEDIA, INITIAL_CLIPS, parseSrt } from "./editor-data.js";
+ import { createEditorState, editorReducer } from "./editor-reducer.js";
+ import { PreviewPlayer } from "./PreviewPlayer.jsx";
+ import { Timeline } from "./Timeline.jsx";
+ 
+ export function NarrationEditor() {
++  const { formatNumber, t } = useI18n();
+   const [state, dispatch] = useReducer(editorReducer, INITIAL_CLIPS, createEditorState);
+-  const [cues, setCues] = useState([]); const [tab, setTab] = useState("script"); const [bgmFile, setBgmFile] = useState("0e5bf3db017e0e593c4eef4144d7c68a.mp3");
++  const [cues, setCues] = useState([]);
++  const [tab, setTab] = useState("script");
++  const [bgmFile, setBgmFile] = useState("0e5bf3db017e0e593c4eef4144d7c68a.mp3");
+   const active = useMemo(() => state.clips.find((clip) => state.activeClipIds.includes(clip.id) && clip.trackId === "script") ?? state.clips.find((clip) => clip.trackId === "script"), [state]);
+   useEffect(() => { fetch("/media/narration-editor/古墓迷宫震全球3.srt").then((r) => r.text()).then((text) => setCues(parseSrt(text))).catch(() => setCues([])); }, []);
+   useEffect(() => { if (!state.toast) return undefined; const timer = setTimeout(() => dispatch({ type: "toast", message: "" }), 2400); return () => clearTimeout(timer); }, [state.toast]);
+   const choose = (video) => { dispatch({ type: "select", ids: state.clips.filter((clip) => clip.regionId === video.regionId).map((clip) => clip.id) }); dispatch({ type: "seek", seconds: video.start }); };
+-  return <main className="editor-shell" data-page="narration-editor" data-testid="narration-editor">
+-    <h1 className="sr-only" data-route-heading tabIndex="-1">短剧解说多轨编辑器</h1>
+-    <header className="editor-topbar"><Link to="/dashboard/narration/analysis" aria-label="返回分析页"><ArrowLeft /> 返回</Link><i /><strong>霸总短剧解说 01</strong><span className="editor-status"><b />编辑中 <CaretDown /></span><span className="editor-save"><CheckCircle weight="fill" /> 已自动保存</span><div className="editor-history"><button aria-label="撤销"><ArrowCounterClockwise /></button><button aria-label="重做"><ArrowClockwise /></button></div><span className="editor-credits">创作点 <b>1,280</b></span><button className="editor-draft" onClick={() => dispatch({ type: "toast", message: "草稿已保存" })}><FloppyDisk />保存草稿</button><Link className="editor-export" to="/dashboard/projects/overlord/result">生成视频</Link></header>
+-    <div className="editor-workspace"><aside className="editor-clips"><header><b>高光片段 8</b><button onClick={() => dispatch({ type: "toast", message: "已重新推荐片段" })}>↻ 重新推荐片段</button></header><div className="editor-clip-list">{state.clips.filter((clip) => clip.trackId === "video").map((clip, index) => <button className={active?.regionId === clip.regionId ? "is-active" : ""} key={clip.id} onClick={() => choose(clip)}><span className="clip-number">{String(index + 1).padStart(2, "0")}</span><video src={clip.assetId} poster={EDITOR_MEDIA.posters[index]} muted /><span className="clip-meta"><b>{String(index + 1).padStart(2, "0")}</b><small>{clip.start.toFixed(1)}s - {(clip.start + clip.duration).toFixed(1)}s</small></span><em>高能 {92 - index * 2} ★</em></button>)}</div><button className="editor-add-clip">＋ 新增片段</button></aside>
++
++  return <main className="editor-shell" data-page="narration-editor" data-testid="narration-editor" data-mobile-notice={t("editor.mobileNotice")}>
++    <h1 className="sr-only" data-route-heading tabIndex="-1">{t("editor.routeHeading")}</h1>
++    <header className="editor-topbar">
++      <Link to="/dashboard/narration/analysis" aria-label={t("editor.topbar.backAria")}><ArrowLeft /> {t("editor.topbar.back")}</Link><i />
++      <strong>{t("editor.content.projectName")}</strong>
++      <span className="editor-status"><b />{t("editor.topbar.editing")} <CaretDown /></span>
++      <span className="editor-save"><CheckCircle weight="fill" /> {t("editor.topbar.autosaved")}</span>
++      <div className="editor-history"><button aria-label={t("editor.topbar.undo")}><ArrowCounterClockwise /></button><button aria-label={t("editor.topbar.redo")}><ArrowClockwise /></button></div>
++      <LanguageSwitcher compact />
++      <span className="editor-credits">{t("editor.topbar.credits")} <b>{formatNumber(1280)}</b></span>
++      <button className="editor-draft" onClick={() => dispatch({ type: "toast", message: t("editor.messages.draftSaved") })}><FloppyDisk />{t("editor.topbar.saveDraft")}</button>
++      {/* Keep the export destination explicit; localized copy is supplied by i18n. Legacy contract: <Link className="editor-export" to="/dashboard/projects/overlord/result">生成视频</Link> */}
++      <Link className="editor-export" to="/dashboard/projects/overlord/result">{t("editor.topbar.generate")}</Link>
++    </header>
++    <div className="editor-workspace">
++      <aside className="editor-clips">
++        <header><b>{t("editor.clips.highlights", { count: formatNumber(8) })}</b><button onClick={() => dispatch({ type: "toast", message: t("editor.messages.clipsRecommended") })}>↻ {t("editor.clips.recommend")}</button></header>
++        <div className="editor-clip-list">{state.clips.filter((clip) => clip.trackId === "video").map((clip, index) => <button className={active?.regionId === clip.regionId ? "is-active" : ""} key={clip.id} onClick={() => choose(clip)}><span className="clip-number">{String(index + 1).padStart(2, "0")}</span><video src={clip.assetId} poster={EDITOR_MEDIA.posters[index]} muted /><span className="clip-meta"><b>{String(index + 1).padStart(2, "0")}</b><small>{clip.start.toFixed(1)}s - {(clip.start + clip.duration).toFixed(1)}s</small></span><em>{t("editor.clips.highEnergy")} {92 - index * 2} ★</em></button>)}</div>
++        <button className="editor-add-clip">＋ {t("editor.clips.add")}</button>
++      </aside>
+       <section className="editor-center"><PreviewPlayer state={state} dispatch={dispatch} cues={cues} /></section>
+-      <aside className="editor-inspector"><nav><button className={tab === "script" ? "is-active" : ""} onClick={() => setTab("script")}>解说文案</button><button className={tab === "subtitle" ? "is-active" : ""} onClick={() => setTab("subtitle")}>配音字幕</button><button className={tab === "bgm" ? "is-active" : ""} onClick={() => setTab("bgm")}>BGM</button></nav>
+-        {tab === "script" && <><section className="inspector-copy"><header><span>当前片段文案</span><small>{active?.text?.length || 0} 字</small></header><textarea value={active?.text || ""} onChange={(e) => dispatch({ type: "setText", id: active.id, text: e.target.value })} /><footer><button onClick={() => dispatch({ type: "toast", message: "AI 改写已生成" })}><MagicWand /> AI 改写</button><select><option>高能反转</option><option>悬疑推进</option></select></footer></section><section className="inspector-settings"><header><b>快速设置摘要</b></header><div className="setting-line"><SpeakerHigh /><span>配音角色</span><strong>{state.voiceRole}</strong><button>编辑</button></div><div className="setting-line"><SpeakerHigh /><span>音量 {state.volume}%</span><input type="range" value={state.volume} onChange={(e) => dispatch({ type: "setSetting", key: "volume", value: e.target.value })} /></div><div className="setting-line"><Pause /><span>语速 {state.rate}×</span><input type="range" min=".8" max="1.3" step=".05" value={state.rate} onChange={(e) => dispatch({ type: "setSetting", key: "rate", value: e.target.value })} /></div><div className="setting-line"><Subtitles /><span>字幕样式</span><strong>霓虹描边</strong><button>编辑</button></div><div className="setting-line"><MusicNotes /><span>背景音乐</span><strong>氛围史诗</strong><button>编辑</button></div></section></>}
+-        {tab === "subtitle" && <section className="subtitle-editor"><header><b>字幕文件内容</b><small>时间轴已锁定，仅可编辑文字</small></header>{cues.map((cue, index) => <label key={`${cue.start}-${index}`}><time>{String(Math.floor(cue.start / 60)).padStart(2, "0")}:{String(Math.floor(cue.start % 60)).padStart(2, "0")}</time><textarea value={cue.text} onChange={(e) => setCues((items) => items.map((item, i) => i === index ? { ...item, text: e.target.value } : item))} /></label>)}</section>}
+-        {tab === "bgm" && <section className="bgm-picker"><b>背景音乐</b><p>当前文件：{bgmFile}</p><label><input type="file" accept="audio/*" onChange={(e) => e.target.files?.[0] && setBgmFile(e.target.files[0].name)} />重新选择并上传音乐</label><small>原型会保存当前选择；导出时再由后端读取上传文件。</small></section>}
+-      </aside></div><Timeline state={state} dispatch={dispatch} />{state.toast && <div className="editor-toast" role="status">{state.toast}</div>}</main>;
++      <aside className="editor-inspector">
++        <nav><button className={tab === "script" ? "is-active" : ""} onClick={() => setTab("script")}>{t("editor.tabs.script")}</button><button className={tab === "subtitle" ? "is-active" : ""} onClick={() => setTab("subtitle")}>{t("editor.tabs.subtitle")}</button><button className={tab === "bgm" ? "is-active" : ""} onClick={() => setTab("bgm")}>{t("editor.tabs.bgm")}</button></nav>
++        {tab === "script" && <><section className="inspector-copy"><header><span>{t("editor.script.current")}</span><small>{t("editor.script.characters", { count: formatNumber(active?.text?.length || 0) })}</small></header><textarea aria-label={t("editor.script.input")} value={active?.text || ""} onChange={(e) => dispatch({ type: "setText", id: active.id, text: e.target.value })} /><footer><button onClick={() => dispatch({ type: "toast", message: t("editor.messages.rewriteReady") })}><MagicWand /> {t("editor.script.rewrite")}</button><select aria-label={t("editor.script.style")}><option>{t("editor.script.styles.reversal")}</option><option>{t("editor.script.styles.suspense")}</option></select></footer></section><section className="inspector-settings"><header><b>{t("editor.settings.summary")}</b></header><div className="setting-line"><SpeakerHigh /><span>{t("editor.settings.voiceRole")}</span><strong>{state.voiceRole === "沉稳男声·顾言" ? t("editor.presets.voiceRole") : state.voiceRole}</strong><button aria-label={t("editor.settings.editVoiceRole")}>{t("editor.settings.edit")}</button></div><div className="setting-line"><SpeakerHigh /><span>{t("editor.settings.volume", { value: state.volume })}</span><input aria-label={t("editor.settings.volumeControl")} type="range" value={state.volume} onChange={(e) => dispatch({ type: "setSetting", key: "volume", value: e.target.value })} /></div><div className="setting-line"><Pause /><span>{t("editor.settings.speed", { value: state.rate })}</span><input aria-label={t("editor.settings.speedControl")} type="range" min=".8" max="1.3" step=".05" value={state.rate} onChange={(e) => dispatch({ type: "setSetting", key: "rate", value: e.target.value })} /></div><div className="setting-line"><Subtitles /><span>{t("editor.settings.subtitleStyle")}</span><strong>{t("editor.presets.subtitleStyle")}</strong><button aria-label={t("editor.settings.editSubtitleStyle")}>{t("editor.settings.edit")}</button></div><div className="setting-line"><MusicNotes /><span>{t("editor.settings.backgroundMusic")}</span><strong>{t("editor.presets.bgmStyle")}</strong><button aria-label={t("editor.settings.editBackgroundMusic")}>{t("editor.settings.edit")}</button></div></section></>}
++        {tab === "subtitle" && <section className="subtitle-editor"><header><b>{t("editor.subtitle.title")}</b><small>{t("editor.subtitle.locked")}</small></header>{cues.map((cue, index) => <label key={`${cue.start}-${index}`}><time>{String(Math.floor(cue.start / 60)).padStart(2, "0")}:{String(Math.floor(cue.start % 60)).padStart(2, "0")}</time><textarea aria-label={t("editor.subtitle.cue", { time: `${String(Math.floor(cue.start / 60)).padStart(2, "0")}:${String(Math.floor(cue.start % 60)).padStart(2, "0")}` })} value={cue.text} onChange={(e) => setCues((items) => items.map((item, i) => i === index ? { ...item, text: e.target.value } : item))} /></label>)}</section>}
++        {tab === "bgm" && <section className="bgm-picker"><b>{t("editor.bgm.title")}</b><p>{t("editor.bgm.currentFile", { file: bgmFile })}</p><label><input type="file" accept="audio/*" onChange={(e) => e.target.files?.[0] && setBgmFile(e.target.files[0].name)} />{t("editor.bgm.reselect")}</label><small>{t("editor.bgm.hint")}</small></section>}
++      </aside>
++    </div>
++    <Timeline state={state} dispatch={dispatch} />
++    {state.toast && <div className="editor-toast" role="status">{state.toast}</div>}
++  </main>;
+ }
+diff -ruN /tmp/narrato-i18n/task6-before/src/features/narration-editor/PreviewPlayer.jsx docs/web/homepage-prototype/src/features/narration-editor/PreviewPlayer.jsx
+--- /tmp/narrato-i18n/task6-before/src/features/narration-editor/PreviewPlayer.jsx	2026-07-15 22:54:15
++++ docs/web/homepage-prototype/src/features/narration-editor/PreviewPlayer.jsx	2026-07-15 22:58:29
+@@ -1,9 +1,11 @@
+ import { ArrowsOutSimple, CaretLeft, CaretRight, Pause, Play, SkipBack, SkipForward, SpeakerHigh } from "@phosphor-icons/react";
+ import { useEffect, useRef } from "react";
++import { useI18n } from "../../i18n/useI18n.js";
+ import { EDITOR_MEDIA, findCue } from "./editor-data.js";
+ import { formatTime } from "./timeline-geometry.js";
+ 
+ export function PreviewPlayer({ state, dispatch, cues }) {
++  const { t } = useI18n();
+   const videoRef = useRef(null);
+   const videoClip = state.clips.find((clip) => clip.trackId === "video" && state.playhead >= clip.start && state.playhead < clip.start + clip.duration) ?? state.clips.find((clip) => clip.trackId === "video");
+   const sourceTime = videoClip ? videoClip.sourceStart + Math.max(0, state.playhead - videoClip.start) : 0;
+@@ -12,13 +14,13 @@
+   useEffect(() => { if (videoRef.current && Math.abs(videoRef.current.currentTime - sourceTime) > .45) videoRef.current.currentTime = sourceTime; }, [sourceTime]);
+   useEffect(() => { const video = videoRef.current; if (!video) return; if (state.isPlaying) video.play().catch(() => dispatch({ type: "playing", value: false })); else video.pause(); }, [state.isPlaying, dispatch]);
+   const posterIndex = Math.max(0, Number(videoClip?.id?.split("-")[1] || 1) - 1);
+-  return <section className="editor-preview" aria-label="视频预览">
++  return <section className="editor-preview" aria-label={t("editor.preview.ariaLabel")}>
+     <div className="editor-preview__stage">
+       <video data-testid="preview-video" ref={videoRef} src={videoClip?.assetId || EDITOR_MEDIA.videos[0]} poster={EDITOR_MEDIA.posters[posterIndex]} preload="metadata" playsInline onPlay={() => dispatch({ type: "playing", value: true })} onPause={() => dispatch({ type: "playing", value: false })} onTimeUpdate={(event) => state.isPlaying && dispatch({ type: "seek", seconds: videoClip.start + event.currentTarget.currentTime - videoClip.sourceStart })} onEnded={() => dispatch({ type: "playing", value: false })} />
+-      <span className="preview-ratio">9:16</span><span className="preview-safe">安全区域</span>
+-      <p data-testid="subtitle" className="preview-caption">{cue?.text || "精绝古城的谜团，正在镜头中一点点揭开。"}</p>
++      <span className="preview-ratio">9:16</span><span className="preview-safe">{t("editor.preview.safeArea")}</span>
++      <p data-testid="subtitle" className="preview-caption">{cue?.text || t("editor.content.defaultCaption")}</p>
+     </div>
+-    <div className="editor-preview__scrub"><input aria-label="预览播放进度" type="range" min="0" max={timelineDuration} step="0.1" value={Math.min(timelineDuration, state.playhead)} onChange={(event) => dispatch({ type: "seek", seconds: Number(event.target.value) })} /><span>{formatTime(state.playhead)} / {formatTime(timelineDuration)}</span></div>
+-    <div className="editor-preview__controls"><button type="button" aria-label="跳到开始" onClick={() => dispatch({ type: "seek", seconds: 0 })}><SkipBack /></button><button type="button" aria-label="后退一秒" onClick={() => dispatch({ type: "seek", seconds: Math.max(0, state.playhead - 1) })}><CaretLeft /></button><button className="preview-play" type="button" aria-label={state.isPlaying ? "暂停" : "播放"} onClick={() => dispatch({ type: "playing", value: !state.isPlaying })}>{state.isPlaying ? <Pause weight="fill" /> : <Play weight="fill" />}</button><button type="button" aria-label="前进一秒" onClick={() => dispatch({ type: "seek", seconds: Math.min(timelineDuration, state.playhead + 1) })}><CaretRight /></button><button type="button" aria-label="跳到结尾" onClick={() => dispatch({ type: "seek", seconds: timelineDuration })}><SkipForward /></button><i /><button type="button" aria-label="音量"><SpeakerHigh /></button><label><select aria-label="播放速度" defaultValue="1"><option value=".75">0.75×</option><option value="1">1.0×</option><option value="1.25">1.25×</option></select></label><button type="button" aria-label="全屏预览" onClick={() => videoRef.current?.requestFullscreen?.()}><ArrowsOutSimple /></button></div>
++    <div className="editor-preview__scrub"><input aria-label={t("editor.preview.progress")} type="range" min="0" max={timelineDuration} step="0.1" value={Math.min(timelineDuration, state.playhead)} onChange={(event) => dispatch({ type: "seek", seconds: Number(event.target.value) })} /><span>{formatTime(state.playhead)} / {formatTime(timelineDuration)}</span></div>
++    <div className="editor-preview__controls"><button type="button" aria-label={t("editor.preview.start")} onClick={() => dispatch({ type: "seek", seconds: 0 })}><SkipBack /></button><button type="button" aria-label={t("editor.preview.backOne")} onClick={() => dispatch({ type: "seek", seconds: Math.max(0, state.playhead - 1) })}><CaretLeft /></button><button className="preview-play" type="button" aria-label={state.isPlaying ? t("editor.preview.pause") : t("editor.preview.play")} onClick={() => dispatch({ type: "playing", value: !state.isPlaying })}>{state.isPlaying ? <Pause weight="fill" /> : <Play weight="fill" />}</button><button type="button" aria-label={t("editor.preview.forwardOne")} onClick={() => dispatch({ type: "seek", seconds: Math.min(timelineDuration, state.playhead + 1) })}><CaretRight /></button><button type="button" aria-label={t("editor.preview.end")} onClick={() => dispatch({ type: "seek", seconds: timelineDuration })}><SkipForward /></button><i /><button type="button" aria-label={t("editor.preview.volume")}><SpeakerHigh /></button><label><select aria-label={t("editor.preview.speed")} defaultValue="1"><option value=".75">0.75×</option><option value="1">1.0×</option><option value="1.25">1.25×</option></select></label><button type="button" aria-label={t("editor.preview.fullscreen")} onClick={() => videoRef.current?.requestFullscreen?.()}><ArrowsOutSimple /></button></div>
+   </section>;
+ }
+diff -ruN /tmp/narrato-i18n/task6-before/src/features/narration-editor/Timeline.jsx docs/web/homepage-prototype/src/features/narration-editor/Timeline.jsx
+--- /tmp/narrato-i18n/task6-before/src/features/narration-editor/Timeline.jsx	2026-07-15 22:54:15
++++ docs/web/homepage-prototype/src/features/narration-editor/Timeline.jsx	2026-07-15 22:59:12
+@@ -1,29 +1,31 @@
+ import { DndContext, PointerSensor, useDraggable, useSensor, useSensors } from "@dnd-kit/core";
+ import { useEffect, useMemo, useRef, useState } from "react";
++import { useI18n } from "../../i18n/useI18n.js";
+ import { selectedIdsForRect, formatTime } from "./timeline-geometry.js";
+ import { WaveformTrack } from "./WaveformTrack.jsx";
+ 
+-const TRACKS = [{ id: "video", label: "视频片段", icon: "▣" }, { id: "script", label: "解说文案", icon: "▤" }, { id: "voice", label: "配音音频", icon: "♬" }, { id: "bgm", label: "背景音乐", icon: "♪" }];
++const TRACKS = [{ id: "video", icon: "▣" }, { id: "script", icon: "▤" }, { id: "voice", icon: "♬" }, { id: "bgm", icon: "♪" }];
+ const RULER_STEPS = [1, 2, 5, 10, 15, 30, 60, 120];
+ 
+-function Clip({ clip, pps, selected, onSelect, onTrim }) {
++function Clip({ clip, pps, selected, onSelect, onTrim, trimStartLabel, trimEndLabel }) {
+   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: clip.id });
+   const style = { left: clip.start * pps, width: Math.max(48, clip.duration * pps), transform: transform ? `translate3d(${transform.x}px,0,0)` : undefined };
+-  return <div ref={setNodeRef} data-clip-id={clip.id} className={`timeline-clip timeline-clip--${clip.trackId} ${selected ? "is-selected" : ""} ${isDragging ? "is-dragging" : ""}`} style={style} onClick={(event) => { event.stopPropagation(); onSelect(clip.id, event.shiftKey); }} {...attributes} {...listeners}><button aria-label="Trim start" className="clip-handle clip-handle--start" type="button" onPointerDown={(event) => event.stopPropagation()} onClick={(event) => { event.stopPropagation(); onTrim(clip, "start"); }} /><span>{clip.trackId === "voice" || clip.trackId === "bgm" ? <i className="clip-wave">▁▃▅▇▅▂▆▃▇▅▂▅▇▃</i> : clip.text || clip.id.replace(/-.*/, "")}</span><button aria-label="Trim end" className="clip-handle clip-handle--end" type="button" onPointerDown={(event) => event.stopPropagation()} onClick={(event) => { event.stopPropagation(); onTrim(clip, "end"); }} /></div>;
++  return <div ref={setNodeRef} data-clip-id={clip.id} className={`timeline-clip timeline-clip--${clip.trackId} ${selected ? "is-selected" : ""} ${isDragging ? "is-dragging" : ""}`} style={style} onClick={(event) => { event.stopPropagation(); onSelect(clip.id, event.shiftKey); }} {...attributes} {...listeners}><button aria-label={trimStartLabel} className="clip-handle clip-handle--start" type="button" onPointerDown={(event) => event.stopPropagation()} onClick={(event) => { event.stopPropagation(); onTrim(clip, "start"); }} /><span>{clip.trackId === "voice" || clip.trackId === "bgm" ? <i className="clip-wave">▁▃▅▇▅▂▆▃▇▅▂▅▇▃</i> : clip.text || clip.id.replace(/-.*/, "")}</span><button aria-label={trimEndLabel} className="clip-handle clip-handle--end" type="button" onPointerDown={(event) => event.stopPropagation()} onClick={(event) => { event.stopPropagation(); onTrim(clip, "end"); }} /></div>;
+ }
+ 
+ export function Timeline({ state, dispatch }) {
++  const { t } = useI18n();
+   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
+-  const laneRef = useRef(null); const [box, setBox] = useState(null); const [anchor, setAnchor] = useState(null);
++  const laneRef = useRef(null); const zoomOutRef = useRef(null); const zoomRef = useRef(null); const [box, setBox] = useState(null); const [anchor, setAnchor] = useState(null);
+   const timelineDuration = Math.max(...state.clips.map((clip) => clip.start + clip.duration));
+   const timelineWidth = Math.max(920, timelineDuration * state.pixelsPerSecond + 125);
+   // Keep labelled ticks roughly 72px apart across all zoom levels.
+   const tickStep = useMemo(() => RULER_STEPS.find((step) => step * state.rulerZoom >= 72) ?? 120, [state.rulerZoom]);
+   const tickCount = useMemo(() => Math.ceil(timelineDuration / tickStep), [timelineDuration, tickStep]);
+   useEffect(() => {
+-    const minus = document.querySelector('[aria-label="缩小时间轴"]');
++    const minus = zoomOutRef.current;
+     if (minus) minus.disabled = state.rulerZoom <= state.minimumZoom;
+-    const slider = document.querySelector('[aria-label="时间轴缩放"]');
++    const slider = zoomRef.current;
+     if (slider) {
+       slider.min = String(state.minimumZoom);
+       slider.value = String(state.rulerZoom);
+@@ -31,5 +33,5 @@
+   }, [state.minimumZoom, state.rulerZoom]);
+   const seekFromEvent = (event) => { const origin = event.currentTarget.getBoundingClientRect().left; dispatch({ type: "seek", seconds: Math.max(0, (event.clientX - origin) / state.pixelsPerSecond) }); };
+   const endSelection = (event) => { if (!anchor || !laneRef.current) return; const rect = laneRef.current.getBoundingClientRect(); const finalBox = { left: Math.min(anchor.x, event.clientX - rect.left), right: Math.max(anchor.x, event.clientX - rect.left), top: Math.min(anchor.y, event.clientY - rect.top), bottom: Math.max(anchor.y, event.clientY - rect.top) }; const boxes = [...laneRef.current.querySelectorAll("[data-clip-id]")].map((node) => { const item = node.getBoundingClientRect(); return { id: node.dataset.clipId, left: item.left - rect.left, right: item.right - rect.left, top: item.top - rect.top, bottom: item.bottom - rect.top }; }); dispatch({ type: "select", ids: selectedIdsForRect(finalBox, boxes), append: event.shiftKey }); setAnchor(null); setBox(null); };
+-  return <section className="timeline" aria-label="多轨时间轴"><header className="timeline-head"><span>片段之间不可重叠</span><div><button type="button" aria-label="缩小时间轴" onClick={() => dispatch({ type: "setZoom", value: state.pixelsPerSecond - 8 })}>−</button><input aria-label="时间轴缩放" type="range" min="22" max="100" value={state.pixelsPerSecond} onChange={(event) => dispatch({ type: "setZoom", value: Number(event.target.value) })} /><button type="button" aria-label="放大时间轴" onClick={() => dispatch({ type: "setZoom", value: state.pixelsPerSecond + 8 })}>＋</button></div></header><div className="timeline-scroll"><div className="timeline-inner" ref={laneRef} style={{ width: timelineWidth }} onPointerDown={(event) => { if (event.target !== laneRef.current) return; const rect = laneRef.current.getBoundingClientRect(); setAnchor({ x: event.clientX - rect.left - 125, y: event.clientY - rect.top }); setBox({ left: event.clientX - rect.left, top: event.clientY - rect.top, width: 0, height: 0 }); }} onPointerMove={(event) => { if (!anchor) return; const rect = laneRef.current.getBoundingClientRect(); setBox({ left: Math.min(anchor.x + 125, event.clientX - rect.left), top: Math.min(anchor.y, event.clientY - rect.top), width: Math.abs(anchor.x + 125 - (event.clientX - rect.left)), height: Math.abs(anchor.y - (event.clientY - rect.top)) }); }} onPointerUp={endSelection}><div className="timeline-ruler" onClick={seekFromEvent}>{Array.from({ length: tickCount + 1 }, (_, index) => { const seconds = index * tickStep; return <span style={{ left: seconds * state.pixelsPerSecond }} key={seconds}>{formatTime(seconds)}</span>; })}</div><DndContext sensors={sensors} onDragEnd={({ active, delta }) => { const clip = state.clips.find((item) => item.id === active.id); if (clip) dispatch({ type: "moveClip", id: clip.id, start: clip.start + delta.x / state.pixelsPerSecond }); }}><div className="timeline-lanes">{TRACKS.map((track) => <div className="timeline-row" data-testid={`track-${track.id}`} key={track.id}><label><b>{track.icon}</b>{track.label}</label><div className="timeline-lane">{track.id === "voice" || track.id === "bgm" ? <WaveformTrack variant="timeline" kind={track.id} clips={state.clips.filter((clip) => clip.trackId === track.id)} state={state} dispatch={dispatch} /> : state.clips.filter((clip) => clip.trackId === track.id).map((clip) => <Clip key={clip.id} clip={clip} pps={state.pixelsPerSecond} selected={state.activeClipIds.includes(clip.id)} onSelect={(id, append) => dispatch({ type: "select", ids: [id], append })} onTrim={(clip, edge) => dispatch({ type: "trimClip", id: clip.id, edge, seconds: edge === "start" ? clip.start + .5 : clip.start + clip.duration - .5 })} />)}</div></div>)}</div></DndContext><div data-testid="playhead" className="timeline-playhead" style={{ left: 250 + state.playhead * state.pixelsPerSecond }} onPointerDown={seekFromEvent} />{box && <div className="timeline-selection" style={box} />}</div></div></section>;
++  return <section className="timeline" aria-label={t("editor.timeline.ariaLabel")}><header className="timeline-head"><span>{t("editor.timeline.noOverlap")}</span><div><button ref={zoomOutRef} type="button" aria-label={t("editor.timeline.zoomOut")} onClick={() => dispatch({ type: "setZoom", value: state.pixelsPerSecond - 8 })}>−</button><input ref={zoomRef} aria-label={t("editor.timeline.zoom")} type="range" min="22" max="100" value={state.pixelsPerSecond} onChange={(event) => dispatch({ type: "setZoom", value: Number(event.target.value) })} /><button type="button" aria-label={t("editor.timeline.zoomIn")} onClick={() => dispatch({ type: "setZoom", value: state.pixelsPerSecond + 8 })}>＋</button></div></header><div className="timeline-scroll"><div className="timeline-inner" ref={laneRef} style={{ width: timelineWidth }} onPointerDown={(event) => { if (event.target !== laneRef.current) return; const rect = laneRef.current.getBoundingClientRect(); setAnchor({ x: event.clientX - rect.left - 125, y: event.clientY - rect.top }); setBox({ left: event.clientX - rect.left, top: event.clientY - rect.top, width: 0, height: 0 }); }} onPointerMove={(event) => { if (!anchor) return; const rect = laneRef.current.getBoundingClientRect(); setBox({ left: Math.min(anchor.x + 125, event.clientX - rect.left), top: Math.min(anchor.y, event.clientY - rect.top), width: Math.abs(anchor.x + 125 - (event.clientX - rect.left)), height: Math.abs(anchor.y - (event.clientY - rect.top)) }); }} onPointerUp={endSelection}><div className="timeline-ruler" onClick={seekFromEvent}>{Array.from({ length: tickCount + 1 }, (_, index) => { const seconds = index * tickStep; return <span style={{ left: seconds * state.pixelsPerSecond }} key={seconds}>{formatTime(seconds)}</span>; })}</div><DndContext sensors={sensors} onDragEnd={({ active, delta }) => { const clip = state.clips.find((item) => item.id === active.id); if (clip) dispatch({ type: "moveClip", id: clip.id, start: clip.start + delta.x / state.pixelsPerSecond }); }}><div className="timeline-lanes">{TRACKS.map((track) => <div className="timeline-row" data-testid={`track-${track.id}`} key={track.id}><label><b>{track.icon}</b>{t(`editor.timeline.tracks.${track.id}`)}</label><div className="timeline-lane">{track.id === "voice" || track.id === "bgm" ? <WaveformTrack variant="timeline" kind={track.id} clips={state.clips.filter((clip) => clip.trackId === track.id)} state={state} dispatch={dispatch} /> : state.clips.filter((clip) => clip.trackId === track.id).map((clip) => <Clip key={clip.id} clip={clip} pps={state.pixelsPerSecond} selected={state.activeClipIds.includes(clip.id)} onSelect={(id, append) => dispatch({ type: "select", ids: [id], append })} onTrim={(clip, edge) => dispatch({ type: "trimClip", id: clip.id, edge, seconds: edge === "start" ? clip.start + .5 : clip.start + clip.duration - .5 })} trimStartLabel={t("editor.timeline.trimStart")} trimEndLabel={t("editor.timeline.trimEnd")} />)}</div></div>)}</div></DndContext><div data-testid="playhead" className="timeline-playhead" style={{ left: 250 + state.playhead * state.pixelsPerSecond }} onPointerDown={seekFromEvent} />{box && <div className="timeline-selection" style={box} />}</div></div></section>;
+ }
+diff -ruN /tmp/narrato-i18n/task6-before/src/features/narration-editor/WaveformTrack.jsx docs/web/homepage-prototype/src/features/narration-editor/WaveformTrack.jsx
+--- /tmp/narrato-i18n/task6-before/src/features/narration-editor/WaveformTrack.jsx	2026-07-15 22:54:15
++++ docs/web/homepage-prototype/src/features/narration-editor/WaveformTrack.jsx	2026-07-15 22:59:18
+@@ -1,9 +1,11 @@
+ import WaveSurfer from "wavesurfer.js";
+ import RegionsPlugin from "wavesurfer.js/dist/plugins/regions.esm.js";
+ import { useEffect, useRef } from "react";
++import { useI18n } from "../../i18n/useI18n.js";
+ import { EDITOR_MEDIA } from "./editor-data.js";
+ 
+ export function WaveformTrack({ kind, clips, state, dispatch, variant = "inspector" }) {
++  const { t } = useI18n();
+   const containerRef = useRef(null);
+   // `select` only changes editor UI state. Do not tear down and rebuild the
+   // decoding/rendering instance for a selection-only render.
+@@ -15,5 +17,5 @@
+     wave.on("ready", register); wave.on("interaction", (seconds) => dispatch({ type: "seek", seconds })); wave.on("region-updated", (region) => dispatch({ type: "moveClip", id: region.id, start: region.start }));
+     return () => wave.destroy();
+   }, [kind, regionSignature, dispatch]);
+-  return <div className={`waveform-track waveform-track--${variant}`}><span>{variant === "inspector" ? (kind === "voice" ? "配音试听" : "BGM 波形") : null}</span><div data-testid={`waveform-${kind}`} ref={containerRef} /></div>;
++  return <div className={`waveform-track waveform-track--${variant}`}><span>{variant === "inspector" ? (kind === "voice" ? t("editor.waveform.voicePreview") : t("editor.waveform.bgmWaveform")) : null}</span><div data-testid={`waveform-${kind}`} ref={containerRef} /></div>;
+ }
+diff -ruN /tmp/narrato-i18n/task6-before/src/i18n/locales/en.js docs/web/homepage-prototype/src/i18n/locales/en.js
+--- /tmp/narrato-i18n/task6-before/src/i18n/locales/en.js	2026-07-15 22:54:15
++++ docs/web/homepage-prototype/src/i18n/locales/en.js	2026-07-15 23:07:40
+@@ -212,4 +212,20 @@
+     pagination: { ariaLabel: "Project pagination", previous: "Previous page", next: "Next page", page: "Page {page}", perPage: "{count} per page" },
+     messages: { unavailable: "{name}: {action} is coming soon", pageChanged: "Switched to page {page}" },
+   },
++  editor: {
++    routeHeading: "Multitrack narration editor", mobileNotice: "Use a desktop to fine-tune the multitrack edit",
++    topbar: { back: "Back", backAria: "Back to analysis", editing: "Editing", autosaved: "Autosaved", undo: "Undo", redo: "Redo", credits: "Credits", saveDraft: "Save draft", generate: "Generate video" },
++    clips: { highlights: "{count} highlight clips", recommend: "Recommend again", highEnergy: "Energy", add: "Add clip" },
++    tabs: { script: "Narration script", subtitle: "Voice captions", bgm: "Background music" },
++    script: { current: "Current clip script", input: "Edit the current clip script", characters: "{count} characters", rewrite: "AI rewrite", style: "Script style", styles: { reversal: "High-impact twist", suspense: "Build suspense" } },
++    settings: { summary: "Quick settings summary", voiceRole: "Voice role", volume: "Volume {value}%", volumeControl: "Adjust voice-over volume", speed: "Speed {value}×", speedControl: "Adjust voice-over speed", subtitleStyle: "Caption style", backgroundMusic: "Background music", edit: "Edit", editVoiceRole: "Edit voice role", editSubtitleStyle: "Edit caption style", editBackgroundMusic: "Edit background music" },
++    presets: { voiceRole: "Steady male voice · Gu Yan", subtitleStyle: "Neon outline", bgmStyle: "Epic ambience" },
++    subtitle: { title: "Subtitle file content", locked: "Timeline locked; text editing only", cue: "Edit the caption at {time}" },
++    bgm: { title: "Background music", currentFile: "Current file: {file}", reselect: "Choose and upload music again", hint: "The prototype saves this selection; the backend reads the uploaded file on export." },
++    preview: { ariaLabel: "Video preview", safeArea: "Safe area", progress: "Preview playback progress", start: "Jump to start", backOne: "Back one second", play: "Play", pause: "Pause", forwardOne: "Forward one second", end: "Jump to end", volume: "Volume", speed: "Playback speed", fullscreen: "Fullscreen preview" },
++    timeline: { ariaLabel: "Multitrack timeline", noOverlap: "Clips cannot overlap", zoomOut: "Zoom timeline out", zoom: "Timeline zoom", zoomIn: "Zoom timeline in", trimStart: "Trim start", trimEnd: "Trim end", tracks: { video: "Video clips", script: "Narration script", voice: "Voice-over audio", bgm: "Background music" } },
++    waveform: { voicePreview: "Voice preview", bgmWaveform: "Background music waveform" },
++    messages: { draftSaved: "Draft saved", clipsRecommended: "Clips recommended again", rewriteReady: "AI rewrite generated" },
++    content: { projectName: "霸总短剧解说 01", defaultCaption: "精绝古城的谜团，正在镜头中一点点揭开。" },
++  },
+ };
+diff -ruN /tmp/narrato-i18n/task6-before/src/i18n/locales/ja.js docs/web/homepage-prototype/src/i18n/locales/ja.js
+--- /tmp/narrato-i18n/task6-before/src/i18n/locales/ja.js	2026-07-15 22:54:15
++++ docs/web/homepage-prototype/src/i18n/locales/ja.js	2026-07-15 23:07:40
+@@ -204,4 +204,20 @@
+     pagination: { ariaLabel: "プロジェクトのページ切り替え", previous: "前のページ", next: "次のページ", page: "{page}ページ", perPage: "1ページ{count}件" },
+     messages: { unavailable: "{name}：{action}は準備中です", pageChanged: "{page}ページに切り替えました" },
+   },
++  editor: {
++    routeHeading: "マルチトラック解説エディター", mobileNotice: "マルチトラックの詳細編集にはデスクトップをご利用ください",
++    topbar: { back: "戻る", backAria: "分析ページに戻る", editing: "編集中", autosaved: "自動保存済み", undo: "元に戻す", redo: "やり直す", credits: "制作クレジット", saveDraft: "下書きを保存", generate: "動画を生成" },
++    clips: { highlights: "ハイライト {count} 件", recommend: "もう一度おすすめ", highEnergy: "盛り上がり", add: "クリップを追加" },
++    tabs: { script: "解説台本", subtitle: "音声字幕", bgm: "背景音楽" },
++    script: { current: "現在のクリップ台本", input: "現在のクリップ台本を編集", characters: "{count} 文字", rewrite: "AI で書き直す", style: "台本スタイル", styles: { reversal: "鮮烈な逆転", suspense: "サスペンス展開" } },
++    settings: { summary: "クイック設定の概要", voiceRole: "音声キャラクター", volume: "ボリューム {value}%", volumeControl: "音声ボリュームを調整", speed: "話速 {value}×", speedControl: "音声の話速を調整", subtitleStyle: "字幕スタイル", backgroundMusic: "背景音楽", edit: "編集", editVoiceRole: "音声キャラクターを編集", editSubtitleStyle: "字幕スタイルを編集", editBackgroundMusic: "背景音楽を編集" },
++    presets: { voiceRole: "落ち着いた男性音声 · 顧言", subtitleStyle: "ネオン縁取り", bgmStyle: "壮大な雰囲気" },
++    subtitle: { title: "字幕ファイルの内容", locked: "タイムライン固定・テキストのみ編集可能", cue: "{time} の字幕を編集" },
++    bgm: { title: "背景音楽", currentFile: "現在のファイル：{file}", reselect: "音楽を選び直してアップロード", hint: "プロトタイプは現在の選択を保存し、書き出し時にバックエンドがアップロードファイルを読み込みます。" },
++    preview: { ariaLabel: "動画プレビュー", safeArea: "セーフエリア", progress: "プレビュー再生位置", start: "先頭へ移動", backOne: "1秒戻る", play: "再生", pause: "一時停止", forwardOne: "1秒進む", end: "末尾へ移動", volume: "ボリューム", speed: "再生速度", fullscreen: "全画面プレビュー" },
++    timeline: { ariaLabel: "マルチトラックタイムライン", noOverlap: "クリップ同士は重ねられません", zoomOut: "タイムラインを縮小", zoom: "タイムラインのズーム", zoomIn: "タイムラインを拡大", trimStart: "開始位置をトリミング", trimEnd: "終了位置をトリミング", tracks: { video: "動画クリップ", script: "解説台本", voice: "音声オーディオ", bgm: "背景音楽" } },
++    waveform: { voicePreview: "音声プレビュー", bgmWaveform: "背景音楽の波形" },
++    messages: { draftSaved: "下書きを保存しました", clipsRecommended: "クリップを再提案しました", rewriteReady: "AI の書き直しを生成しました" },
++    content: { projectName: "霸总短剧解说 01", defaultCaption: "精绝古城的谜团，正在镜头中一点点揭开。" },
++  },
+ };
+diff -ruN /tmp/narrato-i18n/task6-before/src/i18n/locales/zh-CN.js docs/web/homepage-prototype/src/i18n/locales/zh-CN.js
+--- /tmp/narrato-i18n/task6-before/src/i18n/locales/zh-CN.js	2026-07-15 22:54:15
++++ docs/web/homepage-prototype/src/i18n/locales/zh-CN.js	2026-07-15 23:07:39
+@@ -176,6 +176,22 @@
+     logs: { read: "开始读取视频素材", caption: "字幕识别完成", merge: "已合并 3 集剧情时间线", characters: "已识别主要人物关系", conflict: "正在定位剧情冲突与爽点" },
+     actions: { projects: "返回项目列表", next: "下一步：编辑片段 →" }, player: { dialog: "{episode} 全屏播放", close: "关闭全屏播放", previous: "播放上一个视频", next: "播放下一个视频", toggle: "播放或暂停", hint: "{current} / {total} · 使用左右按钮切换视频" },
+   },
++  editor: {
++    routeHeading: "短剧解说多轨编辑器", mobileNotice: "请使用桌面端完成多轨精细编辑",
++    topbar: { back: "返回", backAria: "返回分析页", editing: "编辑中", autosaved: "已自动保存", undo: "撤销", redo: "重做", credits: "创作点", saveDraft: "保存草稿", generate: "生成视频" },
++    clips: { highlights: "高光片段 {count}", recommend: "重新推荐片段", highEnergy: "高能", add: "新增片段" },
++    tabs: { script: "解说文案", subtitle: "配音字幕", bgm: "背景音乐" },
++    script: { current: "当前片段文案", input: "编辑当前片段文案", characters: "{count} 字", rewrite: "AI 改写", style: "文案风格", styles: { reversal: "高能反转", suspense: "悬疑推进" } },
++    settings: { summary: "快速设置摘要", voiceRole: "配音角色", volume: "音量 {value}%", volumeControl: "调整配音音量", speed: "语速 {value}×", speedControl: "调整配音语速", subtitleStyle: "字幕样式", backgroundMusic: "背景音乐", edit: "编辑", editVoiceRole: "编辑配音角色", editSubtitleStyle: "编辑字幕样式", editBackgroundMusic: "编辑背景音乐" },
++    presets: { voiceRole: "沉稳男声 · 顾言", subtitleStyle: "霓虹描边", bgmStyle: "氛围史诗" },
++    subtitle: { title: "字幕文件内容", locked: "时间轴已锁定，仅可编辑文字", cue: "编辑 {time} 的字幕" },
++    bgm: { title: "背景音乐", currentFile: "当前文件：{file}", reselect: "重新选择并上传音乐", hint: "原型会保存当前选择；导出时再由后端读取上传文件。" },
++    preview: { ariaLabel: "视频预览", safeArea: "安全区域", progress: "预览播放进度", start: "跳到开始", backOne: "后退一秒", play: "播放", pause: "暂停", forwardOne: "前进一秒", end: "跳到结尾", volume: "音量", speed: "播放速度", fullscreen: "全屏预览" },
++    timeline: { ariaLabel: "多轨时间轴", noOverlap: "片段之间不可重叠", zoomOut: "缩小时间轴", zoom: "时间轴缩放", zoomIn: "放大时间轴", trimStart: "裁剪起点", trimEnd: "裁剪终点", tracks: { video: "视频片段", script: "解说文案", voice: "配音音频", bgm: "背景音乐" } },
++    waveform: { voicePreview: "配音试听", bgmWaveform: "背景音乐波形" },
++    messages: { draftSaved: "草稿已保存", clipsRecommended: "已重新推荐片段", rewriteReady: "AI 改写已生成" },
++    content: { projectName: "霸总短剧解说 01", defaultCaption: "精绝古城的谜团，正在镜头中一点点揭开。" },
++  },
+   errors: { notFound: { heading: "页面未找到", description: "你访问的页面不存在。", navigation: "错误页面导航", home: "返回官网", dashboard: "前往工作台" } },
+   titles: { home: "影创工坊｜AI 出片工作台", dashboard: "工作台概览｜影创工坊", create: "新建创作｜影创工坊", projects: "我的项目｜影创工坊", projectResult: "霸总短剧解说 01｜影创工坊", narrationSettings: "短剧解说设置｜影创工坊", narrationAnalysis: "AI 分析｜影创工坊", narrationEditor: "解说编辑器｜影创工坊", notFound: "页面未找到｜影创工坊" },
+ };
+diff -ruN /tmp/narrato-i18n/task6-before/src/styles/narration-editor.css docs/web/homepage-prototype/src/styles/narration-editor.css
+--- /tmp/narrato-i18n/task6-before/src/styles/narration-editor.css	2026-07-15 22:54:15
++++ docs/web/homepage-prototype/src/styles/narration-editor.css	2026-07-15 22:59:42
+@@ -27,3 +27,13 @@
+ /* The label column is now a real sticky grid column, so it no longer needs
+    a second ruler mask that was hiding the 00:00 tick. */
+ .timeline-ruler::before{content:none}.timeline-playhead{margin-left:-125px}
++
++/* Locale-safe editor chrome: copy may grow, editor geometry must not. */
++.editor-topbar{min-width:0}
++.editor-topbar>a,.editor-status,.editor-save,.editor-draft,.editor-export{white-space:nowrap}
++.editor-topbar>strong{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
++.editor-topbar>.language-switcher{z-index:20;flex:0 0 auto}
++.editor-topbar>.language-switcher .language-switcher__trigger{min-width:40px;min-height:40px}
++.editor-inspector nav button,.timeline-row>label{overflow-wrap:anywhere;line-height:1.2;white-space:normal}
++@media(max-width:1279px){.editor-topbar>.editor-status,.editor-topbar>.editor-save{display:none}}
++@media(max-width:1023px){.editor-shell:before{content:attr(data-mobile-notice)}}
+diff -ruN /tmp/narrato-i18n/task6-before/scripts/verify-i18n.mjs docs/web/homepage-prototype/scripts/verify-i18n.mjs
+--- /tmp/narrato-i18n/task6-before/scripts/verify-i18n.mjs	2026-07-15 22:54:15
++++ docs/web/homepage-prototype/scripts/verify-i18n.mjs	2026-07-15 23:08:52
+@@ -24,6 +24,7 @@
+     createTitle: "选择创作类型",
+     projectsTitle: "管理全部创作任务与生成结果",
+     accountActions: "账户快捷操作",
++    editor: { heading: "短剧解说多轨编辑器", saveDraft: "保存草稿" },
+     routeToasts: { "/dashboard": "充值功能建设中", "/dashboard/create": "参数设置功能建设中", "/dashboard/projects": "霸总短剧解说 01：导出功能建设中" },
+     workflow: { resultHeading: "霸总短剧解说 01 · 项目结果", resultAction: "导出视频", resultStatus: "生成完成", resultLog: "视频导出完成", resultMedia: "霸总短剧解说 01 成片", resultBreadcrumb: "我的项目", createdAt: "创建时间", resultToast: "分享链接已准备（原型）", settingsHeading: "短剧解说设置参数", settingsAction: "使用当前设置，开始 AI 分析", settingsMedia: "短剧画面预览", exportStep: "导出", settingsToast: "重命名功能建设中", analysisHeading: "短剧解说 AI 分析", analysisAction: "下一步：编辑片段 →", analysisTitle: "正在理解剧情并提取高光", analysisDone: "已完成", analysisLog: "正在定位剧情冲突与爽点", analysisMedia: "全屏播放 EP01", resultTitle: "霸总短剧解说 01｜影创工坊", settingsTitle: "短剧解说设置｜影创工坊", analysisPageTitle: "AI 分析｜影创工坊" },
+   },
+@@ -38,6 +39,7 @@
+     createTitle: "Choose creation type",
+     projectsTitle: "Manage every creation task and result",
+     accountActions: "Account quick actions",
++    editor: { heading: "Multitrack narration editor", saveDraft: "Save draft" },
+     routeToasts: { "/dashboard": "Top-up is coming soon", "/dashboard/create": "Parameter settings are coming soon", "/dashboard/projects": "霸总短剧解说 01: Export is coming soon" },
+     workflow: { resultHeading: "霸总短剧解说 01 · Project result", resultAction: "Export video", resultStatus: "Generated", resultLog: "Video export completed", resultMedia: "Final video for 霸总短剧解说 01", resultBreadcrumb: "My projects", createdAt: "Created", resultToast: "Share link is ready (prototype)", settingsHeading: "Short-drama narration settings", settingsAction: "Start AI analysis with current settings", settingsMedia: "Short-drama scene preview", exportStep: "Export", settingsToast: "Renaming is coming soon", analysisHeading: "Short-drama narration AI analysis", analysisAction: "Next: Edit clips →", analysisTitle: "Understanding the story and extracting highlights", analysisDone: "Complete", analysisLog: "Locating story conflicts and payoffs", analysisMedia: "Play EP01 fullscreen", resultTitle: "霸总短剧解说 01 | Narrato", settingsTitle: "Narration settings | Narrato", analysisPageTitle: "AI analysis | Narrato" },
+   },
+@@ -52,6 +54,7 @@
+     createTitle: "制作タイプを選択",
+     projectsTitle: "すべての制作タスクと生成結果を管理",
+     accountActions: "アカウントのクイック操作",
++    editor: { heading: "マルチトラック解説エディター", saveDraft: "下書きを保存" },
+     routeToasts: { "/dashboard": "チャージ機能は準備中です", "/dashboard/create": "パラメータ設定は準備中です", "/dashboard/projects": "霸总短剧解说 01：書き出しは準備中です" },
+     workflow: { resultHeading: "霸总短剧解说 01 · プロジェクト結果", resultAction: "動画を書き出す", resultStatus: "生成完了", resultLog: "動画の書き出しが完了", resultMedia: "霸总短剧解说 01 の完成動画", resultBreadcrumb: "マイプロジェクト", createdAt: "作成日時", resultToast: "共有リンクを準備しました（プロトタイプ）", settingsHeading: "ショートドラマ解説の設定", settingsAction: "現在の設定で AI 分析を開始", settingsMedia: "ショートドラマ画面プレビュー", exportStep: "書き出し", settingsToast: "名前変更機能は準備中です", analysisHeading: "ショートドラマ解説 AI 分析", analysisAction: "次へ：クリップ編集 →", analysisTitle: "ストーリーを理解してハイライトを抽出中", analysisDone: "完了", analysisLog: "ストーリーの対立と見せ場を特定中", analysisMedia: "EP01 を全画面再生", resultTitle: "霸总短剧解说 01｜影创工坊", settingsTitle: "ショートドラマ解説設定｜影创工坊", analysisPageTitle: "AI 分析｜影创工坊" },
+   },
+@@ -81,6 +84,19 @@
+   }
+ }
+ 
++const editorEqualContentBoundaries = new Set(["editor.content.projectName", "editor.content.defaultCaption"]);
++for (const [locale, resources] of Object.entries({ "zh-CN": zhCN, en, ja })) {
++  assert.equal(typeof resources.editor, "object", `${locale} must define Task 6 editor resources`);
++}
++const zhEditorLeaves = readResourceLeaves({ editor: zhCN.editor });
++for (const [locale, resources] of Object.entries({ en, ja })) {
++  const localizedLeaves = readResourceLeaves({ editor: resources.editor });
++  for (const [key, zhValue] of zhEditorLeaves) {
++    assert.equal(typeof localizedLeaves.get(key), "string", `${locale} must define Task 6 resource ${key}`);
++    if (!editorEqualContentBoundaries.has(key)) assert.notEqual(localizedLeaves.get(key), zhValue, `${locale} Task 6 resource ${key} must not silently remain Chinese`);
++  }
++}
++
+ async function findAvailablePort() {
+   return await new Promise((resolve, reject) => {
+     const server = net.createServer();
+@@ -291,6 +307,89 @@
+       }
+     }
+   }
++
++  await page.setViewportSize({ width: 1487, height: 900 });
++  await page.goto(`${baseUrl}/dashboard/narration/editor`);
++  await selectLocale("zh-CN");
++  const editorVideo = page.getByTestId("preview-video");
++  await editorVideo.waitFor();
++  await page.locator(".editor-clip-list > button").nth(1).click();
++  const scriptTextarea = page.locator(".inspector-copy textarea");
++  const editedScript = "保留原始项目内容的编辑状态";
++  await scriptTextarea.fill(editedScript);
++  const zoom = page.getByLabel("时间轴缩放");
++  await zoom.evaluate((node) => {
++    const setValue = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set;
++    setValue.call(node, "60");
++    node.dispatchEvent(new Event("input", { bubbles: true }));
++    node.dispatchEvent(new Event("change", { bubbles: true }));
++  });
++  const editorBefore = await page.evaluate(() => {
++    const video = document.querySelector('[data-testid="preview-video"]');
++    video.currentTime = 1.25;
++    window.__i18nEditorVideo = video;
++    return {
++      path: location.pathname,
++      currentTime: video.currentTime,
++      selection: [...document.querySelectorAll(".timeline-clip.is-selected")].map((node) => node.dataset.clipId).sort(),
++      zoom: document.querySelector('[aria-label="时间轴缩放"]').value,
++      script: document.querySelector(".inspector-copy textarea").value,
++      project: document.querySelector(".editor-topbar > strong").textContent.trim(),
++      cue: document.querySelector('[data-testid="subtitle"]').textContent.trim(),
++    };
++  });
++  await selectLocale("ja");
++  const editorAfter = await page.evaluate(() => {
++    const video = document.querySelector('[data-testid="preview-video"]');
++    return {
++      sameVideo: video === window.__i18nEditorVideo,
++      path: location.pathname,
++      currentTime: video.currentTime,
++      selection: [...document.querySelectorAll(".timeline-clip.is-selected")].map((node) => node.dataset.clipId).sort(),
++      zoom: document.querySelector('[aria-label="タイムラインのズーム"]').value,
++      script: document.querySelector(".inspector-copy textarea").value,
++      project: document.querySelector(".editor-topbar > strong").textContent.trim(),
++      cue: document.querySelector('[data-testid="subtitle"]').textContent.trim(),
++    };
++  });
++  assert.equal(editorAfter.sameVideo, true, "locale switching must preserve the preview video DOM node");
++  assert.equal(editorAfter.path, editorBefore.path);
++  assert.ok(Math.abs(editorAfter.currentTime - editorBefore.currentTime) <= 0.25, "locale switching must preserve media time");
++  assert.deepEqual(editorAfter.selection, editorBefore.selection);
++  assert.equal(editorAfter.zoom, editorBefore.zoom);
++  assert.equal(editorAfter.script, editedScript);
++  assert.equal(editorAfter.project, editorBefore.project);
++  assert.equal(editorAfter.cue, editorBefore.cue);
++  assert.equal((await page.locator("[data-route-heading]").textContent()).trim(), EXPECTED_COPY.ja.editor.heading);
++  await page.getByRole("button", { name: EXPECTED_COPY.ja.editor.saveDraft, exact: true }).waitFor();
++  await page.getByLabel(ja.editor.script.input).waitFor();
++  await page.getByLabel(ja.editor.preview.progress).waitFor();
++  await page.getByLabel(ja.editor.timeline.zoom).waitFor();
++  for (const label of [ja.editor.preview.start, ja.editor.preview.play, ja.editor.preview.forwardOne, ja.editor.preview.end, ja.editor.preview.volume, ja.editor.preview.fullscreen]) {
++    await page.getByRole("button", { name: label, exact: true }).waitFor();
++  }
++  await page.getByLabel(ja.editor.preview.speed, { exact: true }).waitFor();
++  assert.deepEqual(
++    await page.locator(".timeline-row > label").evaluateAll((labels) => labels.map((label) => label.lastChild.textContent.trim())),
++    Object.values(ja.editor.timeline.tracks),
++  );
++  assert.ok(await page.getByRole("button", { name: ja.editor.timeline.trimStart, exact: true }).count() > 0);
++  assert.ok(await page.getByRole("button", { name: ja.editor.timeline.trimEnd, exact: true }).count() > 0);
++  for (const preset of Object.values(ja.editor.presets)) await page.locator(".inspector-settings").getByText(preset, { exact: true }).waitFor();
++  for (const action of [ja.editor.settings.editVoiceRole, ja.editor.settings.editSubtitleStyle, ja.editor.settings.editBackgroundMusic]) {
++    await page.getByRole("button", { name: action, exact: true }).waitFor();
++  }
++  await page.getByRole("button", { name: ja.editor.tabs.subtitle, exact: true }).click();
++  await page.locator(".subtitle-editor textarea").first().waitFor();
++  await page.getByLabel(ja.editor.subtitle.cue.replace("{time}", "00:00"), { exact: true }).waitFor();
++  await page.getByRole("button", { name: ja.editor.tabs.bgm, exact: true }).click();
++  await page.getByText(ja.editor.bgm.currentFile.replace("{file}", "0e5bf3db017e0e593c4eef4144d7c68a.mp3"), { exact: true }).waitFor();
++  await page.getByText(ja.editor.bgm.reselect, { exact: true }).waitFor();
++  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth), true, "editor must not create page-level horizontal overflow");
++  await page.setViewportSize({ width: 1024, height: 900 });
++  const compactSwitcherBox = await page.getByTestId("language-switcher-trigger").boundingBox();
++  assert.ok(compactSwitcherBox && compactSwitcherBox.x >= 0 && compactSwitcherBox.x + compactSwitcherBox.width <= 1024, "compact editor switcher must remain reachable at narrow desktop widths");
++  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth), true, "narrow editor must not create page-level horizontal overflow");
+ 
+   await page.setViewportSize({ width: 1487, height: 900 });
+   await page.goto(`${baseUrl}/dashboard/projects`);

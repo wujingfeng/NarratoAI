@@ -1,0 +1,641 @@
+# Review package: 6c87114724d710a0166b50590b1447da9b93317a..6a2a546
+
+## Commits
+6a2a546 fix: address dashboard mobile review
+9416f71 feat: add responsive dashboard navigation
+
+## Files changed
+ .../scripts/verify-dashboard.mjs                   | 137 +++++++++++-
+ .../src/components/dashboard/CreditsOverview.jsx   |   1 +
+ .../src/components/dashboard/DashboardHeader.jsx   |   5 +
+ .../components/dashboard/DashboardMobileNav.jsx    |   5 +-
+ .../src/components/dashboard/RecentProjects.jsx    |   1 +
+ .../src/components/dashboard/ToolQuickStart.jsx    |   2 +-
+ .../homepage-prototype/src/styles/dashboard.css    | 243 ++++++++++++++++++++-
+ 7 files changed, 381 insertions(+), 13 deletions(-)
+
+## Diff
+diff --git a/docs/web/homepage-prototype/scripts/verify-dashboard.mjs b/docs/web/homepage-prototype/scripts/verify-dashboard.mjs
+index a49fcc8..7ce0e22 100644
+--- a/docs/web/homepage-prototype/scripts/verify-dashboard.mjs
++++ b/docs/web/homepage-prototype/scripts/verify-dashboard.mjs
+@@ -123,21 +123,21 @@ try {
+   check(await membershipEntry.evaluate((element) => document.activeElement === element), "会员入口可获得键盘焦点");
+   for (const accountAction of [
+     page.getByRole("button", { name: "查看创作点余额 1,280" }),
+     page.getByRole("button", { name: "去充值" }),
+     page.locator(".dashboard-account__avatar"),
+   ]) {
+     await accountAction.focus();
+     check(await accountAction.evaluate((element) => document.activeElement === element), "账户区操作可获得键盘焦点");
+   }
+ 
+-  for (const width of [1280, 1025, 1024]) {
++  for (const width of [1280, 1025]) {
+     await page.setViewportSize({ width, height: 1058 });
+     const responsiveMetrics = await page.evaluate(() => {
+       const sidebar = document.querySelector(".dashboard-sidebar").getBoundingClientRect();
+       const main = document.querySelector(".dashboard-main").getBoundingClientRect();
+       const creation = document.querySelector(".creation-entry-card").getBoundingClientRect();
+       const tools = [...document.querySelectorAll(".tool-quick-start__card")].map((element) =>
+         element.getBoundingClientRect().width,
+       );
+       return {
+         pageWidth: document.documentElement.scrollWidth,
+@@ -152,20 +152,155 @@ try {
+     check(
+       responsiveMetrics.pageWidth <= responsiveMetrics.viewportWidth + 1,
+       `${width} 桌面不得横向溢出`,
+     );
+     check(responsiveMetrics.sidebarWidth >= 220, `${width} 保留可用桌面侧栏`);
+     check(responsiveMetrics.mainLeft >= responsiveMetrics.sidebarWidth, `${width} 主内容避让侧栏`);
+     check(responsiveMetrics.creationWidth >= 280, `${width} 新建创作卡保持可读宽度`);
+     check(responsiveMetrics.minimumToolWidth >= 120, `${width} 工具卡保持可读宽度`);
+     check(responsiveMetrics.mobileNavDisplay === "none", `${width} 桌面隐藏移动底栏`);
+   }
++
++  for (const viewport of [
++    { width: 390, height: 844 },
++    { width: 320, height: 720 },
++    { width: 768, height: 1024 },
++    { width: 1024, height: 1058 },
++  ]) {
++    await page.setViewportSize(viewport);
++    await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
++    const mobileMetrics = await page.evaluate(() => {
++      const sidebar = document.querySelector(".dashboard-sidebar");
++      const mobileNav = document.querySelector(".dashboard-mobile-nav");
++      const tools = document.querySelector(".tool-quick-start__grid");
++      const main = document.querySelector(".dashboard-main");
++      const navTargets = [...mobileNav.querySelectorAll("a, button")].map((element) => {
++        const rect = element.getBoundingClientRect();
++        return { width: rect.width, height: rect.height };
++      });
++      const visiblePageTargets = [
++        ...document.querySelectorAll(
++          ".dashboard-header a, .dashboard-header button, .dashboard-main a, .dashboard-main button, .dashboard-mobile-nav a, .dashboard-mobile-nav button",
++        ),
++      ]
++        .filter((element) => {
++          const rect = element.getBoundingClientRect();
++          const style = getComputedStyle(element);
++          return rect.width > 0 && rect.height > 0 && style.visibility !== "hidden";
++        })
++        .map((element) => {
++          const rect = element.getBoundingClientRect();
++          return {
++            label: element.getAttribute("aria-label") || element.textContent.trim() || element.className,
++            width: rect.width,
++            height: rect.height,
++          };
++        });
++      const creditActionIcon = document
++        .querySelector(".credits-overview__action svg")
++        .getBoundingClientRect();
++      const lastContent = document.querySelector(".credits-overview").getBoundingClientRect();
++      const navRect = mobileNav.getBoundingClientRect();
++      return {
++        pageWidth: document.documentElement.scrollWidth,
++        viewportWidth: innerWidth,
++        sidebarDisplay: getComputedStyle(sidebar).display,
++        mobileNavDisplay: getComputedStyle(mobileNav).display,
++        toolsClient: tools.clientWidth,
++        toolsScroll: tools.scrollWidth,
++        toolsOverflow: getComputedStyle(tools).overflowX,
++        toolsTemplate: getComputedStyle(tools).gridTemplateColumns,
++        toolWidths: [...tools.children].map((element) => element.getBoundingClientRect().width),
++        bodyPaddingBottom: parseFloat(getComputedStyle(main).paddingBottom),
++        navHeight: navRect.height,
++        navTargets,
++        visiblePageTargets,
++        creditActionIcon: { width: creditActionIcon.width, height: creditActionIcon.height },
++        inspirationDisplay: getComputedStyle(document.querySelector(".inspiration-panel")).display,
++        creditsRingDisplay: document.querySelector(".credits-ring")
++          ? getComputedStyle(document.querySelector(".credits-ring")).display
++          : "missing",
++        lastContentBottom: lastContent.bottom,
++        navTop: navRect.top,
++      };
++    });
++    const size = `${viewport.width}×${viewport.height}`;
++    check(mobileMetrics.pageWidth <= mobileMetrics.viewportWidth + 1, `${size} 移动页面无横向溢出`);
++    check(mobileMetrics.sidebarDisplay === "none", `${size} 移动隐藏桌面侧栏`);
++    check(mobileMetrics.mobileNavDisplay !== "none", `${size} 移动显示底部导航`);
++    check(
++      mobileMetrics.toolsScroll > mobileMetrics.toolsClient && ["auto", "scroll"].includes(mobileMetrics.toolsOverflow),
++      `${size} 工具只在内部横向滚动（client=${mobileMetrics.toolsClient}, scroll=${mobileMetrics.toolsScroll}, overflow=${mobileMetrics.toolsOverflow}, template=${mobileMetrics.toolsTemplate}, cards=${mobileMetrics.toolWidths.join("/")}）`,
++    );
++    check(mobileMetrics.bodyPaddingBottom >= mobileMetrics.navHeight, `${size} 底部 padding 覆盖固定导航`);
++    check(
++      mobileMetrics.navTargets.every(({ width, height }) => width >= 44 && height >= 44),
++      `${size} 移动导航触控目标至少 44px`,
++    );
++    const undersizedTarget = mobileMetrics.visiblePageTargets.find(({ width, height }) => width < 44 || height < 44);
++    check(
++      !undersizedTarget,
++      `${size} 页面内主要可见交互目标至少 44px${
++        undersizedTarget
++          ? `（${undersizedTarget.label}: ${undersizedTarget.width}×${undersizedTarget.height}）`
++          : ""
++      }`,
++    );
++    check(
++      mobileMetrics.creditActionIcon.width >= 18 && mobileMetrics.creditActionIcon.height >= 18,
++      `${size} 月耗操作箭头清晰可见`,
++    );
++    check(mobileMetrics.inspirationDisplay === "none", `${size} 移动隐藏创作灵感`);
++    check(mobileMetrics.creditsRingDisplay === "none", `${size} 移动隐藏完整创作点圆环`);
++    check(mobileMetrics.lastContentBottom <= mobileMetrics.navTop, `${size} 最后一项不被固定底栏遮挡`);
++    check(
++      (await page.locator(".dashboard-mobile-nav a[aria-current='page']").textContent()).includes("概览"),
++      `${size} 移动概览标记当前页面`,
++    );
++    await page.getByText("处理中 66%", { exact: true }).waitFor({ state: "visible" });
++  }
++
++  await page.setViewportSize({ width: 390, height: 844 });
++  check(
++    await page.locator("a.dashboard-header--mobile[aria-label='影创工坊'][href='/']").count() === 1,
++    "移动 Header Logo 使用具名首页 Link",
++  );
++  const unlabeledIconButtons = await page.locator("button").evaluateAll((buttons) =>
++    buttons.filter((button) => !button.textContent.trim() && !button.getAttribute("aria-label")).length,
++  );
++  check(unlabeledIconButtons === 0, "纯图标按钮均有 aria-label");
++
++  await page.emulateMedia({ reducedMotion: "reduce" });
++  await page.getByRole("button", { name: /新建创作/ }).first().click();
++  await page.getByRole("status").filter({ hasText: "新建创作功能建设中" }).waitFor();
++  const reducedMotion = await page.evaluate(() =>
++    ["[data-dashboard-banner]", ".dashboard-toast", ".tool-quick-start__card"].map((selector) => {
++      const element = document.querySelector(selector);
++      if (!element) return null;
++      const style = getComputedStyle(element);
++      return { animationName: style.animationName, transitionDuration: style.transitionDuration };
++    }),
++  );
++  check(
++    reducedMotion.length === 3 && reducedMotion.every(Boolean),
++    "减少动态效果采样完整覆盖 Banner、Toast 与工具卡",
++  );
++  check(
++    reducedMotion.every(({ animationName }) => animationName === "none"),
++    "减少动态效果时 Banner、Toast 与卡片不播放动画",
++  );
++  check(
++    reducedMotion.every(({ transitionDuration }) => parseFloat(transitionDuration) <= 0.01),
++    "减少动态效果时过渡降级为近静态",
++  );
++  await page.getByRole("button", { name: "关闭提示" }).click();
++  await page.emulateMedia({ reducedMotion: "no-preference" });
+   await page.setViewportSize({ width: 1487, height: 1058 });
+   check(await page.locator("h1").count() === 1, "Dashboard 只有一个 h1");
+   check(await page.getByRole("navigation", { name: "工作台主导航" }).count() === 1, "桌面主导航存在");
+   check(await page.getByRole("link", { name: "影创工坊" }).getAttribute("href") === "/", "品牌链接返回官网");
+   const projectStatuses = await page.locator("[data-project-status]").evaluateAll((elements) =>
+     elements.map((element) => element.dataset.projectStatus).sort(),
+   );
+   check(projectStatuses.join(",") === "complete,draft,processing", "最近项目精确覆盖 complete、processing、draft 三态");
+   check(await page.getByText("1,280", { exact: true }).count() >= 1, "余额为 1,280");
+   check(await page.getByText(/本月.*240.*创作点/).count() >= 1, "月耗为 240");
+diff --git a/docs/web/homepage-prototype/src/components/dashboard/CreditsOverview.jsx b/docs/web/homepage-prototype/src/components/dashboard/CreditsOverview.jsx
+index 6c4c004..bad4844 100644
+--- a/docs/web/homepage-prototype/src/components/dashboard/CreditsOverview.jsx
++++ b/docs/web/homepage-prototype/src/components/dashboard/CreditsOverview.jsx
+@@ -1,14 +1,15 @@
+ import { ArrowUpRight, Coins } from "@phosphor-icons/react";
+ 
+ export function CreditsOverview({ credits, onUnavailable }) {
+   return (
+     <section className="credits-overview" aria-labelledby="credits-title">
+       <div className="dashboard-section-heading credits-overview__heading"><p>账户资源</p><h2 id="credits-title">创作点</h2></div>
+       <span className="credits-overview__icon" aria-hidden="true"><Coins /></span>
++      <span className="credits-ring" aria-hidden="true" />
+       <p className="credits-overview__balance-label">当前余额</p>
+       <strong className="credits-overview__balance-value">{credits.balance.toLocaleString("en-US")}</strong>
+       <p className="credits-overview__usage"><span aria-hidden="true" />本月已使用 {credits.monthlyUsed} 创作点</p>
+       <button className="credits-overview__action" type="button" onClick={() => onUnavailable("充值创作点功能建设中")}>充值创作点<ArrowUpRight aria-hidden="true" /></button>
+     </section>
+   );
+ }
+diff --git a/docs/web/homepage-prototype/src/components/dashboard/DashboardHeader.jsx b/docs/web/homepage-prototype/src/components/dashboard/DashboardHeader.jsx
+index 8f645e2..0537b4d 100644
+--- a/docs/web/homepage-prototype/src/components/dashboard/DashboardHeader.jsx
++++ b/docs/web/homepage-prototype/src/components/dashboard/DashboardHeader.jsx
+@@ -1,15 +1,20 @@
+ import { UserCircle } from "@phosphor-icons/react";
++import { Link } from "react-router-dom";
++import { BrandMark } from "../BrandMark.jsx";
+ 
+ export function DashboardHeader({ credits, onUnavailable }) {
+   return (
+     <header className="dashboard-header">
++      <Link className="dashboard-header--mobile" to="/" aria-label="影创工坊">
++        <BrandMark />
++      </Link>
+       <div className="dashboard-account" aria-label="账户快捷操作">
+         <button
+           className="dashboard-account__balance"
+           type="button"
+           aria-label={`查看创作点余额 ${credits.balance.toLocaleString("en-US")}`}
+           onClick={() => onUnavailable("创作点明细功能建设中")}
+         >
+           <span>创作点</span>
+           <strong>{credits.balance.toLocaleString("en-US")}</strong>
+         </button>
+diff --git a/docs/web/homepage-prototype/src/components/dashboard/DashboardMobileNav.jsx b/docs/web/homepage-prototype/src/components/dashboard/DashboardMobileNav.jsx
+index a12fcf8..768e4bb 100644
+--- a/docs/web/homepage-prototype/src/components/dashboard/DashboardMobileNav.jsx
++++ b/docs/web/homepage-prototype/src/components/dashboard/DashboardMobileNav.jsx
+@@ -1,18 +1,19 @@
+ import { NavLink } from "react-router-dom";
+ 
+ export function DashboardMobileNav({ items, onUnavailable }) {
+-  const visibleItems = items.filter((item) => ["overview", "projects", "narration", "account"].includes(item.id));
++  const mobileLabels = { overview: "概览", create: "新建", projects: "项目", account: "我的" };
++  const visibleItems = items.filter((item) => Object.hasOwn(mobileLabels, item.id));
+   return (
+     <nav className="dashboard-mobile-nav" aria-label="移动工作台导航">
+       {visibleItems.map((item) => {
+         const Icon = item.icon;
+-        const content = <><Icon aria-hidden="true" /><span>{item.label}</span></>;
++        const content = <><Icon aria-hidden="true" /><span>{mobileLabels[item.id]}</span></>;
+         return item.to ? (
+           <NavLink to={item.to} end key={item.id}>{content}</NavLink>
+         ) : (
+           <button type="button" onClick={() => onUnavailable(item.unavailableMessage)} key={item.id}>{content}</button>
+         );
+       })}
+     </nav>
+   );
+ }
+diff --git a/docs/web/homepage-prototype/src/components/dashboard/RecentProjects.jsx b/docs/web/homepage-prototype/src/components/dashboard/RecentProjects.jsx
+index 3c0315e..72302aa 100644
+--- a/docs/web/homepage-prototype/src/components/dashboard/RecentProjects.jsx
++++ b/docs/web/homepage-prototype/src/components/dashboard/RecentProjects.jsx
+@@ -20,16 +20,17 @@ export function RecentProjects({ projects, onUnavailable }) {
+             <DashboardThumbnail src={project.image} alt={`${project.title}封面`} fallbackLabel={project.tool} />
+             <span className="recent-projects__details">
+               <strong>{project.title}</strong>
+               <small>{project.tool}</small>
+             </span>
+             <span className={`recent-projects__status recent-projects__status--${project.status}`}>
+               {project.progress !== null && <progress value={project.progress} max="100">{project.progress}%</progress>}
+               <span>{project.statusLabel}</span>
+               <small className="recent-projects__credits">消耗 {project.credits}</small>
+             </span>
++            <ArrowRight className="recent-projects__arrow" aria-hidden="true" />
+           </button>
+         ))}
+       </div>
+     </section>
+   );
+ }
+diff --git a/docs/web/homepage-prototype/src/components/dashboard/ToolQuickStart.jsx b/docs/web/homepage-prototype/src/components/dashboard/ToolQuickStart.jsx
+index 4d77936..f318851 100644
+--- a/docs/web/homepage-prototype/src/components/dashboard/ToolQuickStart.jsx
++++ b/docs/web/homepage-prototype/src/components/dashboard/ToolQuickStart.jsx
+@@ -1,20 +1,20 @@
+ import { ArrowUpRight } from "@phosphor-icons/react";
+ 
+ export function ToolQuickStart({ tools, onUnavailable }) {
+   return (
+     <section className="tool-quick-start" aria-labelledby="quick-start-title">
+       <div className="dashboard-section-heading">
+         <p>选择工具</p>
+         <h2 id="quick-start-title">快速开始</h2>
+       </div>
+-      <div className="tool-quick-start__grid">
++      <div className="tool-quick-start__grid dashboard-tool-list">
+         {tools.map((tool) => {
+           const Icon = tool.icon;
+           return (
+             <button
+               className={`tool-quick-start__card tool-quick-start__card--${tool.tone}`}
+               type="button"
+               onClick={() => onUnavailable(tool.unavailableMessage)}
+               key={tool.id}
+             >
+               <span aria-hidden="true"><Icon /></span>
+diff --git a/docs/web/homepage-prototype/src/styles/dashboard.css b/docs/web/homepage-prototype/src/styles/dashboard.css
+index 23610c8..ba018ec 100644
+--- a/docs/web/homepage-prototype/src/styles/dashboard.css
++++ b/docs/web/homepage-prototype/src/styles/dashboard.css
+@@ -156,20 +156,22 @@
+ .dashboard-main { margin-left: var(--dashboard-sidebar-width); }
+ 
+ .dashboard-header {
+   display: flex;
+   align-items: center;
+   justify-content: flex-end;
+   min-height: 92px;
+   padding: 0 32px;
+ }
+ 
++.dashboard-header--mobile { display: none; }
++
+ .dashboard-account { display: flex; align-items: center; gap: 15px; }
+ .dashboard-account button {
+   display: inline-flex;
+   align-items: center;
+   justify-content: center;
+   min-height: 40px;
+   border: 1px solid transparent;
+   color: var(--dashboard-text);
+   cursor: pointer;
+ }
+@@ -371,20 +373,21 @@
+ .dashboard-thumbnail__fallback { display: grid; place-items: center; width: 100%; height: 100%; padding: 8px; background: linear-gradient(145deg, #18243b, #0b1323); color: #8290a8; font-size: 12px; text-align: center; }
+ .recent-projects__details { display: grid; gap: 10px; min-width: 0; }
+ .recent-projects__details strong { overflow: hidden; font-size: 16px; font-weight: 520; text-overflow: ellipsis; white-space: nowrap; }
+ .recent-projects__details small { color: var(--dashboard-text-muted); font-size: 12px; }
+ .recent-projects__status { display: grid; justify-items: end; gap: 7px; font-size: 14px; }
+ .recent-projects__credits { color: var(--dashboard-text-muted); font-size: 11px; font-weight: 400; }
+ .recent-projects__status--complete { color: var(--dashboard-success); }
+ .recent-projects__status--processing { color: var(--dashboard-warning); }
+ .recent-projects__status--draft { color: var(--dashboard-cyan); }
+ .recent-projects__status progress { width: 70px; height: 4px; overflow: hidden; border: 0; border-radius: 4px; accent-color: var(--dashboard-warning); }
++.recent-projects__arrow { display: none; }
+ 
+ .credits-overview { position: relative; display: flex; align-items: center; flex-direction: column; padding-inline: 14px; text-align: center; }
+ .credits-overview__heading { align-self: stretch; justify-content: flex-start; }
+ .credits-overview__icon { display: none; }
+ .credits-overview::before,
+ .credits-ring {
+   content: "";
+   position: absolute;
+   top: 70px;
+   width: 184px;
+@@ -394,21 +397,21 @@
+   -webkit-mask: radial-gradient(circle, transparent 0 64%, #000 65% 73%, transparent 74%);
+   mask: radial-gradient(circle, transparent 0 64%, #000 65% 73%, transparent 74%);
+   filter: drop-shadow(0 0 7px rgba(33, 199, 232, 0.28));
+ }
+ .credits-ring::after { content: ""; position: absolute; inset: 11px; border-radius: inherit; background: var(--dashboard-surface); }
+ .credits-overview__balance-label { position: absolute; top: 185px; margin: 0; color: var(--dashboard-text-muted); font-size: 13px; }
+ .credits-overview__balance-value { position: absolute; z-index: 2; top: 145px; font-size: 30px; font-weight: 560; letter-spacing: 0.04em; }
+ .credits-overview__usage { position: absolute; bottom: 26px; left: 18px; display: flex; align-items: center; gap: 8px; margin: 0; color: var(--dashboard-text-muted); font-size: 13px; }
+ .credits-overview__usage span { width: 8px; height: 8px; border-radius: 50%; background: #7840e7; }
+ .credits-overview__action { position: absolute; right: 11px; bottom: 19px; width: 40px; height: 32px; overflow: hidden; border: 0; background: transparent; color: transparent; font-size: 0; cursor: pointer; }
+-.credits-overview__action svg { color: var(--dashboard-text-muted); }
++.credits-overview__action svg { width: 20px; height: 20px; color: var(--dashboard-text-muted); }
+ .credits-overview__action:hover svg { color: #fff; transform: translateX(2px); }
+ 
+ .inspiration-panel__list { display: grid; gap: 10px; margin-top: 17px; }
+ .inspiration-panel__item { display: grid; grid-template-columns: 104px minmax(0, 1fr) 24px; align-items: center; min-height: 122px; gap: 11px; width: 100%; padding: 5px; border: 1px solid var(--dashboard-border); border-radius: 8px; background: rgba(8, 16, 29, 0.7); color: var(--dashboard-text); text-align: left; cursor: pointer; }
+ .inspiration-panel__item:hover { border-color: var(--dashboard-border-strong); background: var(--dashboard-panel-hover); }
+ .inspiration-panel .dashboard-thumbnail { width: 104px; height: 110px; }
+ .inspiration-panel__content { display: grid; gap: 9px; min-width: 0; }
+ .inspiration-panel strong { overflow: hidden; font-size: 14px; font-weight: 520; text-overflow: ellipsis; white-space: nowrap; }
+ .inspiration-panel small { display: -webkit-box; overflow: hidden; color: var(--dashboard-text-muted); font-size: 11px; line-height: 1.55; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+ .inspiration-panel__arrow { color: #718099; }
+@@ -448,19 +451,241 @@
+   .tool-quick-start__card > strong { font-size: 17px; }
+   .tool-quick-start__card > small { font-size: 12px; }
+   .dashboard-content-grid { grid-template-columns: 1fr; }
+   .dashboard-content-grid__side { grid-template-columns: minmax(280px, 0.8fr) minmax(0, 1.2fr); }
+   .recent-projects,
+   .credits-overview,
+   .inspiration-panel { min-height: 350px; }
+ }
+ 
+ @media (max-width: 1024px) {
+-  :root { --dashboard-sidebar-width: 220px; }
+-  .dashboard-main { padding: 16px 20px 32px; gap: 16px; }
+-  .dashboard-primary-grid { grid-template-columns: minmax(280px, 1.05fr) minmax(0, 1.95fr); gap: 12px; }
+-  .creation-entry-card { min-height: 220px; }
+-  .tool-quick-start__grid { gap: 10px; }
+-  .tool-quick-start__card { min-height: 220px; }
+-  .dashboard-content-grid { grid-template-columns: 1fr; }
+-  .dashboard-content-grid__side { grid-template-columns: repeat(2, minmax(0, 1fr)); }
++  .dashboard-shell { overflow-x: clip; }
++  .dashboard-sidebar { display: none; }
++  .dashboard-header,
++  .dashboard-main { margin-left: 0; }
++
++  .dashboard-header {
++    position: static;
++    justify-content: space-between;
++    min-height: 84px;
++    gap: 16px;
++    padding: 16px 20px;
++  }
++
++  .dashboard-header--mobile {
++    display: inline-flex;
++    align-items: center;
++    min-width: 44px;
++    min-height: 44px;
++    color: var(--dashboard-text);
++    text-decoration: none;
++  }
++  .dashboard-header--mobile .brand-mark { gap: 7px; }
++  .dashboard-header--mobile .brand-mark__symbol { width: 34px; height: 34px; }
++  .dashboard-header--mobile .brand-mark__text { font-size: 17px; white-space: nowrap; }
++  .dashboard-account { gap: 10px; }
++  .dashboard-account button { min-width: 44px; min-height: 44px; }
++  .dashboard-account__balance {
++    gap: 7px;
++    padding: 0 13px !important;
++    border-color: rgba(142, 166, 211, 0.38) !important;
++    border-radius: 999px;
++  }
++  .dashboard-account__balance span { font-size: 13px; }
++  .dashboard-account__balance strong { color: var(--dashboard-cyan); font-size: 16px; }
++  .dashboard-account__recharge { display: none !important; }
++  .dashboard-account__avatar { width: 44px; }
++
++  .dashboard-main {
++    display: flex;
++    min-width: 0;
++    flex-direction: column;
++    gap: 28px;
++    padding: 4px 20px calc(var(--dashboard-mobile-nav-height) + 32px + env(safe-area-inset-bottom));
++  }
++
++  .promotion-banner {
++    grid-template-columns: minmax(0, 1fr) 40px;
++    grid-template-rows: 1fr auto;
++    min-height: 200px;
++    padding: 26px 22px 24px;
++  }
++  .promotion-banner__content { align-self: start; padding-right: 24%; }
++  .promotion-banner__eyebrow { margin-bottom: 9px; }
++  .promotion-banner__title { font-size: clamp(21px, 5vw, 28px); line-height: 1.35; }
++  .promotion-banner__action { grid-column: 1; grid-row: 2; justify-self: start; min-height: 44px; padding: 10px 24px; }
++  .promotion-banner__close { grid-column: 2; grid-row: 1; min-width: 44px; min-height: 44px; margin: -12px -11px 0 0; }
++  .promotion-banner__crystal { top: 44px; right: 8%; width: 100px; height: 104px; opacity: 0.9; }
++  .promotion-banner__orbit { right: 3%; bottom: 38px; width: 148px; }
++  .promotion-banner__beam { width: 65%; }
++
++  .dashboard-primary-grid,
++  .dashboard-content-grid,
++  .dashboard-content-grid__side { display: flex; min-width: 0; flex-direction: column; }
++  .dashboard-primary-grid { gap: 28px; }
++  .dashboard-content-grid { gap: 28px; }
++  .dashboard-content-grid__side { gap: 20px; }
++
++  .creation-entry-card {
++    grid-template-columns: 54px minmax(0, 1fr) 48px;
++    min-height: 154px;
++    gap: 12px 16px;
++    padding: 24px 22px;
++  }
++  .creation-entry-card__eyebrow { display: none; }
++  .creation-entry-card h2 { font-size: 25px; }
++  .creation-entry-card__description { margin-top: 9px; font-size: 13px; line-height: 1.5; }
++
++  .tool-quick-start > .dashboard-section-heading {
++    position: static;
++    width: auto;
++    height: auto;
++    margin: 0 0 16px;
++    overflow: visible;
++    clip: auto;
++    white-space: normal;
++  }
++  .tool-quick-start__grid {
++    display: grid;
++    grid-template-columns: repeat(3, max(250px, 78vw));
++    grid-auto-flow: column;
++    grid-auto-columns: max(250px, 78vw);
++    gap: 14px;
++    height: auto;
++    margin-inline: -1px;
++    padding: 1px 1px 10px;
++    overflow-x: auto;
++    overflow-y: hidden;
++    overscroll-behavior-inline: contain;
++    scroll-snap-type: inline proximity;
++    scrollbar-width: thin;
++  }
++  .tool-quick-start__card {
++    min-height: 184px;
++    scroll-snap-align: start;
++  }
++  .tool-quick-start__card > span { top: 24px; }
++
++  .recent-projects,
++  .credits-overview { min-height: 0; padding: 20px 16px; }
++  .dashboard-section-heading button { min-height: 44px; }
++  .recent-projects__list { gap: 10px; }
++  .recent-projects__item {
++    position: relative;
++    grid-template-columns: 92px minmax(0, 1fr) minmax(62px, auto);
++    min-height: 94px;
++    gap: 12px;
++    padding: 5px 34px 5px 5px;
++  }
++  .recent-projects__item .dashboard-thumbnail { width: 92px; height: 80px; }
++  .recent-projects__details { gap: 8px; }
++  .recent-projects__details strong { font-size: 15px; }
++  .recent-projects__status { font-size: 13px; }
++  .recent-projects__status progress { width: 62px; }
++  .recent-projects__arrow { position: absolute; right: 9px; display: block; width: 18px; height: 18px; color: #c7cfdd; }
++
++  .dashboard-inspiration,
++  .inspiration-panel,
++  .credits-overview::before,
++  .credits-ring { display: none; }
++  .credits-overview {
++    display: grid;
++    grid-template-columns: 44px minmax(0, 1fr) 36px;
++    align-items: center;
++    min-height: 92px;
++    gap: 12px;
++    text-align: left;
++  }
++  .credits-overview__heading,
++  .credits-overview__balance-label,
++  .credits-overview__balance-value { display: none; }
++  .credits-overview__icon { display: grid; place-items: center; width: 44px; height: 44px; border: 1px solid #8e42f0; border-radius: 50%; color: #a754ff; }
++  .credits-overview__icon svg { width: 25px; height: 25px; }
++  .credits-overview__usage { position: static; gap: 0; color: #b5bdcc; font-size: 16px; }
++  .credits-overview__usage span { display: none; }
++  .credits-overview__action { position: static; width: 44px; height: 44px; justify-self: end; }
++
++  .dashboard-footer { display: none; }
++  .dashboard-mobile-nav {
++    position: fixed;
++    z-index: 40;
++    inset: auto 0 0;
++    display: grid;
++    grid-template-columns: repeat(4, minmax(0, 1fr));
++    min-height: var(--dashboard-mobile-nav-height);
++    padding: 6px max(8px, env(safe-area-inset-right)) env(safe-area-inset-bottom) max(8px, env(safe-area-inset-left));
++    border-top: 1px solid rgba(142, 166, 211, 0.24);
++    border-radius: 22px 22px 0 0;
++    background: rgba(7, 14, 26, 0.97);
++    box-shadow: 0 -12px 32px rgba(0, 0, 0, 0.34);
++  }
++  .dashboard-mobile-nav a,
++  .dashboard-mobile-nav button {
++    display: flex;
++    min-width: 44px;
++    min-height: 64px;
++    flex-direction: column;
++    align-items: center;
++    justify-content: center;
++    gap: 4px;
++    border: 0;
++    border-radius: 10px;
++    background: transparent;
++    color: #98a3b7;
++    font: inherit;
++    font-size: 12px;
++    text-decoration: none;
++    cursor: pointer;
++  }
++  .dashboard-mobile-nav svg { width: 24px; height: 24px; }
++  .dashboard-mobile-nav a[aria-current="page"] { color: #a852ff; }
++  .dashboard-toast {
++    right: 14px;
++    bottom: calc(var(--dashboard-mobile-nav-height) + 14px + env(safe-area-inset-bottom));
++    left: 14px;
++    min-width: 0;
++  }
++}
++
++@media (max-width: 390px) {
++  .dashboard-header { padding-inline: 14px; }
++  .dashboard-header--mobile .brand-mark__text { font-size: 15px; }
++  .dashboard-account__balance { padding-inline: 10px !important; }
++  .dashboard-account__balance span { display: none; }
++  .dashboard-main { gap: 24px; padding-inline: 14px; }
++  .promotion-banner { min-height: 196px; padding-inline: 18px; }
++  .promotion-banner__content { padding-right: 18%; }
++  .promotion-banner__crystal { right: 2%; opacity: 0.68; }
++  .creation-entry-card { grid-template-columns: 45px minmax(0, 1fr) 44px; gap: 11px; padding-inline: 16px; }
++  .creation-entry-card__icon { width: 45px; height: 45px; }
++  .creation-entry-card button { width: 44px; height: 44px; }
++  .creation-entry-card h2 { font-size: 22px; }
++  .tool-quick-start__grid { grid-auto-columns: max(250px, 78vw); }
++  .recent-projects { padding-inline: 12px; }
++  .recent-projects__item { grid-template-columns: 78px minmax(0, 1fr) minmax(54px, auto); gap: 9px; padding-right: 29px; }
++  .recent-projects__item .dashboard-thumbnail { width: 78px; height: 70px; }
++  .recent-projects__details strong { white-space: normal; line-height: 1.25; }
++  .recent-projects__status progress { width: 54px; }
++  .credits-overview__usage { font-size: 14px; }
++}
++
++@media (max-width: 340px) {
++  .promotion-banner__content { padding-right: 8%; }
++  .promotion-banner__title { font-size: 20px; }
++  .creation-entry-card__description { font-size: 12px; }
++  .recent-projects__item { grid-template-columns: 68px minmax(0, 1fr) 52px; gap: 7px; }
++  .recent-projects__item .dashboard-thumbnail { width: 68px; height: 64px; }
++  .recent-projects__details strong { font-size: 13px; }
++  .recent-projects__details small,
++  .recent-projects__credits { font-size: 10px; }
++  .recent-projects__status { font-size: 12px; }
++}
++
++@media (prefers-reduced-motion: reduce) {
++  .dashboard-shell *,
++  .dashboard-shell *::before,
++  .dashboard-shell *::after {
++    scroll-behavior: auto !important;
++    animation: none !important;
++    transition-duration: 0.01ms !important;
++  }
+ }

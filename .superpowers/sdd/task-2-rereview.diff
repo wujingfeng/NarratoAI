@@ -1,0 +1,237 @@
+# Review package: 19d5dc79c52a005bf327361ed0024aa00248dfb7..2eef104
+
+## Commits
+2eef104 test: harden creation route coverage
+179864e feat: route creation actions to dashboard
+
+## Files changed
+ .../homepage-prototype/scripts/verify-routing.mjs  | 85 ++++++++++++++++++++++
+ docs/web/homepage-prototype/src/pages/HomePage.jsx | 33 ++-------
+ 2 files changed, 93 insertions(+), 25 deletions(-)
+
+## Diff
+diff --git a/docs/web/homepage-prototype/scripts/verify-routing.mjs b/docs/web/homepage-prototype/scripts/verify-routing.mjs
+index a82b0b5..0e08e0d 100644
+--- a/docs/web/homepage-prototype/scripts/verify-routing.mjs
++++ b/docs/web/homepage-prototype/scripts/verify-routing.mjs
+@@ -1,36 +1,121 @@
++import { readFile } from "node:fs/promises";
++import path from "node:path";
++import { fileURLToPath } from "node:url";
+ import { chromium } from "playwright";
+ 
+ const baseUrl = process.env.BASE_URL || "http://127.0.0.1:4173";
++const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+ const executablePath =
+   process.env.CHROME_PATH || "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
++const homePageSource = await readFile(path.join(projectRoot, "src/pages/HomePage.jsx"), "utf8");
++const retiredWorkspaceToast = ["正式工作台接入后", "继续"].join("");
++if (homePageSource.includes(retiredWorkspaceToast)) {
++  throw new Error("HomePage.jsx 不得保留旧工作台 Toast 文案");
++}
++
+ const browser = await chromium.launch({ executablePath, headless: true });
+ const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
+ const failures = [];
+ 
+ await page.route("**/favicon.ico", (route) => route.fulfill({ status: 204 }));
+ 
+ page.on("console", (message) => {
+   if (message.type() === "error") {
+     const location = message.location().url;
+     failures.push(`console.error${location ? ` (${location})` : ""}: ${message.text()}`);
+   }
+ });
+ page.on("pageerror", (error) => failures.push(`pageerror: ${error.message}`));
+ page.on("requestfailed", (request) => {
+   failures.push(`requestfailed: ${request.method()} ${request.url()} ${request.failure()?.errorText}`);
+ });
+ page.on("response", (response) => {
+   if (response.status() >= 400) failures.push(`response ${response.status()}: ${response.url()}`);
+ });
+ 
++async function expectDashboardAfterClick(locator, label) {
++  await locator.click();
++  await page.waitForURL(`${baseUrl}/dashboard`);
++  if ((await page.locator("h1").textContent()) !== "工作台概览") {
++    throw new Error(`${label} 未进入工作台`);
++  }
++  await page.goBack();
++  await page.waitForURL(`${baseUrl}/`);
++}
++
++async function verifyCreationEntries() {
++  await page.goto(`${baseUrl}/`, { waitUntil: "domcontentloaded" });
++  const startButtons = page.getByRole("button", { name: /^开始创作/ });
++  const startButtonCount = await startButtons.count();
++  if (startButtonCount !== 2) {
++    throw new Error(`开始创作入口应为 2 个，实际为 ${startButtonCount} 个`);
++  }
++  await expectDashboardAfterClick(
++    startButtons.first(),
++    "Hero 开始创作",
++  );
++
++  for (const toolId of ["narration", "translation", "remix"]) {
++    await page.locator(`#tool-tab-${toolId}`).click();
++    const templates = page.getByRole("button", { name: /使用相同模板创作/ });
++    const templateCount = await templates.count();
++    if (templateCount !== 3) {
++      throw new Error(`${toolId} 模板入口应为 3 个，实际为 ${templateCount} 个`);
++    }
++    for (let index = 0; index < templateCount; index += 1) {
++      await expectDashboardAfterClick(templates.nth(index), `${toolId} 模板 ${index + 1}`);
++      await page.locator(`#tool-tab-${toolId}`).click();
++    }
++  }
++
++  const tryButtons = page.getByRole("button", { name: /立即体验/ });
++  const tryButtonCount = await tryButtons.count();
++  if (tryButtonCount !== 3) {
++    throw new Error(`能力入口应为 3 个，实际为 ${tryButtonCount} 个`);
++  }
++  for (let index = 0; index < tryButtonCount; index += 1) {
++    await expectDashboardAfterClick(tryButtons.nth(index), `能力入口 ${index + 1}`);
++  }
++
++  await expectDashboardAfterClick(
++    startButtons.last(),
++    "底部开始创作",
++  );
++}
++
++async function verifyPreservedWebsiteBehaviors() {
++  await page.getByRole("button", { name: "查看案例", exact: true }).first().click();
++  await page.locator("#demo").waitFor({ state: "visible" });
++  await page.waitForFunction(() => window.scrollY > 0);
++  if (new URL(page.url()).pathname !== "/") throw new Error("Hero 查看案例不应离开官网");
++
++  await page.locator("#tool-tab-translation").click();
++  if ((await page.locator("#tool-tab-translation").getAttribute("aria-selected")) !== "true") {
++    throw new Error("Demo Tab 无法切换");
++  }
++
++  await page.getByRole("button", { name: /^播放案例：/ }).first().click();
++  await page.getByRole("dialog").waitFor({ state: "visible" });
++  await page.getByRole("button", { name: "关闭案例", exact: true }).click();
++
++  await page.getByRole("button", { name: "登录", exact: true }).click();
++  await page.getByRole("status").getByText("登录流程待接入", { exact: true }).waitFor();
++  await page.getByRole("button", { name: "关闭提示" }).click();
++
++  await page.getByRole("button", { name: "价格", exact: true }).first().click();
++  await page.getByRole("status").getByText("价格页待接入", { exact: true }).waitFor();
++}
++
+ try {
++  await verifyCreationEntries();
++  await verifyPreservedWebsiteBehaviors();
+   await page.goto(`${baseUrl}/dashboard`, { waitUntil: "domcontentloaded" });
+   if ((await page.locator("h1").textContent()) !== "工作台概览") {
+     throw new Error("/dashboard 应渲染工作台概览而不是官网");
+   }
+   await page.goto(`${baseUrl}/missing-route`, { waitUntil: "domcontentloaded" });
+   await page.getByRole("heading", { name: "页面未找到" }).waitFor();
+   if (failures.length > 0) throw new Error(`路由访问存在浏览器错误:\n${failures.join("\n")}`);
+ } finally {
+   await browser.close();
+ }
+diff --git a/docs/web/homepage-prototype/src/pages/HomePage.jsx b/docs/web/homepage-prototype/src/pages/HomePage.jsx
+index 081c29c..8af7c75 100644
+--- a/docs/web/homepage-prototype/src/pages/HomePage.jsx
++++ b/docs/web/homepage-prototype/src/pages/HomePage.jsx
+@@ -1,43 +1,39 @@
+ import { useCallback, useEffect, useRef, useState } from "react";
++import { useNavigate } from "react-router-dom";
+ import { SiteHeader } from "../components/SiteHeader.jsx";
+ import { HeroSection } from "../components/HeroSection.jsx";
+-import { DemoSection, TOOL_DATA } from "../components/DemoSection.jsx";
++import { DemoSection } from "../components/DemoSection.jsx";
+ import { CapabilitySection } from "../components/CapabilitySection.jsx";
+ import { FaqSection } from "../components/FaqSection.jsx";
+ import { FinalCtaSection } from "../components/FinalCtaSection.jsx";
+ import { SiteFooter } from "../components/SiteFooter.jsx";
+ import { VideoModal } from "../components/VideoModal.jsx";
+ import { Toast } from "../components/Toast.jsx";
+ 
+ export function HomePage() {
++  const navigate = useNavigate();
+   const [activeTool, setActiveTool] = useState("narration");
+   const [menuOpen, setMenuOpen] = useState(false);
+   const [activeSection, setActiveSection] = useState("hero");
+   const [modalCase, setModalCase] = useState(null);
+   const [toast, setToast] = useState("");
+   const toastTimer = useRef(null);
+   const modalTriggerRef = useRef(null);
+ 
+   const showToast = useCallback((message) => {
+     setToast(message);
+     window.clearTimeout(toastTimer.current);
+     toastTimer.current = window.setTimeout(() => setToast(""), 3200);
+   }, []);
+ 
+-  const chooseTool = useCallback(
+-    (toolId, message) => {
+-      setActiveTool(toolId);
+-      if (message) showToast(message);
+-    },
+-    [showToast],
+-  );
++  const startCreation = useCallback(() => navigate("/dashboard"), [navigate]);
+ 
+   const scrollTo = useCallback((id) => {
+     document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
+     setMenuOpen(false);
+   }, []);
+ 
+   const openCase = useCallback((caseItem) => {
+     modalTriggerRef.current = document.activeElement;
+     setModalCase(caseItem);
+   }, []);
+@@ -75,42 +71,29 @@ export function HomePage() {
+     <div className="site-shell" data-page="home">
+       <SiteHeader
+         activeSection={activeSection}
+         menuOpen={menuOpen}
+         onMenuChange={setMenuOpen}
+         onNavigate={scrollTo}
+         onFeedback={showToast}
+         isInert={modalOpen}
+       />
+       <main inert={pageContentHidden ? true : undefined} aria-hidden={pageContentHidden ? "true" : undefined}>
+-        <HeroSection
+-          onStart={() => chooseTool("narration", "已选择：短剧解说，正式工作台接入后继续")}
+-          onViewDemo={() => scrollTo("demo")}
+-        />
++        <HeroSection onStart={startCreation} onViewDemo={() => scrollTo("demo")} />
+         <DemoSection
+           activeTool={activeTool}
+           onToolChange={setActiveTool}
+           onOpenCase={openCase}
+-          onTemplate={(caseItem) =>
+-            showToast(`已选择：${caseItem.toolName}，正式工作台接入后继续`)
+-          }
+-        />
+-        <CapabilitySection
+-          activeTool={activeTool}
+-          onChooseTool={(toolId) => {
+-            chooseTool(toolId, `已选择：${TOOL_DATA[toolId].label}，正式工作台接入后继续`);
+-            scrollTo("demo");
+-          }}
++          onTemplate={startCreation}
+         />
++        <CapabilitySection activeTool={activeTool} onChooseTool={startCreation} />
+         <section className="lower-grid page-container" aria-label="常见问题与开始创作">
+           <FaqSection />
+-          <FinalCtaSection
+-            onStart={() => chooseTool("narration", "已选择：短剧解说，正式工作台接入后继续")}
+-          />
++          <FinalCtaSection onStart={startCreation} />
+         </section>
+       </main>
+       <SiteFooter onNavigate={scrollTo} onFeedback={showToast} isInert={pageContentHidden} />
+       <VideoModal caseItem={modalCase} onClose={closeModal} returnFocusRef={modalTriggerRef} />
+       <Toast message={toast} onClose={() => setToast("")} isInert={pageContentHidden} />
+     </div>
+   );
+ }

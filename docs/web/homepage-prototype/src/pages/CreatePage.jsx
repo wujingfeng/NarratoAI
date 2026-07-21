@@ -9,6 +9,7 @@ import { DashboardSidebar } from "../components/dashboard/DashboardSidebar.jsx";
 import { DashboardToast } from "../components/dashboard/DashboardToast.jsx";
 import { dashboardCredits, dashboardNavItems } from "../data/dashboardData.js";
 import { creationTypes, initialCreateVideos } from "../data/createData.js";
+import { useI18n } from "../i18n/useI18n.js";
 
 const VIDEO_EXTENSIONS = new Set(["mp4", "mov", "avi"]);
 const VIDEO_SIZE_LIMIT = 5 * 1024 * 1024 * 1024;
@@ -50,6 +51,7 @@ function readVideoDuration(file) {
 }
 
 export function CreatePage() {
+  const { formatNumber, t } = useI18n();
   const [toast, setToast] = useState({ id: 0, message: "" });
   const [selectedType, setSelectedType] = useState("narration");
   const [videos, setVideos] = useState(initialCreateVideos);
@@ -84,23 +86,23 @@ export function CreatePage() {
       const extension = file.name.split(".").pop()?.toLowerCase();
       return VIDEO_EXTENSIONS.has(extension) && file.size <= VIDEO_SIZE_LIMIT;
     });
-    if (validFiles.length !== files.length) showUnavailable("仅支持 5GB 以内的 MP4、MOV 或 AVI 文件");
+    if (validFiles.length !== files.length) showUnavailable(t("create.messages.invalidVideo"));
     if (!validFiles.length) return;
     const availableCount = selectedCreationType.maxVideos - videos.length;
     if (availableCount <= 0) {
-      showUnavailable(`${selectedCreationType.title}最多上传 ${selectedCreationType.maxVideos} 个视频`);
+      showUnavailable(t("create.messages.maxVideos", { type: t(selectedCreationType.titleKey), count: formatNumber(selectedCreationType.maxVideos) }));
       return;
     }
     const acceptedFiles = validFiles.slice(0, availableCount);
     if (acceptedFiles.length < validFiles.length) {
-      showUnavailable(`${selectedCreationType.title}最多上传 ${selectedCreationType.maxVideos} 个视频`);
+      showUnavailable(t("create.messages.maxVideos", { type: t(selectedCreationType.titleKey), count: formatNumber(selectedCreationType.maxVideos) }));
     }
     const newVideos = acceptedFiles.map((file, index) => ({
         id: `${file.name}-${file.lastModified}-${file.size}-${Date.now()}-${index}`,
         name: file.name,
         durationSeconds: 0,
         durationLabel: "--:--",
-        subtitleStatus: "待识别，将使用 AI 识别",
+        subtitleStatusKey: "create.subtitle.pending",
         statusTone: "warning",
         subtitleName: null,
         thumbnail: null,
@@ -118,19 +120,19 @@ export function CreatePage() {
 
   const handleNext = () => {
     if (videos.length > selectedCreationType.maxVideos) {
-      showUnavailable(`${selectedCreationType.title}当前有 ${videos.length} 个视频，最多支持 ${selectedCreationType.maxVideos} 个`);
+      showUnavailable(t("create.messages.tooMany", { type: t(selectedCreationType.titleKey), current: formatNumber(videos.length), count: formatNumber(selectedCreationType.maxVideos) }));
       return;
     }
-    showUnavailable("参数设置功能建设中");
+    showUnavailable(t("create.messages.settingsUnavailable"));
   };
 
   const handleVideoSubtitle = (videoId, file) => {
     if (!file.name.toLowerCase().endsWith(".srt") || file.size > SUBTITLE_SIZE_LIMIT) {
-      showUnavailable("仅支持 50MB 以内的 SRT 字幕文件");
+      showUnavailable(t("create.messages.invalidSubtitle"));
       return;
     }
     setVideos((current) => current.map((video) => video.id === videoId
-      ? { ...video, subtitleName: file.name, subtitleStatus: file.name, statusTone: "success" }
+      ? { ...video, subtitleName: file.name, subtitleStatusKey: null, statusTone: "success" }
       : video));
   };
 
@@ -141,8 +143,8 @@ export function CreatePage() {
         <DashboardHeader credits={dashboardCredits} onUnavailable={showUnavailable} />
         <main className="create-main">
           <header className="create-heading">
-            <h1 data-route-heading tabIndex="-1">创建新的 AI 视频</h1>
-            <p>选择创作类型并上传素材</p>
+            <h1 data-route-heading tabIndex="-1">{t("create.routeHeading")}</h1>
+            <p>{t("create.description")}</p>
           </header>
           <div className="create-layout">
             <div className="create-form">
@@ -156,7 +158,7 @@ export function CreatePage() {
                 onRemove={(id) => setVideos((current) => current.filter((video) => video.id !== id))}
                 onSubtitleSelect={handleVideoSubtitle}
               />
-              <p className="create-autosave"><ShieldCheck aria-hidden="true" />系统会自动保存上传进度</p>
+              <p className="create-autosave"><ShieldCheck aria-hidden="true" />{t("create.autosave")}</p>
             </div>
             <CreationSummary
               durationLabel={summary.durationLabel}

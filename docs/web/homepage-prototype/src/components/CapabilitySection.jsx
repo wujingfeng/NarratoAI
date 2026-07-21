@@ -11,52 +11,44 @@ import {
   UserFocus,
   VideoCamera,
 } from "@phosphor-icons/react";
+import { useI18n } from "../i18n/useI18n.js";
 
-const capabilities = [
+const capabilityMeta = [
   {
     id: "narration",
     tone: "violet",
     icon: FilmSlate,
-    title: "短剧解说",
-    subtitle: "小白也能做短剧号",
-    features: "高光片段 · 解说文案 · AI 配音 · 字幕 · BGM",
   },
   {
     id: "translation",
     tone: "cyan",
     icon: Translate,
-    title: "视频翻译",
-    subtitle: "让内容跨越语言",
-    features: "字幕翻译 · 重新配音 · 双语字幕",
   },
   {
     id: "remix",
     tone: "orange",
     icon: Scissors,
-    title: "短剧混剪",
-    subtitle: "不用懂剪辑",
-    features: "高光片段 · 保留原声 · BGM",
   },
 ];
 
-const processSteps = [
-  { icon: CloudArrowUp, label: "上传素材" },
-  { icon: Cpu, label: "AI 分析" },
-  { icon: UserFocus, label: "用户审核" },
-  { icon: VideoCamera, label: "自动合成" },
-  { icon: DownloadSimple, label: "导出发布" },
+const processStepMeta = [
+  { id: "upload", icon: CloudArrowUp },
+  { id: "analysis", icon: Cpu },
+  { id: "review", icon: UserFocus },
+  { id: "compose", icon: VideoCamera },
+  { id: "export", icon: DownloadSimple },
 ];
 
-function CapabilityCard({ item, selected, onChoose }) {
+function CapabilityCard({ item, selected, onChoose, t }) {
   const Icon = item.icon;
   return (
     <article className={`capability-card capability-card--${item.tone} ${selected ? "is-selected" : ""}`}>
       <div className="capability-card__copy">
         <span className="capability-card__icon"><Icon size={35} weight="duotone" /></span>
-        <h3>{item.title}</h3>
-        <p>{item.subtitle}</p>
-        <small>{item.features}</small>
-        <button type="button" onClick={() => onChoose(item.id)}>立即体验 <ArrowRight size={17} /></button>
+        <h3>{t(`home.capabilities.items.${item.id}.title`)}</h3>
+        <p>{t(`home.capabilities.items.${item.id}.subtitle`)}</p>
+        <small>{t(`home.capabilities.items.${item.id}.features`)}</small>
+        <button type="button" onClick={() => onChoose(item.id)}>{t("home.capabilities.tryNow")} <ArrowRight size={17} /></button>
       </div>
       <div className="capability-orbit" aria-hidden="true">
         <span className="capability-orbit__halo" />
@@ -67,37 +59,38 @@ function CapabilityCard({ item, selected, onChoose }) {
   );
 }
 
-function ProcessStepper() {
+function ProcessStepper({ t }) {
   return (
     <div className="process-panel">
       <div className="process-steps">
-        {processSteps.map(({ icon: Icon, label }, index) => (
-          <div className="process-step" key={label}>
+        {processStepMeta.map(({ id, icon: Icon }, index) => (
+          <div className="process-step" key={id}>
             <div className="process-step__node"><Icon size={28} weight="duotone" /></div>
-            <span><b>{index + 1}</b>{label}</span>
-            {index < processSteps.length - 1 && <i className="process-step__connector" />}
+            <span><b>{index + 1}</b>{t(`home.capabilities.process.${id}`)}</span>
+            {index < processStepMeta.length - 1 && <i className="process-step__connector" />}
           </div>
         ))}
       </div>
-      <div className="process-note"><Sparkle size={30} weight="duotone" /><p>小白可以沿用 AI 推荐，<br />有经验也能逐步调整</p></div>
+      <div className="process-note"><Sparkle size={30} weight="duotone" /><p>{t("home.capabilities.processNoteLine1")}<br />{t("home.capabilities.processNoteLine2")}</p></div>
     </div>
   );
 }
 
 export function CapabilitySection({ activeTool, onChooseTool }) {
+  const { t } = useI18n();
   return (
     <section id="capabilities" className="capability-section section-anchor page-container">
       <div className="capability-heading">
-        <span className="section-kicker">ALL-IN-ONE WORKSPACE</span>
-        <h2>一个工作台，搞定<span className="gradient-text">三种视频创作</span></h2>
-        <p><MagicWand size={18} weight="duotone" /> 选择目标，剩下的交给 AI 流程</p>
+        <span className="section-kicker">{t("home.capabilities.kicker")}</span>
+        <h2>{t("home.capabilities.headingPrefix")}<span className="gradient-text">{t("home.capabilities.headingAccent")}</span></h2>
+        <p><MagicWand size={18} weight="duotone" /> {t("home.capabilities.description")}</p>
       </div>
       <div className="capability-grid">
-        {capabilities.map((item) => (
-          <CapabilityCard key={item.id} item={item} selected={activeTool === item.id} onChoose={onChooseTool} />
+        {capabilityMeta.map((item) => (
+          <CapabilityCard key={item.id} item={item} selected={activeTool === item.id} onChoose={onChooseTool} t={t} />
         ))}
       </div>
-      <ProcessStepper />
+      <ProcessStepper t={t} />
     </section>
   );
 }

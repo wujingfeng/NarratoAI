@@ -34,6 +34,8 @@ html {
   scroll-behavior: smooth;
   scroll-padding-top: var(--header-height);
   background: var(--bg-page);
+  /* Keep horizontal gestures inside the app instead of triggering browser history navigation. */
+  overscroll-behavior-x: none;
 }
 
 body {
@@ -45,6 +47,7 @@ body {
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
+  overscroll-behavior-x: none;
 }
 
 button,

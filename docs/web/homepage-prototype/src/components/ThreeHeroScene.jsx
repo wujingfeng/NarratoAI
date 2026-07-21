@@ -126,6 +126,14 @@ export function ThreeHeroScene({ heroRef, workbenchRef, poseName }) {
     motionQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
     reducedMotion = motionQuery.matches;
 
+    if (reducedMotion) {
+      enterFallback();
+      return () => {
+        syncLoopRef.current = () => {};
+        fallbackRef.current = () => {};
+      };
+    }
+
     const callRuntime = (method, ...argumentsList) => {
       if (!runtime || disposed) return;
 
@@ -161,6 +169,10 @@ export function ThreeHeroScene({ heroRef, workbenchRef, poseName }) {
 
     const onMotionChange = (event) => {
       reducedMotion = event.matches;
+      if (reducedMotion) {
+        enterFallback();
+        return;
+      }
       callRuntime("setMotionMode", reducedMotion);
       syncLoop();
     };

@@ -1,0 +1,383 @@
+# Review package: 6a2a54618a6f0a78291e69410bcc541d7ea1ff63..742a59b
+
+## Commits
+742a59b fix: verify real favicon and route focus
+1892747 test: verify dashboard routes and visuals
+
+## Files changed
+ docs/web/homepage-prototype/index.html             |  1 +
+ docs/web/homepage-prototype/public/favicon.svg     | 15 ++++
+ .../scripts/capture-dashboard.mjs                  | 55 ++++++++++++++
+ .../scripts/verify-dashboard.mjs                   | 65 ++++++++++++++++-
+ .../homepage-prototype/scripts/verify-routing.mjs  | 84 +++++++++++++++++++---
+ .../src/components/HeroSection.jsx                 |  2 +-
+ 6 files changed, 212 insertions(+), 10 deletions(-)
+
+## Diff
+diff --git a/docs/web/homepage-prototype/index.html b/docs/web/homepage-prototype/index.html
+index 0da2db2..a9bda2e 100644
+--- a/docs/web/homepage-prototype/index.html
++++ b/docs/web/homepage-prototype/index.html
+@@ -1,14 +1,15 @@
+ <!doctype html>
+ <html lang="zh-CN">
+   <head>
+     <meta charset="UTF-8" />
+     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+     <meta name="theme-color" content="#02050d" />
+     <meta name="description" content="影创工坊 AI 视频创作工作台首页原型" />
++    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+     <title>影创工坊｜AI 出片工作台</title>
+   </head>
+   <body>
+     <div id="root"></div>
+     <script type="module" src="/src/main.jsx"></script>
+   </body>
+ </html>
+diff --git a/docs/web/homepage-prototype/public/favicon.svg b/docs/web/homepage-prototype/public/favicon.svg
+new file mode 100644
+index 0000000..3d24c64
+--- /dev/null
++++ b/docs/web/homepage-prototype/public/favicon.svg
+@@ -0,0 +1,15 @@
++<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="影创工坊">
++  <defs>
++    <linearGradient id="blue" x1="0" y1="0" x2="1" y2="1">
++      <stop offset="0" stop-color="#60a5fa" />
++      <stop offset="1" stop-color="#2563eb" />
++    </linearGradient>
++    <linearGradient id="violet" x1="0" y1="0" x2="1" y2="1">
++      <stop offset="0" stop-color="#c084fc" />
++      <stop offset="1" stop-color="#7c3aed" />
++    </linearGradient>
++  </defs>
++  <path d="M32 6 47 32H17Z" fill="none" stroke="url(#blue)" stroke-width="7" stroke-linejoin="round" />
++  <path d="m11 51 15-26 15 26Z" fill="none" stroke="url(#blue)" stroke-width="7" stroke-linejoin="round" />
++  <path d="m38 51 15-26 6 26Z" fill="none" stroke="url(#violet)" stroke-width="7" stroke-linejoin="round" />
++</svg>
+diff --git a/docs/web/homepage-prototype/scripts/capture-dashboard.mjs b/docs/web/homepage-prototype/scripts/capture-dashboard.mjs
+new file mode 100644
+index 0000000..0baeab7
+--- /dev/null
++++ b/docs/web/homepage-prototype/scripts/capture-dashboard.mjs
+@@ -0,0 +1,55 @@
++import { mkdir } from "node:fs/promises";
++import { chromium } from "playwright";
++
++const baseUrl = process.env.BASE_URL || "http://127.0.0.1:4173";
++const executablePath =
++  process.env.CHROME_PATH || "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
++const outputDir = new URL("../artifacts/screenshots/", import.meta.url);
++const issues = [];
++
++await mkdir(outputDir, { recursive: true });
++const browser = await chromium.launch({ executablePath, headless: true });
++
++async function capture(name, viewport, fullPage) {
++  const page = await browser.newPage({ viewport, deviceScaleFactor: 1 });
++  page.on("console", (message) => {
++    if (message.type() === "error") {
++      const location = message.location().url;
++      issues.push(`[${name}] console${location ? ` (${location})` : ""}: ${message.text()}`);
++    }
++  });
++  page.on("pageerror", (error) => issues.push(`[${name}] pageerror: ${error.message}`));
++  page.on("requestfailed", (request) => issues.push(`[${name}] requestfailed: ${request.url()}`));
++  page.on("response", (response) => {
++    if (response.status() >= 400) issues.push(`[${name}] response ${response.status()}: ${response.url()}`);
++  });
++
++  try {
++    await page.goto(`${baseUrl}/dashboard`, { waitUntil: "networkidle" });
++    await page.locator('[data-page="dashboard"]').waitFor();
++    await page.evaluate(() => document.fonts.ready);
++    await page.screenshot({
++      path: new URL(`${name}.png`, outputDir).pathname,
++      fullPage,
++    });
++  } finally {
++    await page.close();
++  }
++}
++
++try {
++  await capture("dashboard-desktop-1487", { width: 1487, height: 1058 }, false);
++  await capture("dashboard-mobile-390", { width: 390, height: 844 }, false);
++  await capture("dashboard-mobile-390-full", { width: 390, height: 844 }, true);
++  await capture("dashboard-tablet-768", { width: 768, height: 1024 }, true);
++  await capture("dashboard-wide-1920", { width: 1920, height: 1080 }, false);
++} finally {
++  await browser.close();
++}
++
++if (issues.length > 0) {
++  console.error(issues.join("\n"));
++  process.exitCode = 1;
++} else {
++  console.log(`Dashboard screenshots captured in ${outputDir.pathname}`);
++}
+diff --git a/docs/web/homepage-prototype/scripts/verify-dashboard.mjs b/docs/web/homepage-prototype/scripts/verify-dashboard.mjs
+index 7ce0e22..533b9df 100644
+--- a/docs/web/homepage-prototype/scripts/verify-dashboard.mjs
++++ b/docs/web/homepage-prototype/scripts/verify-dashboard.mjs
+@@ -1,22 +1,85 @@
++import { readFile, readdir } from "node:fs/promises";
++import path from "node:path";
++import { fileURLToPath } from "node:url";
+ import { chromium } from "playwright";
+ 
+ const baseUrl = process.env.BASE_URL || "http://127.0.0.1:4173";
++const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
++const scanRoot = process.env.DASHBOARD_SCAN_ROOT
++  ? path.resolve(process.env.DASHBOARD_SCAN_ROOT)
++  : projectRoot;
++const authoredTargets = [
++  "src/pages/DashboardPage.jsx",
++  "src/components/dashboard",
++  "src/styles/dashboard.css",
++  "src/data/dashboardData.js",
++  "public",
++];
++const forbidden = [
++  ["参考图文件名", /(?:04-dashboard-desktop|28-dashboard-mobile)\.png/i],
++  ["data image", /data:image/i],
++  ["base64", /base64/i],
++  ["canvas", /<canvas\b|CanvasRenderingContext2D|drawImage\s*\(/i],
++  ["CSS url 背景", /background-image\s*:\s*url\s*\(/i],
++  ["SVG 内嵌位图", /<image\b|xlink:href\s*=|href\s*=\s*["']data:image/i],
++];
++
++async function collectFiles(target) {
++  const entries = await readdir(target, { withFileTypes: true });
++  const files = [];
++  for (const entry of entries) {
++    const entryPath = path.join(target, entry.name);
++    if (entry.isDirectory()) files.push(...(await collectFiles(entryPath)));
++    else if (entry.isFile()) files.push(entryPath);
++  }
++  return files;
++}
++
++async function verifyAuthoredSources() {
++  const files = [];
++  for (const target of authoredTargets) {
++    const absoluteTarget = path.join(scanRoot, target);
++    try {
++      const entries = await collectFiles(absoluteTarget);
++      files.push(...entries);
++    } catch (error) {
++      if (error.code === "ENOTDIR") files.push(absoluteTarget);
++      else if (error.code !== "ENOENT") throw error;
++    }
++  }
++
++  const violations = [];
++  for (const file of files) {
++    const source = await readFile(file, "utf8");
++    for (const [label, pattern] of forbidden) {
++      const match = source.match(pattern);
++      if (match) violations.push(`${path.relative(scanRoot, file)}: ${label} (${match[0]})`);
++    }
++  }
++  if (violations.length > 0) {
++    throw new Error(`Dashboard authored source 反贴图扫描失败:\n${violations.join("\n")}`);
++  }
++  console.log(`Dashboard authored source 反贴图扫描通过（${files.length} files）`);
++}
++
++await verifyAuthoredSources();
++if (process.env.DASHBOARD_SCAN_ONLY === "1") process.exit(0);
++
+ const executablePath =
+   process.env.CHROME_PATH || "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
+ const browser = await chromium.launch({ executablePath, headless: true });
+ const page = await browser.newPage({ viewport: { width: 1487, height: 1058 } });
+ const failures = [];
+ const failedThumbnailUrl = new URL("/assets/documentary-thumb.webp", baseUrl).href;
+ let thumbnail404Observed = false;
+ 
+-await page.route("**/favicon.ico", (route) => route.fulfill({ status: 204 }));
+ await page.route("**/assets/documentary-thumb.webp", (route) => {
+   route.fulfill({ status: 404, contentType: "image/webp", body: "" });
+ });
+ 
+ page.on("console", (message) => {
+   if (message.type() === "error") {
+     const location = message.location().url;
+     if (location === failedThumbnailUrl && message.text().includes("404")) return;
+     failures.push(`console.error${location ? ` (${location})` : ""}: ${message.text()}`);
+   }
+diff --git a/docs/web/homepage-prototype/scripts/verify-routing.mjs b/docs/web/homepage-prototype/scripts/verify-routing.mjs
+index 0e08e0d..8bd0512 100644
+--- a/docs/web/homepage-prototype/scripts/verify-routing.mjs
++++ b/docs/web/homepage-prototype/scripts/verify-routing.mjs
+@@ -10,22 +10,20 @@ const executablePath =
+ const homePageSource = await readFile(path.join(projectRoot, "src/pages/HomePage.jsx"), "utf8");
+ const retiredWorkspaceToast = ["正式工作台接入后", "继续"].join("");
+ if (homePageSource.includes(retiredWorkspaceToast)) {
+   throw new Error("HomePage.jsx 不得保留旧工作台 Toast 文案");
+ }
+ 
+ const browser = await chromium.launch({ executablePath, headless: true });
+ const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
+ const failures = [];
+ 
+-await page.route("**/favicon.ico", (route) => route.fulfill({ status: 204 }));
+-
+ page.on("console", (message) => {
+   if (message.type() === "error") {
+     const location = message.location().url;
+     failures.push(`console.error${location ? ` (${location})` : ""}: ${message.text()}`);
+   }
+ });
+ page.on("pageerror", (error) => failures.push(`pageerror: ${error.message}`));
+ page.on("requestfailed", (request) => {
+   failures.push(`requestfailed: ${request.method()} ${request.url()} ${request.failure()?.errorText}`);
+ });
+@@ -36,20 +34,95 @@ page.on("response", (response) => {
+ async function expectDashboardAfterClick(locator, label) {
+   await locator.click();
+   await page.waitForURL(`${baseUrl}/dashboard`);
+   if ((await page.locator("h1").textContent()) !== "工作台概览") {
+     throw new Error(`${label} 未进入工作台`);
+   }
+   await page.goBack();
+   await page.waitForURL(`${baseUrl}/`);
+ }
+ 
++async function expectRouteState({ pathname, title, heading }) {
++  await page.waitForURL(`${baseUrl}${pathname}`);
++  await page.waitForFunction((expectedTitle) => document.title === expectedTitle, title);
++  const routeHeadings = page.locator("[data-route-heading]");
++  await routeHeadings.first().waitFor();
++  const headingCount = await routeHeadings.count();
++  if (headingCount !== 1) throw new Error(`${pathname} 应有且仅有一个路由标题，实际 ${headingCount} 个`);
++  const routeHeading = routeHeadings.first();
++  const actualHeading = await routeHeading.textContent();
++  if (actualHeading !== heading) {
++    throw new Error(`${pathname} 路由标题文本不匹配：expected=${heading}, actual=${actualHeading}`);
++  }
++  const headingElement = await routeHeading.elementHandle();
++  await page.waitForFunction((element) => document.activeElement === element, headingElement);
++}
++
++async function expectHomeRouteState() {
++  await expectRouteState({
++    pathname: "/",
++    title: "影创工坊｜AI 出片工作台",
++    heading: "专为自媒体小白打造的AI 出片工作台",
++  });
++}
++
++async function verifyRouteHistoryAndNotFound() {
++  await page.goto(`${baseUrl}/dashboard`, { waitUntil: "domcontentloaded" });
++  await expectRouteState({
++    pathname: "/dashboard",
++    title: "工作台概览｜影创工坊",
++    heading: "工作台概览",
++  });
++
++  await page.reload({ waitUntil: "domcontentloaded" });
++  await expectRouteState({
++    pathname: "/dashboard",
++    title: "工作台概览｜影创工坊",
++    heading: "工作台概览",
++  });
++
++  await page.getByRole("link", { name: "影创工坊" }).click();
++  await expectHomeRouteState();
++
++  await page.goBack();
++  await expectRouteState({
++    pathname: "/dashboard",
++    title: "工作台概览｜影创工坊",
++    heading: "工作台概览",
++  });
++
++  await page.goForward();
++  await expectHomeRouteState();
++
++  await page.goto(`${baseUrl}/missing-route`, { waitUntil: "domcontentloaded" });
++  await expectRouteState({
++    pathname: "/missing-route",
++    title: "页面未找到｜影创工坊",
++    heading: "页面未找到",
++  });
++
++  await page.getByRole("link", { name: "返回官网" }).click();
++  await expectHomeRouteState();
++  await page.goBack();
++  await expectRouteState({
++    pathname: "/missing-route",
++    title: "页面未找到｜影创工坊",
++    heading: "页面未找到",
++  });
++  await page.getByRole("link", { name: "前往工作台" }).click();
++  await expectRouteState({
++    pathname: "/dashboard",
++    title: "工作台概览｜影创工坊",
++    heading: "工作台概览",
++  });
++}
++
+ async function verifyCreationEntries() {
+   await page.goto(`${baseUrl}/`, { waitUntil: "domcontentloaded" });
+   const startButtons = page.getByRole("button", { name: /^开始创作/ });
+   const startButtonCount = await startButtons.count();
+   if (startButtonCount !== 2) {
+     throw new Error(`开始创作入口应为 2 个，实际为 ${startButtonCount} 个`);
+   }
+   await expectDashboardAfterClick(
+     startButtons.first(),
+     "Hero 开始创作",
+@@ -102,22 +175,17 @@ async function verifyPreservedWebsiteBehaviors() {
+   await page.getByRole("status").getByText("登录流程待接入", { exact: true }).waitFor();
+   await page.getByRole("button", { name: "关闭提示" }).click();
+ 
+   await page.getByRole("button", { name: "价格", exact: true }).first().click();
+   await page.getByRole("status").getByText("价格页待接入", { exact: true }).waitFor();
+ }
+ 
+ try {
+   await verifyCreationEntries();
+   await verifyPreservedWebsiteBehaviors();
+-  await page.goto(`${baseUrl}/dashboard`, { waitUntil: "domcontentloaded" });
+-  if ((await page.locator("h1").textContent()) !== "工作台概览") {
+-    throw new Error("/dashboard 应渲染工作台概览而不是官网");
+-  }
+-  await page.goto(`${baseUrl}/missing-route`, { waitUntil: "domcontentloaded" });
+-  await page.getByRole("heading", { name: "页面未找到" }).waitFor();
++  await verifyRouteHistoryAndNotFound();
+   if (failures.length > 0) throw new Error(`路由访问存在浏览器错误:\n${failures.join("\n")}`);
+ } finally {
+   await browser.close();
+ }
+ 
+ console.log("路由骨架验收通过");
+diff --git a/docs/web/homepage-prototype/src/components/HeroSection.jsx b/docs/web/homepage-prototype/src/components/HeroSection.jsx
+index ec73fc1..d9485d4 100644
+--- a/docs/web/homepage-prototype/src/components/HeroSection.jsx
++++ b/docs/web/homepage-prototype/src/components/HeroSection.jsx
+@@ -162,21 +162,21 @@ export function HeroSection({ onStart, onViewDemo }) {
+         <div className="hero-mirror-floor__workbench-reflection">
+           <i />
+           <i />
+           <i />
+         </div>
+       </div>
+       <ThreeHeroScene heroRef={heroRef} workbenchRef={workbenchRef} poseName={poseName} />
+       <div className="hero-main page-container">
+         <div className="hero-copy">
+           <div className="eyebrow">AI 视频创作 · 小白也能做专业视频</div>
+-          <h1><span>专为自媒体小白打造的</span><strong>AI 出片工作台</strong></h1>
++          <h1 data-route-heading tabIndex="-1"><span>专为自媒体小白打造的</span><strong>AI 出片工作台</strong></h1>
+           <p>
+             <span className="hero-description--desktop">上传素材，AI 自动完成剪辑、文案、配音、字幕与合成。短剧解说、视频翻译、智能混剪，一个工作台搞定。</span>
+             <span className="hero-description--mobile">上传素材，AI 自动完成剪辑、文案、配音、字幕与合成。</span>
+           </p>
+           <div className="hero-actions">
+             <button className="primary-button" type="button" onClick={onStart}>开始创作 <ArrowRight size={22} /></button>
+             <button className="secondary-button" type="button" onClick={onViewDemo}><Play size={18} weight="fill" /> 查看案例</button>
+           </div>
+         </div>
+         <HeroWorkbench workbenchRef={workbenchRef} />

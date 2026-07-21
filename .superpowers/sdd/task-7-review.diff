@@ -1,0 +1,98 @@
+# Review package: 742a59b77a114853a9faa964c1f8750841c3f15a..34c984d
+
+## Commits
+34c984d fix: resolve dashboard acceptance gaps
+
+## Files changed
+ .../scripts/verify-dashboard.mjs                   | 36 ++++++++++++++++++++++
+ .../homepage-prototype/src/styles/dashboard.css    |  1 +
+ 2 files changed, 37 insertions(+)
+
+## Diff
+diff --git a/docs/web/homepage-prototype/scripts/verify-dashboard.mjs b/docs/web/homepage-prototype/scripts/verify-dashboard.mjs
+index 533b9df..92631ee 100644
+--- a/docs/web/homepage-prototype/scripts/verify-dashboard.mjs
++++ b/docs/web/homepage-prototype/scripts/verify-dashboard.mjs
+@@ -186,20 +186,56 @@ try {
+   check(await membershipEntry.evaluate((element) => document.activeElement === element), "会员入口可获得键盘焦点");
+   for (const accountAction of [
+     page.getByRole("button", { name: "查看创作点余额 1,280" }),
+     page.getByRole("button", { name: "去充值" }),
+     page.locator(".dashboard-account__avatar"),
+   ]) {
+     await accountAction.focus();
+     check(await accountAction.evaluate((element) => document.activeElement === element), "账户区操作可获得键盘焦点");
+   }
+ 
++  const dashboardImages = page.locator(".dashboard-shell img");
++  check((await dashboardImages.count()) > 0, "Dashboard 存在允许的项目或灵感内容图片");
++  await dashboardImages.evaluateAll((images) => {
++    images.forEach((image) => {
++      image.hidden = true;
++    });
++  });
++  const imageHiddenMetrics = await page.evaluate(() => ({
++    imagesHidden: [...document.querySelectorAll(".dashboard-shell img")].every(
++      (image) => image.hidden && getComputedStyle(image).display === "none",
++    ),
++    logo: Boolean(document.querySelector(".dashboard-shell a[href='/']")),
++    banner: Boolean(document.querySelector("[data-dashboard-banner]")),
++    heading: document.querySelector("h1")?.textContent.trim(),
++    projectStates: document.querySelectorAll("[data-project-status]").length,
++    progress: document.querySelector("progress")?.value,
++    balance: document.body.textContent.includes("1,280"),
++    monthlyCredits: document.body.textContent.includes("240 创作点"),
++  }));
++  check(imageHiddenMetrics.imagesHidden, "设置 hidden 后所有 Dashboard 内容图片均不可见");
++  check(
++    imageHiddenMetrics.logo &&
++      imageHiddenMetrics.banner &&
++      imageHiddenMetrics.heading === "工作台概览" &&
++      imageHiddenMetrics.projectStates === 3 &&
++      imageHiddenMetrics.progress === 66 &&
++      imageHiddenMetrics.balance &&
++      imageHiddenMetrics.monthlyCredits,
++    "隐藏全部内容图片后 Dashboard 主体结构仍完整",
++  );
++  await dashboardImages.evaluateAll((images) => {
++    images.forEach((image) => {
++      image.hidden = false;
++    });
++  });
++
+   for (const width of [1280, 1025]) {
+     await page.setViewportSize({ width, height: 1058 });
+     const responsiveMetrics = await page.evaluate(() => {
+       const sidebar = document.querySelector(".dashboard-sidebar").getBoundingClientRect();
+       const main = document.querySelector(".dashboard-main").getBoundingClientRect();
+       const creation = document.querySelector(".creation-entry-card").getBoundingClientRect();
+       const tools = [...document.querySelectorAll(".tool-quick-start__card")].map((element) =>
+         element.getBoundingClientRect().width,
+       );
+       return {
+diff --git a/docs/web/homepage-prototype/src/styles/dashboard.css b/docs/web/homepage-prototype/src/styles/dashboard.css
+index ba018ec..a28ae41 100644
+--- a/docs/web/homepage-prototype/src/styles/dashboard.css
++++ b/docs/web/homepage-prototype/src/styles/dashboard.css
+@@ -363,20 +363,21 @@
+ .dashboard-section-heading h2 { margin: 0; font-size: 19px; font-weight: 530; }
+ .dashboard-section-heading button { display: inline-flex; align-items: center; gap: 5px; padding: 6px; border: 0; background: transparent; color: var(--dashboard-text-muted); cursor: pointer; }
+ .dashboard-section-heading button:hover { color: #fff; }
+ 
+ .recent-projects__list { display: grid; gap: 9px; margin-top: 17px; }
+ .recent-projects__item { display: grid; grid-template-columns: 112px minmax(0, 1fr) 90px; align-items: center; min-height: 83px; gap: 14px; width: 100%; padding: 4px 11px 4px 4px; border: 1px solid rgba(117, 139, 177, 0.18); border-radius: 8px; background: rgba(9, 17, 31, 0.66); color: var(--dashboard-text); text-align: left; cursor: pointer; }
+ .recent-projects__item:hover { border-color: var(--dashboard-border-strong); background: var(--dashboard-panel-hover); }
+ .dashboard-thumbnail { display: block; overflow: hidden; border-radius: 5px; background: #111827; }
+ .recent-projects__item .dashboard-thumbnail { width: 112px; height: 73px; }
+ .dashboard-thumbnail img { width: 100%; height: 100%; object-fit: cover; }
++.dashboard-shell img[hidden] { display: none; }
+ .dashboard-thumbnail__fallback { display: grid; place-items: center; width: 100%; height: 100%; padding: 8px; background: linear-gradient(145deg, #18243b, #0b1323); color: #8290a8; font-size: 12px; text-align: center; }
+ .recent-projects__details { display: grid; gap: 10px; min-width: 0; }
+ .recent-projects__details strong { overflow: hidden; font-size: 16px; font-weight: 520; text-overflow: ellipsis; white-space: nowrap; }
+ .recent-projects__details small { color: var(--dashboard-text-muted); font-size: 12px; }
+ .recent-projects__status { display: grid; justify-items: end; gap: 7px; font-size: 14px; }
+ .recent-projects__credits { color: var(--dashboard-text-muted); font-size: 11px; font-weight: 400; }
+ .recent-projects__status--complete { color: var(--dashboard-success); }
+ .recent-projects__status--processing { color: var(--dashboard-warning); }
+ .recent-projects__status--draft { color: var(--dashboard-cyan); }
+ .recent-projects__status progress { width: 70px; height: 4px; overflow: hidden; border: 0; border-radius: 4px; accent-color: var(--dashboard-warning); }

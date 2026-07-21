@@ -1,0 +1,1322 @@
+diff -ruN /tmp/narrato-i18n/task4-before/src/components/create/CreationSummary.jsx docs/web/homepage-prototype/src/components/create/CreationSummary.jsx
+--- /tmp/narrato-i18n/task4-before/src/components/create/CreationSummary.jsx	2026-07-15 22:09:33
++++ docs/web/homepage-prototype/src/components/create/CreationSummary.jsx	2026-07-15 22:13:11
+@@ -1,22 +1,25 @@
++import { useI18n } from "../../i18n/useI18n.js";
++
+ export function CreationSummary({ durationLabel, estimatedCredits, balance, onNext }) {
++  const { formatNumber, t } = useI18n();
+   return (
+     <aside className="create-summary" aria-labelledby="create-summary-heading">
+-      <h2 id="create-summary-heading">创作小结</h2>
++      <h2 id="create-summary-heading">{t("create.summary.title")}</h2>
+       <dl>
+         <div>
+-          <dt>源视频总时长</dt>
++          <dt>{t("create.summary.duration")}</dt>
+           <dd className="create-summary__duration">{durationLabel}</dd>
+         </div>
+         <div>
+-          <dt>预计消耗</dt>
+-          <dd className="create-summary__credits">{estimatedCredits} <span>创作点</span></dd>
++          <dt>{t("create.summary.estimated")}</dt>
++          <dd className="create-summary__credits">{formatNumber(estimatedCredits)} <span>{t("dashboard.credits.title")}</span></dd>
+         </div>
+         <div>
+-          <dt>当前余额</dt>
+-          <dd className="create-summary__balance">{balance.toLocaleString("en-US")}</dd>
++          <dt>{t("create.summary.balance")}</dt>
++          <dd className="create-summary__balance">{formatNumber(balance)}</dd>
+         </div>
+       </dl>
+-      <button className="create-summary__next" type="button" onClick={onNext}>下一步：设置参数</button>
++      <button className="create-summary__next" type="button" onClick={onNext}>{t("create.summary.next")}</button>
+     </aside>
+   );
+ }
+diff -ruN /tmp/narrato-i18n/task4-before/src/components/create/CreationTypeSelector.jsx docs/web/homepage-prototype/src/components/create/CreationTypeSelector.jsx
+--- /tmp/narrato-i18n/task4-before/src/components/create/CreationTypeSelector.jsx	2026-07-15 22:09:33
++++ docs/web/homepage-prototype/src/components/create/CreationTypeSelector.jsx	2026-07-15 22:13:12
+@@ -1,10 +1,12 @@
+ import { Check } from "@phosphor-icons/react";
++import { useI18n } from "../../i18n/useI18n.js";
+ 
+ export function CreationTypeSelector({ types, selectedType, onChange }) {
++  const { t } = useI18n();
+   return (
+     <section className="create-type-section" aria-labelledby="create-type-heading">
+-      <h2 id="create-type-heading">选择创作类型</h2>
+-      <div className="create-type-grid" role="group" aria-label="创作类型">
++      <h2 id="create-type-heading">{t("create.typeSelector.title")}</h2>
++      <div className="create-type-grid" role="group" aria-label={t("create.typeSelector.ariaLabel")}>
+         {types.map((type) => {
+           const Icon = type.icon;
+           const selected = selectedType === type.id;
+@@ -19,8 +21,8 @@
+             >
+               {selected && <span className="create-type-card__check"><Check weight="bold" aria-hidden="true" /></span>}
+               <Icon className="create-type-card__icon" weight="duotone" aria-hidden="true" />
+-              <strong>{type.title}</strong>
+-              <small>{type.description}</small>
++              <strong>{t(type.titleKey)}</strong>
++              <small>{t(type.descriptionKey)}</small>
+             </button>
+           );
+         })}
+diff -ruN /tmp/narrato-i18n/task4-before/src/components/create/UploadedVideoList.jsx docs/web/homepage-prototype/src/components/create/UploadedVideoList.jsx
+--- /tmp/narrato-i18n/task4-before/src/components/create/UploadedVideoList.jsx	2026-07-15 22:09:33
++++ docs/web/homepage-prototype/src/components/create/UploadedVideoList.jsx	2026-07-15 22:13:12
+@@ -1,8 +1,10 @@
+ import { CheckCircle, DotsSixVertical, FilmStrip, Trash, WarningCircle } from "@phosphor-icons/react";
++import { useI18n } from "../../i18n/useI18n.js";
+ 
+ export function UploadedVideoList({ videos, onRemove, onSubtitleSelect }) {
++  const { t } = useI18n();
+   return (
+-    <div className="create-video-list" aria-label="已选择视频">
++    <div className="create-video-list" aria-label={t("create.upload.selectedVideos")}>
+       {videos.map((video, index) => {
+         const StatusIcon = video.statusTone === "success" ? CheckCircle : WarningCircle;
+         return (
+@@ -19,16 +21,16 @@
+                 className="create-file-input"
+                 type="file"
+                 accept=".srt,application/x-subrip,text/plain"
+-                aria-label={`为 ${video.name} 上传字幕`}
++                aria-label={t("create.upload.uploadSubtitle", { name: video.name })}
+                 onChange={(event) => {
+                   if (event.target.files?.[0]) onSubtitleSelect(video.id, event.target.files[0]);
+                   event.target.value = "";
+                 }}
+               />
+               <StatusIcon weight="bold" aria-hidden="true" />
+-              <span>{video.subtitleName || "点击上传字幕，或AI 智能识别"}</span>
++              <span>{video.subtitleName || t(video.subtitleStatusKey || "create.subtitle.clickOrAi")}</span>
+             </label>
+-            <button type="button" aria-label={`删除 ${video.name}`} onClick={() => onRemove(video.id)}>
++            <button type="button" aria-label={t("create.upload.removeVideo", { name: video.name })} onClick={() => onRemove(video.id)}>
+               <Trash aria-hidden="true" />
+             </button>
+           </article>
+diff -ruN /tmp/narrato-i18n/task4-before/src/components/create/VideoUploadPanel.jsx docs/web/homepage-prototype/src/components/create/VideoUploadPanel.jsx
+--- /tmp/narrato-i18n/task4-before/src/components/create/VideoUploadPanel.jsx	2026-07-15 22:09:33
++++ docs/web/homepage-prototype/src/components/create/VideoUploadPanel.jsx	2026-07-15 22:13:12
+@@ -1,8 +1,10 @@
+ import { CloudArrowUp, PlusCircle } from "@phosphor-icons/react";
+ import { useRef } from "react";
+ import { UploadedVideoList } from "./UploadedVideoList.jsx";
++import { useI18n } from "../../i18n/useI18n.js";
+ 
+ export function VideoUploadPanel({ videos, maxVideos, isDragging, onFiles, onDragStateChange, onRemove, onSubtitleSelect }) {
++  const { formatNumber, t } = useI18n();
+   const inputRef = useRef(null);
+   const handleFiles = (files) => {
+     if (files?.length) onFiles([...files]);
+@@ -10,7 +12,7 @@
+ 
+   return (
+     <section className="create-upload-section" aria-labelledby="create-upload-heading">
+-      <h2 id="create-upload-heading">上传素材</h2>
++      <h2 id="create-upload-heading">{t("create.upload.title")}</h2>
+       <div
+         className={`create-video-dropzone${isDragging ? " is-dragging" : ""}`}
+         onDragEnter={(event) => { event.preventDefault(); onDragStateChange(true); }}
+@@ -30,6 +32,7 @@
+           type="file"
+           accept="video/mp4,video/quicktime,video/x-msvideo,.mp4,.mov,.avi"
+           multiple
++          aria-label={t("create.upload.chooseVideos")}
+           onChange={(event) => {
+             handleFiles(event.target.files);
+             event.target.value = "";
+@@ -37,12 +40,12 @@
+         />
+         <button className="create-upload-add" type="button" onClick={() => inputRef.current?.click()}>
+           <PlusCircle aria-hidden="true" />
+-          继续添加
++          {t("create.upload.addMore")}
+         </button>
+         <div className="create-dropzone-copy">
+           <CloudArrowUp weight="duotone" aria-hidden="true" />
+-          <p>拖拽视频到这里，或 <button type="button" onClick={() => inputRef.current?.click()}>点击选择文件</button></p>
+-          <small>支持 MP4 / MOV / AVI，单个文件最大 5GB，最多 {maxVideos} 个</small>
++          <p>{t("create.upload.dragPrefix")} <button type="button" onClick={() => inputRef.current?.click()}>{t("create.upload.chooseFile")}</button></p>
++          <small>{t("create.upload.limits", { count: formatNumber(maxVideos) })}</small>
+         </div>
+         <UploadedVideoList videos={videos} onRemove={onRemove} onSubtitleSelect={onSubtitleSelect} />
+       </div>
+diff -ruN /tmp/narrato-i18n/task4-before/src/components/dashboard/CreationEntryCard.jsx docs/web/homepage-prototype/src/components/dashboard/CreationEntryCard.jsx
+--- /tmp/narrato-i18n/task4-before/src/components/dashboard/CreationEntryCard.jsx	2026-07-15 22:09:33
++++ docs/web/homepage-prototype/src/components/dashboard/CreationEntryCard.jsx	2026-07-15 22:12:23
+@@ -1,23 +1,25 @@
+ import { ArrowUpRight } from "@phosphor-icons/react";
+ import { Link } from "react-router-dom";
++import { useI18n } from "../../i18n/useI18n.js";
+ 
+ export function CreationEntryCard({ action, onUnavailable }) {
++  const { t } = useI18n();
+   const Icon = action.icon;
+   return (
+     <article className="creation-entry-card">
+       <span className="creation-entry-card__icon" aria-hidden="true"><Icon /></span>
+       <div>
+-        <p className="creation-entry-card__eyebrow">开始一次新的 AI 创作</p>
+-        <h2>新建创作</h2>
+-        <p className="creation-entry-card__description">上传素材，跟随引导完成专业出片</p>
++        <p className="creation-entry-card__eyebrow">{t("dashboard.creation.eyebrow")}</p>
++        <h2>{t("dashboard.creation.title")}</h2>
++        <p className="creation-entry-card__description">{t("dashboard.creation.description")}</p>
+       </div>
+       {action.to ? (
+-        <Link to={action.to} aria-label={action.label}>
+-          {action.label}<ArrowUpRight aria-hidden="true" />
++        <Link to={action.to} aria-label={t(action.labelKey)}>
++          {t(action.labelKey)}<ArrowUpRight aria-hidden="true" />
+         </Link>
+       ) : (
+-        <button type="button" onClick={() => onUnavailable(action.unavailableMessage)}>
+-          {action.label}<ArrowUpRight aria-hidden="true" />
++        <button type="button" onClick={() => onUnavailable(t(action.unavailableMessageKey))}>
++          {t(action.labelKey)}<ArrowUpRight aria-hidden="true" />
+         </button>
+       )}
+     </article>
+diff -ruN /tmp/narrato-i18n/task4-before/src/components/dashboard/CreditsOverview.jsx docs/web/homepage-prototype/src/components/dashboard/CreditsOverview.jsx
+--- /tmp/narrato-i18n/task4-before/src/components/dashboard/CreditsOverview.jsx	2026-07-15 22:09:33
++++ docs/web/homepage-prototype/src/components/dashboard/CreditsOverview.jsx	2026-07-15 22:12:24
+@@ -1,15 +1,17 @@
+ import { ArrowUpRight, Coins } from "@phosphor-icons/react";
++import { useI18n } from "../../i18n/useI18n.js";
+ 
+ export function CreditsOverview({ credits, onUnavailable }) {
++  const { formatNumber, t } = useI18n();
+   return (
+     <section className="credits-overview" aria-labelledby="credits-title">
+-      <div className="dashboard-section-heading credits-overview__heading"><p>账户资源</p><h2 id="credits-title">创作点</h2></div>
++      <div className="dashboard-section-heading credits-overview__heading"><p>{t("dashboard.credits.resource")}</p><h2 id="credits-title">{t("dashboard.credits.title")}</h2></div>
+       <span className="credits-overview__icon" aria-hidden="true"><Coins /></span>
+       <span className="credits-ring" aria-hidden="true" />
+-      <p className="credits-overview__balance-label">当前余额</p>
+-      <strong className="credits-overview__balance-value">{credits.balance.toLocaleString("en-US")}</strong>
+-      <p className="credits-overview__usage"><span aria-hidden="true" />本月已使用 {credits.monthlyUsed} 创作点</p>
+-      <button className="credits-overview__action" type="button" onClick={() => onUnavailable("充值创作点功能建设中")}>充值创作点<ArrowUpRight aria-hidden="true" /></button>
++      <p className="credits-overview__balance-label">{t("dashboard.credits.balance")}</p>
++      <strong className="credits-overview__balance-value">{formatNumber(credits.balance)}</strong>
++      <p className="credits-overview__usage"><span aria-hidden="true" />{t("dashboard.credits.monthlyUsed", { count: formatNumber(credits.monthlyUsed) })}</p>
++      <button className="credits-overview__action" type="button" aria-label={t("dashboard.credits.recharge")} onClick={() => onUnavailable(t("dashboard.unavailable.rechargeCredits"))}>{t("dashboard.credits.recharge")}<ArrowUpRight aria-hidden="true" /></button>
+     </section>
+   );
+ }
+diff -ruN /tmp/narrato-i18n/task4-before/src/components/dashboard/DashboardHeader.jsx docs/web/homepage-prototype/src/components/dashboard/DashboardHeader.jsx
+--- /tmp/narrato-i18n/task4-before/src/components/dashboard/DashboardHeader.jsx	2026-07-15 22:09:33
++++ docs/web/homepage-prototype/src/components/dashboard/DashboardHeader.jsx	2026-07-15 22:26:44
+@@ -1,31 +1,37 @@
+ import { UserCircle } from "@phosphor-icons/react";
+ import { Link } from "react-router-dom";
+ import { BrandMark } from "../BrandMark.jsx";
++import { LanguageSwitcher } from "../i18n/LanguageSwitcher.jsx";
++import { useI18n } from "../../i18n/useI18n.js";
+ 
+ export function DashboardHeader({ credits, onUnavailable }) {
++  const { formatNumber, t } = useI18n();
+   return (
+     <header className="dashboard-header">
+-      <Link className="dashboard-header--mobile" to="/" aria-label="影创工坊">
++      <Link className="dashboard-header--mobile" to="/" aria-label={t("dashboard.header.home")}>
+         <BrandMark />
+       </Link>
+-      <div className="dashboard-account" aria-label="账户快捷操作">
++      <div className="dashboard-account-cluster" role="group" aria-label={t("dashboard.header.accountActions")}>
++        <div className="dashboard-account">
++          <LanguageSwitcher compact />
++          <button
++            className="dashboard-account__balance"
++            type="button"
++            aria-label={t("dashboard.header.viewBalance", { balance: formatNumber(credits.balance) })}
++            onClick={() => onUnavailable(t("dashboard.unavailable.creditDetails"))}
++          >
++            <span>{t("dashboard.credits.title")}</span>
++            <strong>{formatNumber(credits.balance)}</strong>
++          </button>
++          <button className="dashboard-account__recharge" type="button" onClick={() => onUnavailable(t("dashboard.unavailable.recharge"))}>
++            {t("dashboard.header.recharge")}
++          </button>
++        </div>
+         <button
+-          className="dashboard-account__balance"
+-          type="button"
+-          aria-label={`查看创作点余额 ${credits.balance.toLocaleString("en-US")}`}
+-          onClick={() => onUnavailable("创作点明细功能建设中")}
+-        >
+-          <span>创作点</span>
+-          <strong>{credits.balance.toLocaleString("en-US")}</strong>
+-        </button>
+-        <button className="dashboard-account__recharge" type="button" onClick={() => onUnavailable("充值功能建设中")}>
+-          去充值
+-        </button>
+-        <button
+           className="dashboard-account__avatar"
+           type="button"
+-          aria-label="账户中心"
+-          onClick={() => onUnavailable("账户中心功能建设中")}
++          aria-label={t("dashboard.nav.account")}
++          onClick={() => onUnavailable(t("dashboard.unavailable.account"))}
+         >
+           <UserCircle aria-hidden="true" />
+         </button>
+diff -ruN /tmp/narrato-i18n/task4-before/src/components/dashboard/DashboardMobileNav.jsx docs/web/homepage-prototype/src/components/dashboard/DashboardMobileNav.jsx
+--- /tmp/narrato-i18n/task4-before/src/components/dashboard/DashboardMobileNav.jsx	2026-07-15 22:09:33
++++ docs/web/homepage-prototype/src/components/dashboard/DashboardMobileNav.jsx	2026-07-15 22:12:24
+@@ -1,17 +1,19 @@
+ import { NavLink } from "react-router-dom";
++import { useI18n } from "../../i18n/useI18n.js";
+ 
+ export function DashboardMobileNav({ items, onUnavailable }) {
+-  const mobileLabels = { overview: "概览", create: "新建", projects: "项目", account: "我的" };
++  const { t } = useI18n();
++  const mobileLabels = { overview: "dashboard.mobile.overview", create: "dashboard.mobile.create", projects: "dashboard.mobile.projects", account: "dashboard.mobile.account" };
+   const visibleItems = items.filter((item) => Object.hasOwn(mobileLabels, item.id));
+   return (
+-    <nav className="dashboard-mobile-nav" aria-label="移动工作台导航">
++    <nav className="dashboard-mobile-nav" aria-label={t("dashboard.mobile.navigation")}>
+       {visibleItems.map((item) => {
+         const Icon = item.icon;
+-        const content = <><Icon aria-hidden="true" /><span>{mobileLabels[item.id]}</span></>;
++        const content = <><Icon aria-hidden="true" /><span>{t(mobileLabels[item.id])}</span></>;
+         return item.to ? (
+           <NavLink to={item.to} end={item.id !== "projects"} key={item.id}>{content}</NavLink>
+         ) : (
+-          <button type="button" onClick={() => onUnavailable(item.unavailableMessage)} key={item.id}>{content}</button>
++          <button type="button" onClick={() => onUnavailable(t(item.unavailableMessageKey))} key={item.id}>{content}</button>
+         );
+       })}
+     </nav>
+diff -ruN /tmp/narrato-i18n/task4-before/src/components/dashboard/DashboardSidebar.jsx docs/web/homepage-prototype/src/components/dashboard/DashboardSidebar.jsx
+--- /tmp/narrato-i18n/task4-before/src/components/dashboard/DashboardSidebar.jsx	2026-07-15 22:09:33
++++ docs/web/homepage-prototype/src/components/dashboard/DashboardSidebar.jsx	2026-07-15 22:12:24
+@@ -1,35 +1,38 @@
+ import { ArrowRight, CrownSimple } from "@phosphor-icons/react";
+ import { Link, NavLink } from "react-router-dom";
+ import { BrandMark } from "../BrandMark.jsx";
++import { useI18n } from "../../i18n/useI18n.js";
+ 
+ function NavigationItem({ item, onUnavailable }) {
++  const { t } = useI18n();
+   const Icon = item.icon;
+-  const content = <><Icon aria-hidden="true" /><span>{item.label}</span></>;
++  const content = <><Icon aria-hidden="true" /><span>{t(item.labelKey)}</span></>;
+ 
+   return item.to ? (
+     <NavLink to={item.to} end={item.id !== "projects"}>{content}</NavLink>
+   ) : (
+-    <button type="button" onClick={() => onUnavailable(item.unavailableMessage)}>{content}</button>
++    <button type="button" onClick={() => onUnavailable(t(item.unavailableMessageKey))}>{content}</button>
+   );
+ }
+ 
+ export function DashboardSidebar({ items, onUnavailable }) {
++  const { t } = useI18n();
+   const groups = [
+     { id: "main", label: null },
+-    { id: "tools", label: "工具" },
+-    { id: "account", label: "账户" },
++    { id: "tools", labelKey: "dashboard.sidebar.tools" },
++    { id: "account", labelKey: "dashboard.sidebar.account" },
+   ];
+ 
+   return (
+     <aside className="dashboard-sidebar">
+-      <Link className="dashboard-sidebar__brand" to="/" aria-label="影创工坊">
++      <Link className="dashboard-sidebar__brand" to="/" aria-label={t("dashboard.header.home")}>
+         <BrandMark />
+       </Link>
+-      <nav aria-label="工作台主导航">
++      <nav aria-label={t("dashboard.sidebar.navigation")}>
+         {groups.map((group) => (
+           <div className={`dashboard-sidebar__group dashboard-sidebar__group--${group.id}`} key={group.id}>
+-            {group.label && (
+-              <p className="dashboard-sidebar__group-title"><span>{group.label}</span><i aria-hidden="true" /></p>
++            {group.labelKey && (
++              <p className="dashboard-sidebar__group-title"><span>{t(group.labelKey)}</span><i aria-hidden="true" /></p>
+             )}
+             {items.filter((item) => item.group === group.id).map((item) => (
+               <NavigationItem item={item} onUnavailable={onUnavailable} key={item.id} />
+@@ -40,12 +43,12 @@
+       <button
+         className="dashboard-membership-card"
+         type="button"
+-        onClick={() => onUnavailable("升级会员功能建设中")}
++        onClick={() => onUnavailable(t("dashboard.unavailable.upgrade"))}
+       >
+         <CrownSimple className="dashboard-membership-card__icon" aria-hidden="true" />
+         <span className="dashboard-membership-card__copy">
+-          <strong>升级会员</strong>
+-          <small>解锁更多权限，创作更高效</small>
++          <strong>{t("dashboard.membership.title")}</strong>
++          <small>{t("dashboard.membership.description")}</small>
+         </span>
+         <ArrowRight className="dashboard-membership-card__arrow" aria-hidden="true" />
+       </button>
+diff -ruN /tmp/narrato-i18n/task4-before/src/components/dashboard/DashboardThumbnail.jsx docs/web/homepage-prototype/src/components/dashboard/DashboardThumbnail.jsx
+--- /tmp/narrato-i18n/task4-before/src/components/dashboard/DashboardThumbnail.jsx	2026-07-15 22:09:33
++++ docs/web/homepage-prototype/src/components/dashboard/DashboardThumbnail.jsx	2026-07-15 22:12:24
+@@ -1,6 +1,8 @@
+ import { useState } from "react";
++import { useI18n } from "../../i18n/useI18n.js";
+ 
+ export function DashboardThumbnail({ src, alt, fallbackLabel }) {
++  const { t } = useI18n();
+   const [failed, setFailed] = useState(false);
+ 
+   return (
+@@ -18,7 +20,7 @@
+         <span
+           className="dashboard-thumbnail__fallback"
+           role="img"
+-          aria-label={`${fallbackLabel}缩略图不可用`}
++          aria-label={t("dashboard.thumbnailUnavailable", { name: fallbackLabel })}
+         >
+           {fallbackLabel}
+         </span>
+diff -ruN /tmp/narrato-i18n/task4-before/src/components/dashboard/DashboardToast.jsx docs/web/homepage-prototype/src/components/dashboard/DashboardToast.jsx
+--- /tmp/narrato-i18n/task4-before/src/components/dashboard/DashboardToast.jsx	2026-07-15 22:09:33
++++ docs/web/homepage-prototype/src/components/dashboard/DashboardToast.jsx	2026-07-15 22:12:25
+@@ -1,10 +1,12 @@
+ import { X } from "@phosphor-icons/react";
++import { useI18n } from "../../i18n/useI18n.js";
+ 
+ export function DashboardToast({ message, onClose }) {
++  const { t } = useI18n();
+   return (
+     <div className="dashboard-toast" role="status" aria-live="polite">
+       <span>{message}</span>
+-      <button type="button" aria-label="关闭提示" onClick={onClose}><X aria-hidden="true" /></button>
++      <button type="button" aria-label={t("dashboard.toast.close")} onClick={onClose}><X aria-hidden="true" /></button>
+     </div>
+   );
+ }
+diff -ruN /tmp/narrato-i18n/task4-before/src/components/dashboard/InspirationPanel.jsx docs/web/homepage-prototype/src/components/dashboard/InspirationPanel.jsx
+--- /tmp/narrato-i18n/task4-before/src/components/dashboard/InspirationPanel.jsx	2026-07-15 22:09:33
++++ docs/web/homepage-prototype/src/components/dashboard/InspirationPanel.jsx	2026-07-15 22:12:47
+@@ -1,15 +1,17 @@
+ import { ArrowUpRight } from "@phosphor-icons/react";
+ import { DashboardThumbnail } from "./DashboardThumbnail.jsx";
++import { useI18n } from "../../i18n/useI18n.js";
+ 
+ export function InspirationPanel({ inspirations, onUnavailable }) {
++  const { t } = useI18n();
+   return (
+     <section className="inspiration-panel" aria-labelledby="inspiration-title">
+-      <div className="dashboard-section-heading"><p>探索更多</p><h2 id="inspiration-title">创作灵感</h2></div>
++      <div className="dashboard-section-heading"><p>{t("dashboard.inspiration.eyebrow")}</p><h2 id="inspiration-title">{t("dashboard.inspiration.title")}</h2></div>
+       <div className="inspiration-panel__list">
+         {inspirations.map((item) => (
+-          <button className="inspiration-panel__item" type="button" onClick={() => onUnavailable(item.unavailableMessage)} key={item.id}>
+-            <DashboardThumbnail src={item.image} alt={`${item.title}封面`} fallbackLabel={item.title} />
+-            <span className="inspiration-panel__content"><strong>{item.title}</strong><small>{item.description}</small></span>
++          <button className="inspiration-panel__item" type="button" onClick={() => onUnavailable(t(item.unavailableMessageKey))} key={item.id}>
++            <DashboardThumbnail src={item.image} alt={t("dashboard.coverAlt", { name: t(item.titleKey) })} fallbackLabel={t(item.titleKey)} />
++            <span className="inspiration-panel__content"><strong>{t(item.titleKey)}</strong><small>{t(item.descriptionKey)}</small></span>
+             <ArrowUpRight className="inspiration-panel__arrow" aria-hidden="true" />
+           </button>
+         ))}
+diff -ruN /tmp/narrato-i18n/task4-before/src/components/dashboard/PromotionBanner.jsx docs/web/homepage-prototype/src/components/dashboard/PromotionBanner.jsx
+--- /tmp/narrato-i18n/task4-before/src/components/dashboard/PromotionBanner.jsx	2026-07-15 22:09:33
++++ docs/web/homepage-prototype/src/components/dashboard/PromotionBanner.jsx	2026-07-15 22:12:48
+@@ -1,19 +1,21 @@
+ import { ArrowRight, X } from "@phosphor-icons/react";
++import { useI18n } from "../../i18n/useI18n.js";
+ 
+ export function PromotionBanner({ onClose, onUnavailable }) {
++  const { t } = useI18n();
+   return (
+-    <section className="promotion-banner" data-dashboard-banner aria-label="促销信息">
++    <section className="promotion-banner" data-dashboard-banner aria-label={t("dashboard.promotion.ariaLabel")}>
+       <span className="promotion-banner__crystal" aria-hidden="true" />
+       <span className="promotion-banner__orbit" aria-hidden="true" />
+       <span className="promotion-banner__beam" aria-hidden="true" />
+       <div className="promotion-banner__content">
+-        <p className="promotion-banner__eyebrow">限时创作加速计划</p>
+-        <h2 className="promotion-banner__title">本周升级，额外获得 20% 创作点</h2>
++        <p className="promotion-banner__eyebrow">{t("dashboard.promotion.eyebrow")}</p>
++        <h2 className="promotion-banner__title">{t("dashboard.promotion.title")}</h2>
+       </div>
+-      <button className="promotion-banner__action" type="button" onClick={() => onUnavailable("优惠活动功能建设中")}>
+-        立即查看 <ArrowRight aria-hidden="true" />
++      <button className="promotion-banner__action" type="button" onClick={() => onUnavailable(t("dashboard.unavailable.promotion"))}>
++        {t("dashboard.promotion.action")} <ArrowRight aria-hidden="true" />
+       </button>
+-      <button className="promotion-banner__close" type="button" aria-label="关闭促销信息" onClick={onClose}>
++      <button className="promotion-banner__close" type="button" aria-label={t("dashboard.promotion.close")} onClick={onClose}>
+         <X aria-hidden="true" />
+       </button>
+       <span className="promotion-banner__indicator" aria-hidden="true" />
+diff -ruN /tmp/narrato-i18n/task4-before/src/components/dashboard/RecentProjects.jsx docs/web/homepage-prototype/src/components/dashboard/RecentProjects.jsx
+--- /tmp/narrato-i18n/task4-before/src/components/dashboard/RecentProjects.jsx	2026-07-15 22:09:33
++++ docs/web/homepage-prototype/src/components/dashboard/RecentProjects.jsx	2026-07-15 22:12:48
+@@ -1,12 +1,14 @@
+ import { ArrowRight } from "@phosphor-icons/react";
+ import { DashboardThumbnail } from "./DashboardThumbnail.jsx";
++import { useI18n } from "../../i18n/useI18n.js";
+ 
+ export function RecentProjects({ projects, onUnavailable }) {
++  const { formatNumber, t } = useI18n();
+   return (
+     <section className="recent-projects" aria-labelledby="recent-projects-title">
+       <div className="dashboard-section-heading">
+-        <div><p>最近动态</p><h2 id="recent-projects-title">最近项目</h2></div>
+-        <button type="button" onClick={() => onUnavailable("全部项目功能建设中")}>查看全部<ArrowRight aria-hidden="true" /></button>
++        <div><p>{t("dashboard.recent.eyebrow")}</p><h2 id="recent-projects-title">{t("dashboard.recent.title")}</h2></div>
++        <button type="button" onClick={() => onUnavailable(t("dashboard.unavailable.allProjects"))}>{t("dashboard.recent.viewAll")}<ArrowRight aria-hidden="true" /></button>
+       </div>
+       <div className="recent-projects__list">
+         {projects.map((project) => (
+@@ -14,18 +16,18 @@
+             className="recent-projects__item"
+             type="button"
+             data-project-status={project.status}
+-            onClick={() => onUnavailable(`${project.title}功能建设中`)}
++            onClick={() => onUnavailable(t("dashboard.unavailable.project", { name: project.title }))}
+             key={project.id}
+           >
+-            <DashboardThumbnail src={project.image} alt={`${project.title}封面`} fallbackLabel={project.tool} />
++            <DashboardThumbnail src={project.image} alt={t("dashboard.coverAlt", { name: project.title })} fallbackLabel={t(`dashboard.nav.${project.type}`)} />
+             <span className="recent-projects__details">
+               <strong>{project.title}</strong>
+-              <small>{project.tool}</small>
++              <small>{t(`dashboard.nav.${project.type}`)}</small>
+             </span>
+             <span className={`recent-projects__status recent-projects__status--${project.status}`}>
+               {project.progress !== null && <progress value={project.progress} max="100">{project.progress}%</progress>}
+-              <span>{project.statusLabel}</span>
+-              <small className="recent-projects__credits">消耗 {project.credits}</small>
++              <span>{t(project.statusKey, { progress: project.progress })}</span>
++              <small className="recent-projects__credits">{t("dashboard.recent.creditsUsed", { count: formatNumber(project.credits) })}</small>
+             </span>
+             <ArrowRight className="recent-projects__arrow" aria-hidden="true" />
+           </button>
+diff -ruN /tmp/narrato-i18n/task4-before/src/components/dashboard/ToolQuickStart.jsx docs/web/homepage-prototype/src/components/dashboard/ToolQuickStart.jsx
+--- /tmp/narrato-i18n/task4-before/src/components/dashboard/ToolQuickStart.jsx	2026-07-15 22:09:33
++++ docs/web/homepage-prototype/src/components/dashboard/ToolQuickStart.jsx	2026-07-15 22:12:48
+@@ -1,11 +1,13 @@
+ import { ArrowUpRight } from "@phosphor-icons/react";
++import { useI18n } from "../../i18n/useI18n.js";
+ 
+ export function ToolQuickStart({ tools, onUnavailable }) {
++  const { t } = useI18n();
+   return (
+     <section className="tool-quick-start" aria-labelledby="quick-start-title">
+       <div className="dashboard-section-heading">
+-        <p>选择工具</p>
+-        <h2 id="quick-start-title">快速开始</h2>
++        <p>{t("dashboard.quickStart.eyebrow")}</p>
++        <h2 id="quick-start-title">{t("dashboard.quickStart.title")}</h2>
+       </div>
+       <div className="tool-quick-start__grid dashboard-tool-list">
+         {tools.map((tool) => {
+@@ -14,12 +16,12 @@
+             <button
+               className={`tool-quick-start__card tool-quick-start__card--${tool.tone}`}
+               type="button"
+-              onClick={() => onUnavailable(tool.unavailableMessage)}
++              onClick={() => onUnavailable(t(tool.unavailableMessageKey))}
+               key={tool.id}
+             >
+               <span aria-hidden="true"><Icon /></span>
+-              <strong>{tool.title}</strong>
+-              <small>{tool.description}</small>
++              <strong>{t(tool.titleKey)}</strong>
++              <small>{t(tool.descriptionKey)}</small>
+               <ArrowUpRight aria-hidden="true" />
+             </button>
+           );
+diff -ruN /tmp/narrato-i18n/task4-before/src/components/projects/ProjectFilters.jsx docs/web/homepage-prototype/src/components/projects/ProjectFilters.jsx
+--- /tmp/narrato-i18n/task4-before/src/components/projects/ProjectFilters.jsx	2026-07-15 22:09:33
++++ docs/web/homepage-prototype/src/components/projects/ProjectFilters.jsx	2026-07-15 22:13:49
+@@ -1,20 +1,22 @@
+ import { FilmSlate, FunnelSimple, MagicWand, Scissors, Translate } from "@phosphor-icons/react";
++import { useI18n } from "../../i18n/useI18n.js";
+ 
+ const categoryIcons = { all: FunnelSimple, narration: FilmSlate, translation: Translate, remix: Scissors };
+ 
+ export function ProjectFilters({ categories, activeCategory, onCategoryChange, status, statuses, onStatusChange }) {
++  const { t } = useI18n();
+   return (
+-    <div className="project-filters" aria-label="项目筛选">
+-      <div className="project-filters__categories" role="tablist" aria-label="项目类型">
++    <div className="project-filters" aria-label={t("projects.filters.ariaLabel")}>
++      <div className="project-filters__categories" role="tablist" aria-label={t("projects.filters.types")}>
+         {categories.map((category) => {
+           const Icon = categoryIcons[category.id];
+-          return <button className={activeCategory === category.id ? "is-active" : ""} type="button" role="tab" aria-selected={activeCategory === category.id} onClick={() => onCategoryChange(category.id)} key={category.id}><Icon aria-hidden="true" /><span>{category.label}</span></button>;
++          return <button className={activeCategory === category.id ? "is-active" : ""} type="button" role="tab" aria-selected={activeCategory === category.id} onClick={() => onCategoryChange(category.id)} key={category.id}><Icon aria-hidden="true" /><span>{t(category.labelKey)}</span></button>;
+         })}
+       </div>
+       <label className="project-status-select">
+-        <span className="sr-only">按状态筛选</span>
++        <span className="sr-only">{t("projects.filters.status")}</span>
+         <select value={status} onChange={(event) => onStatusChange(event.target.value)}>
+-          {statuses.map((item) => <option value={item.id} key={item.id}>{item.label}</option>)}
++          {statuses.map((item) => <option value={item.id} key={item.id}>{t(item.labelKey)}</option>)}
+         </select>
+       </label>
+     </div>
+diff -ruN /tmp/narrato-i18n/task4-before/src/components/projects/ProjectPagination.jsx docs/web/homepage-prototype/src/components/projects/ProjectPagination.jsx
+--- /tmp/narrato-i18n/task4-before/src/components/projects/ProjectPagination.jsx	2026-07-15 22:09:33
++++ docs/web/homepage-prototype/src/components/projects/ProjectPagination.jsx	2026-07-15 22:13:49
+@@ -1,5 +1,7 @@
+ import { CaretLeft, CaretRight } from "@phosphor-icons/react";
++import { useI18n } from "../../i18n/useI18n.js";
+ 
+ export function ProjectPagination({ page, pages, onPageChange }) {
+-  return <nav className="project-pagination" aria-label="项目分页"><button type="button" disabled={page === 1} aria-label="上一页" onClick={() => onPageChange(page - 1)}><CaretLeft aria-hidden="true" /></button>{Array.from({ length: pages }, (_, index) => index + 1).map((number) => <button type="button" className={page === number ? "is-active" : ""} aria-current={page === number ? "page" : undefined} onClick={() => onPageChange(number)} key={number}>{number}</button>)}<button type="button" disabled={page === pages} aria-label="下一页" onClick={() => onPageChange(page + 1)}><CaretRight aria-hidden="true" /></button><span>10 条/页</span></nav>;
++  const { formatNumber, t } = useI18n();
++  return <nav className="project-pagination" aria-label={t("projects.pagination.ariaLabel")}><button type="button" disabled={page === 1} aria-label={t("projects.pagination.previous")} onClick={() => onPageChange(page - 1)}><CaretLeft aria-hidden="true" /></button>{Array.from({ length: pages }, (_, index) => index + 1).map((number) => <button type="button" className={page === number ? "is-active" : ""} aria-label={t("projects.pagination.page", { page: formatNumber(number) })} aria-current={page === number ? "page" : undefined} onClick={() => onPageChange(number)} key={number}>{formatNumber(number)}</button>)}<button type="button" disabled={page === pages} aria-label={t("projects.pagination.next")} onClick={() => onPageChange(page + 1)}><CaretRight aria-hidden="true" /></button><span>{t("projects.pagination.perPage", { count: formatNumber(10) })}</span></nav>;
+ }
+diff -ruN /tmp/narrato-i18n/task4-before/src/components/projects/ProjectTable.jsx docs/web/homepage-prototype/src/components/projects/ProjectTable.jsx
+--- /tmp/narrato-i18n/task4-before/src/components/projects/ProjectTable.jsx	2026-07-15 22:09:33
++++ docs/web/homepage-prototype/src/components/projects/ProjectTable.jsx	2026-07-15 22:13:49
+@@ -1,34 +1,38 @@
+ import { CheckCircle, Clock, DownloadSimple, Eye, FileText, PlayCircle, WarningCircle } from "@phosphor-icons/react";
+ import { DashboardThumbnail } from "../dashboard/DashboardThumbnail.jsx";
+ import { Link } from "react-router-dom";
++import { useI18n } from "../../i18n/useI18n.js";
+ 
+ const typeIcon = { narration: FileText, translation: PlayCircle, remix: WarningCircle };
+ 
+ function ProjectStatus({ project }) {
+-  if (project.status === "processing") return <div className="project-status project-status--processing"><strong>{project.statusLabel}</strong><progress value={project.progress} max="100" aria-label={`${project.title}处理进度 ${project.progress}%`} /></div>;
++  const { t } = useI18n();
++  if (project.status === "processing") return <div className="project-status project-status--processing"><strong>{t(project.statusKey, { progress: project.progress })}</strong><progress value={project.progress} max="100" aria-label={t("projects.table.progress", { name: project.title, progress: project.progress })} /></div>;
+   const Icon = project.status === "complete" ? CheckCircle : project.status === "failed" ? WarningCircle : Clock;
+-  return <span className={`project-status project-status--${project.status}`}><Icon aria-hidden="true" />{project.statusLabel}{project.status === "failed" && <small>查看原因 ›</small>}</span>;
++  return <span className={`project-status project-status--${project.status}`}><Icon aria-hidden="true" />{t(project.statusKey)}{project.status === "failed" && <small>{t("projects.actions.reason")} ›</small>}</span>;
+ }
+ 
+ function ProjectActions({ project, onAction }) {
+-  if (project.status === "complete") return <div className="project-actions">{project.resultPath ? <Link to={project.resultPath}><Eye aria-hidden="true" />查看结果</Link> : <button type="button" onClick={() => onAction("查看结果", project)}><Eye aria-hidden="true" />查看结果</button>}<button className="project-actions__export" type="button" onClick={() => onAction("导出", project)}><DownloadSimple aria-hidden="true" />导出</button></div>;
+-  if (project.status === "processing") return <div className="project-actions"><button type="button" onClick={() => onAction("查看进度", project)}>查看进度</button></div>;
+-  if (project.status === "draft") return <div className="project-actions"><button className="project-actions__continue" type="button" onClick={() => onAction("继续编辑", project)}>继续编辑</button></div>;
+-  return <div className="project-actions"><button className="project-actions__reason" type="button" onClick={() => onAction("查看原因", project)}>查看原因</button><button className="project-actions__retry" type="button" onClick={() => onAction("重新生成", project)}>↻ 重新生成</button></div>;
++  const { t } = useI18n();
++  if (project.status === "complete") return <div className="project-actions">{project.resultPath ? <Link to={project.resultPath}><Eye aria-hidden="true" />{t("projects.actions.result")}</Link> : <button type="button" onClick={() => onAction("result", project)}><Eye aria-hidden="true" />{t("projects.actions.result")}</button>}<button className="project-actions__export" type="button" onClick={() => onAction("export", project)}><DownloadSimple aria-hidden="true" />{t("projects.actions.export")}</button></div>;
++  if (project.status === "processing") return <div className="project-actions"><button type="button" onClick={() => onAction("progress", project)}>{t("projects.actions.progress")}</button></div>;
++  if (project.status === "draft") return <div className="project-actions"><button className="project-actions__continue" type="button" onClick={() => onAction("continue", project)}>{t("projects.actions.continue")}</button></div>;
++  return <div className="project-actions"><button className="project-actions__reason" type="button" onClick={() => onAction("reason", project)}>{t("projects.actions.reason")}</button><button className="project-actions__retry" type="button" onClick={() => onAction("retry", project)}>↻ {t("projects.actions.retry")}</button></div>;
+ }
+ 
+ export function ProjectTable({ projects, onAction }) {
+-  if (projects.length === 0) return <div className="projects-empty"><FileText aria-hidden="true" /><strong>暂无匹配项目</strong><span>试试更换筛选条件或新建创作</span></div>;
++  const { formatNumber, t } = useI18n();
++  if (projects.length === 0) return <div className="projects-empty"><FileText aria-hidden="true" /><strong>{t("projects.empty.title")}</strong><span>{t("projects.empty.description")}</span></div>;
+   return (
+     <div className="projects-table-wrap">
+       <table className="projects-table">
+-        <thead><tr><th>项目</th><th>类型</th><th>状态</th><th>创建时间</th><th>创作点</th><th>操作</th></tr></thead>
++        <thead><tr><th>{t("projects.table.project")}</th><th>{t("projects.table.type")}</th><th>{t("projects.table.status")}</th><th>{t("projects.table.created")}</th><th>{t("projects.table.credits")}</th><th>{t("projects.table.actions")}</th></tr></thead>
+         <tbody>{projects.map((project) => {
+           const Icon = typeIcon[project.type];
+           return <tr key={project.id}>
+-            <td><div className="project-name"><DashboardThumbnail src={project.image} alt={`${project.title}缩略图`} fallbackLabel={project.title} /><div><strong>{project.title}</strong><small><Clock aria-hidden="true" />{project.duration}</small></div></div></td>
+-            <td><span className={`project-type project-type--${project.type}`}><Icon aria-hidden="true" />{project.typeLabel}</span></td>
+-            <td><ProjectStatus project={project} /></td><td className="project-date">{project.createdAt}</td><td className="project-credits">{project.credits}</td><td><ProjectActions project={project} onAction={onAction} /></td>
++            <td><div className="project-name"><DashboardThumbnail src={project.image} alt={t("dashboard.thumbnailAlt", { name: project.title })} fallbackLabel={project.title} /><div><strong>{project.title}</strong><small><Clock aria-hidden="true" />{project.duration}</small></div></div></td>
++            <td><span className={`project-type project-type--${project.type}`}><Icon aria-hidden="true" />{t(project.typeKey)}</span></td>
++            <td><ProjectStatus project={project} /></td><td className="project-date">{project.createdAt}</td><td className="project-credits">{formatNumber(project.credits)}</td><td><ProjectActions project={project} onAction={onAction} /></td>
+           </tr>;
+         })}</tbody>
+       </table>
+diff -ruN /tmp/narrato-i18n/task4-before/src/data/createData.js docs/web/homepage-prototype/src/data/createData.js
+--- /tmp/narrato-i18n/task4-before/src/data/createData.js	2026-07-15 22:09:33
++++ docs/web/homepage-prototype/src/data/createData.js	2026-07-15 22:11:48
+@@ -3,24 +3,24 @@
+ export const creationTypes = [
+   {
+     id: "narration",
+-    title: "短剧解说",
+-    description: "加旁白讲剧情",
++    titleKey: "create.types.narration.title",
++    descriptionKey: "create.types.narration.description",
+     icon: FilmSlate,
+     tone: "violet",
+     maxVideos: 5,
+   },
+   {
+     id: "translation",
+-    title: "视频翻译",
+-    description: "多语言翻译配音",
++    titleKey: "create.types.translation.title",
++    descriptionKey: "create.types.translation.description",
+     icon: Translate,
+     tone: "cyan",
+     maxVideos: 1,
+   },
+   {
+     id: "remix",
+-    title: "短剧混剪",
+-    description: "不用懂剪辑，智能提取高光",
++    titleKey: "create.types.remix.title",
++    descriptionKey: "create.types.remix.description",
+     icon: Scissors,
+     tone: "orange",
+     maxVideos: 10,
+@@ -33,7 +33,7 @@
+     name: "第 1 集.mp4",
+     durationSeconds: 201,
+     durationLabel: "03:21",
+-    subtitleStatus: "已匹配 SRT",
++    subtitleStatusKey: "create.subtitle.matched",
+     statusTone: "success",
+     subtitleName: "第1集.srt",
+     thumbnail: "/assets/short-drama-thumb.webp",
+@@ -43,7 +43,7 @@
+     name: "第 2 集.mp4",
+     durationSeconds: 178,
+     durationLabel: "02:58",
+-    subtitleStatus: "未上传，将使用 AI 识别",
++    subtitleStatusKey: "create.subtitle.aiRecognition",
+     statusTone: "warning",
+     subtitleName: null,
+     thumbnail: "/assets/film-action-thumb.webp",
+@@ -53,7 +53,7 @@
+     name: "第 3 集.mp4",
+     durationSeconds: 143,
+     durationLabel: "02:23",
+-    subtitleStatus: "未上传，将使用 AI 识别",
++    subtitleStatusKey: "create.subtitle.aiRecognition",
+     statusTone: "warning",
+     subtitleName: null,
+     thumbnail: "/assets/documentary-thumb.webp",
+diff -ruN /tmp/narrato-i18n/task4-before/src/data/dashboardData.js docs/web/homepage-prototype/src/data/dashboardData.js
+--- /tmp/narrato-i18n/task4-before/src/data/dashboardData.js	2026-07-15 22:09:33
++++ docs/web/homepage-prototype/src/data/dashboardData.js	2026-07-15 22:11:48
+@@ -9,57 +9,57 @@
+   UserCircle,
+ } from "@phosphor-icons/react";
+ 
+-const navItem = (id, label, icon, group, to = null) => ({
++const navItem = (id, icon, group, to = null) => ({
+   id,
+-  label,
++  labelKey: `dashboard.nav.${id}`,
+   icon,
+   to,
+-  unavailableMessage: to ? null : `${label}功能建设中`,
++  unavailableMessageKey: to ? null : `dashboard.unavailable.${id}`,
+   group,
+ });
+ 
+ export const dashboardNavItems = [
+-  navItem("overview", "工作台概览", House, "main", "/dashboard"),
+-  navItem("create", "新建创作", MagicWand, "main", "/dashboard/create"),
+-  navItem("projects", "我的项目", ClockCounterClockwise, "main", "/dashboard/projects"),
+-  navItem("narration", "短剧解说", FilmSlate, "tools", "/dashboard/narration/settings"),
+-  navItem("translation", "视频翻译", Translate, "tools"),
+-  navItem("remix", "短剧混剪", Scissors, "tools"),
+-  navItem("credits", "创作点", Coins, "account"),
+-  navItem("account", "账户中心", UserCircle, "account"),
++  navItem("overview", House, "main", "/dashboard"),
++  navItem("create", MagicWand, "main", "/dashboard/create"),
++  navItem("projects", ClockCounterClockwise, "main", "/dashboard/projects"),
++  navItem("narration", FilmSlate, "tools", "/dashboard/narration/settings"),
++  navItem("translation", Translate, "tools"),
++  navItem("remix", Scissors, "tools"),
++  navItem("credits", Coins, "account"),
++  navItem("account", UserCircle, "account"),
+ ];
+ 
+ export const dashboardTools = [
+   {
+     id: "narration",
+-    title: "短剧解说",
+-    description: "智能识别剧情，高效生成解说成片",
++    titleKey: "dashboard.tools.narration.title",
++    descriptionKey: "dashboard.tools.narration.description",
+     tone: "violet",
+     icon: FilmSlate,
+-    unavailableMessage: "短剧解说功能建设中",
++    unavailableMessageKey: "dashboard.unavailable.narration",
+   },
+   {
+     id: "translation",
+-    title: "视频翻译",
+-    description: "多语言字幕与配音一站式处理",
++    titleKey: "dashboard.tools.translation.title",
++    descriptionKey: "dashboard.tools.translation.description",
+     tone: "cyan",
+     icon: Translate,
+-    unavailableMessage: "视频翻译功能建设中",
++    unavailableMessageKey: "dashboard.unavailable.translation",
+   },
+   {
+     id: "remix",
+-    title: "短剧混剪",
+-    description: "自动提取高光片段，快速完成混剪",
++    titleKey: "dashboard.tools.remix.title",
++    descriptionKey: "dashboard.tools.remix.description",
+     tone: "orange",
+     icon: Scissors,
+-    unavailableMessage: "短剧混剪功能建设中",
++    unavailableMessageKey: "dashboard.unavailable.remix",
+   },
+ ];
+ 
+ export const recentProjects = [
+-  { id: "narration-01", title: "霸总短剧解说 01", tool: "短剧解说", status: "complete", statusLabel: "已完成", progress: null, credits: 120, image: "/assets/short-drama-thumb.webp" },
+-  { id: "remix-city", title: "都市逆袭 · 混剪", tool: "短剧混剪", status: "processing", statusLabel: "处理中 66%", progress: 66, credits: 80, image: "/assets/film-action-thumb.webp" },
+-  { id: "translation-mystery", title: "悬疑短剧翻译", tool: "视频翻译", status: "draft", statusLabel: "草稿", progress: null, credits: 150, image: "/assets/documentary-thumb.webp" },
++  { id: "narration-01", title: "霸总短剧解说 01", type: "narration", titleKey: null, status: "complete", statusKey: "dashboard.status.complete", progress: null, credits: 120, image: "/assets/short-drama-thumb.webp" },
++  { id: "remix-city", title: "都市逆袭 · 混剪", type: "remix", titleKey: null, status: "processing", statusKey: "dashboard.status.processing", progress: 66, credits: 80, image: "/assets/film-action-thumb.webp" },
++  { id: "translation-mystery", title: "悬疑短剧翻译", type: "translation", titleKey: null, status: "draft", statusKey: "dashboard.status.draft", progress: null, credits: 150, image: "/assets/documentary-thumb.webp" },
+ ];
+ 
+ export const dashboardCredits = { balance: 1280, monthlyUsed: 240 };
+@@ -67,22 +67,22 @@
+ export const inspirations = [
+   {
+     id: "storytelling",
+-    title: "解说节奏指南",
+-    description: "掌握悬念、转折与高潮的叙事密度",
++    titleKey: "dashboard.inspirations.storytelling.title",
++    descriptionKey: "dashboard.inspirations.storytelling.description",
+     image: "/assets/short-drama-thumb.webp",
+-    unavailableMessage: "解说节奏指南功能建设中",
++    unavailableMessageKey: "dashboard.unavailable.storytelling",
+   },
+   {
+     id: "creative-remix",
+-    title: "热门混剪灵感",
+-    description: "从近期热门题材中找到创作方向",
++    titleKey: "dashboard.inspirations.creativeRemix.title",
++    descriptionKey: "dashboard.inspirations.creativeRemix.description",
+     image: "/assets/film-action-thumb.webp",
+-    unavailableMessage: "热门混剪灵感功能建设中",
++    unavailableMessageKey: "dashboard.unavailable.creativeRemix",
+   },
+ ];
+ 
+ export const dashboardPrimaryAction = {
+-  label: "新建创作",
++  labelKey: "dashboard.nav.create",
+   icon: MagicWand,
+   to: "/dashboard/create",
+ };
+diff -ruN /tmp/narrato-i18n/task4-before/src/data/projectsData.js docs/web/homepage-prototype/src/data/projectsData.js
+--- /tmp/narrato-i18n/task4-before/src/data/projectsData.js	2026-07-15 22:09:33
++++ docs/web/homepage-prototype/src/data/projectsData.js	2026-07-15 22:11:48
+@@ -1,23 +1,23 @@
+ export const projectCategories = [
+-  { id: "all", label: "全部" },
+-  { id: "narration", label: "短剧解说" },
+-  { id: "translation", label: "视频翻译" },
+-  { id: "remix", label: "短剧混剪" },
++  { id: "all", labelKey: "projects.categories.all" },
++  { id: "narration", labelKey: "projects.categories.narration" },
++  { id: "translation", labelKey: "projects.categories.translation" },
++  { id: "remix", labelKey: "projects.categories.remix" },
+ ];
+ 
+ export const projects = [
+-  { id: "overlord", title: "霸总短剧解说 01", duration: "00:30:00", type: "narration", typeLabel: "短剧解说", status: "complete", statusLabel: "已完成", createdAt: "2024-05-30 14:30", credits: 120, image: "/assets/short-drama-thumb.webp", resultPath: "/dashboard/projects/overlord/result" },
+-  { id: "fate", title: "命运的反转 · 英文翻译", duration: "00:18:36", type: "translation", typeLabel: "视频翻译", status: "processing", statusLabel: "处理中 66%", progress: 66, createdAt: "2024-05-30 13:22", credits: 80, image: "/assets/documentary-thumb.webp" },
+-  { id: "city", title: "都市逆袭高光混剪", duration: "00:01:45", type: "remix", typeLabel: "短剧混剪", status: "complete", statusLabel: "已完成", createdAt: "2024-05-30 11:05", credits: 150, image: "/assets/film-action-thumb.webp" },
+-  { id: "suspense", title: "悬疑短剧解说", duration: "00:25:20", type: "narration", typeLabel: "短剧解说", status: "draft", statusLabel: "草稿", createdAt: "2024-05-29 18:40", credits: 60, image: "/assets/documentary-thumb.webp" },
+-  { id: "sweet", title: "甜宠短剧翻译", duration: "00:22:10", type: "translation", typeLabel: "视频翻译", status: "draft", statusLabel: "草稿", createdAt: "2024-05-29 16:15", credits: 70, image: "/assets/short-drama-thumb.webp" },
+-  { id: "grudge", title: "豪门恩怨混剪", duration: "00:02:05", type: "remix", typeLabel: "短剧混剪", status: "failed", statusLabel: "生成失败", createdAt: "2024-05-29 09:50", credits: 90, image: "/assets/film-action-thumb.webp" },
++  { id: "overlord", title: "霸总短剧解说 01", duration: "00:30:00", type: "narration", typeKey: "projects.categories.narration", status: "complete", statusKey: "projects.status.complete", createdAt: "2024-05-30 14:30", credits: 120, image: "/assets/short-drama-thumb.webp", resultPath: "/dashboard/projects/overlord/result" },
++  { id: "fate", title: "命运的反转 · 英文翻译", duration: "00:18:36", type: "translation", typeKey: "projects.categories.translation", status: "processing", statusKey: "projects.status.processingPercent", progress: 66, createdAt: "2024-05-30 13:22", credits: 80, image: "/assets/documentary-thumb.webp" },
++  { id: "city", title: "都市逆袭高光混剪", duration: "00:01:45", type: "remix", typeKey: "projects.categories.remix", status: "complete", statusKey: "projects.status.complete", createdAt: "2024-05-30 11:05", credits: 150, image: "/assets/film-action-thumb.webp" },
++  { id: "suspense", title: "悬疑短剧解说", duration: "00:25:20", type: "narration", typeKey: "projects.categories.narration", status: "draft", statusKey: "projects.status.draft", createdAt: "2024-05-29 18:40", credits: 60, image: "/assets/documentary-thumb.webp" },
++  { id: "sweet", title: "甜宠短剧翻译", duration: "00:22:10", type: "translation", typeKey: "projects.categories.translation", status: "draft", statusKey: "projects.status.draft", createdAt: "2024-05-29 16:15", credits: 70, image: "/assets/short-drama-thumb.webp" },
++  { id: "grudge", title: "豪门恩怨混剪", duration: "00:02:05", type: "remix", typeKey: "projects.categories.remix", status: "failed", statusKey: "projects.status.failed", createdAt: "2024-05-29 09:50", credits: 90, image: "/assets/film-action-thumb.webp" },
+ ];
+ 
+ export const projectStatusOptions = [
+-  { id: "all", label: "全部状态" },
+-  { id: "complete", label: "已完成" },
+-  { id: "processing", label: "处理中" },
+-  { id: "draft", label: "草稿" },
+-  { id: "failed", label: "生成失败" },
++  { id: "all", labelKey: "projects.status.all" },
++  { id: "complete", labelKey: "projects.status.complete" },
++  { id: "processing", labelKey: "projects.status.processing" },
++  { id: "draft", labelKey: "projects.status.draft" },
++  { id: "failed", labelKey: "projects.status.failed" },
+ ];
+diff -ruN /tmp/narrato-i18n/task4-before/src/i18n/locales/en.js docs/web/homepage-prototype/src/i18n/locales/en.js
+--- /tmp/narrato-i18n/task4-before/src/i18n/locales/en.js	2026-07-15 22:09:33
++++ docs/web/homepage-prototype/src/i18n/locales/en.js	2026-07-15 22:15:50
+@@ -40,4 +40,46 @@
+   return Object.fromEntries(Object.entries(value).map(([key, child]) => [key, localize(child)]));
+ }
+ 
+-export const en = localize(zhCN);
++const localized = localize(zhCN);
++export const en = {
++  ...localized,
++  dashboard: {
++    routeHeading: "Workspace overview", footer: "Narrato · Make AI creation simple", thumbnailUnavailable: "Thumbnail unavailable for {name}", thumbnailAlt: "Thumbnail for {name}", coverAlt: "Cover for {name}",
++    nav: { overview: "Workspace overview", create: "New creation", projects: "My projects", narration: "Short-drama narration", translation: "Video translation", remix: "Short-drama remix", credits: "Credits", account: "Account" },
++    mobile: { navigation: "Mobile workspace navigation", overview: "Overview", create: "Create", projects: "Projects", account: "Me" },
++    sidebar: { navigation: "Workspace navigation", tools: "Tools", account: "Account" },
++    header: { home: "Narrato home", accountActions: "Account quick actions", viewBalance: "View credit balance: {balance}", recharge: "Top up" },
++    membership: { title: "Upgrade membership", description: "Unlock more tools and create faster" },
++    creation: { eyebrow: "Start a new AI creation", title: "New creation", description: "Upload footage and follow the guided workflow" },
++    quickStart: { eyebrow: "Choose a tool", title: "Quick start" },
++    tools: { narration: { title: "Short-drama narration", description: "Understand the story and generate narration efficiently" }, translation: { title: "Video translation", description: "Handle multilingual captions and dubbing in one place" }, remix: { title: "Short-drama remix", description: "Extract highlights and build a remix automatically" } },
++    promotion: { ariaLabel: "Promotion", eyebrow: "Limited-time creation boost", title: "Upgrade this week and get 20% extra credits", action: "View offer", close: "Close promotion" },
++    recent: { eyebrow: "Recent activity", title: "Recent projects", viewAll: "View all", creditsUsed: "Used {count}" },
++    status: { complete: "Complete", processing: "Processing {progress}%", draft: "Draft" },
++    credits: { resource: "Account resources", title: "Credits", balance: "Current balance", monthlyUsed: "Used {count} credits this month", recharge: "Top up credits" },
++    inspiration: { eyebrow: "Explore more", title: "Creative inspiration" },
++    inspirations: { storytelling: { title: "Narration pacing guide", description: "Balance suspense, twists, and climaxes" }, creativeRemix: { title: "Trending remix ideas", description: "Find directions in recent popular themes" } },
++    toast: { close: "Close notification" },
++    unavailable: { translation: "Video translation is coming soon", remix: "Short-drama remix is coming soon", credits: "Credits are coming soon", account: "Account center is coming soon", narration: "Short-drama narration is coming soon", upgrade: "Membership upgrades are coming soon", creditDetails: "Credit details are coming soon", recharge: "Top-up is coming soon", rechargeCredits: "Credit top-up is coming soon", promotion: "This promotion is coming soon", allProjects: "All projects is coming soon", project: "{name} is coming soon", storytelling: "The narration pacing guide is coming soon", creativeRemix: "Trending remix ideas are coming soon" },
++  },
++  create: {
++    routeHeading: "Create a new AI video", description: "Choose a creation type and upload footage", autosave: "Upload progress is saved automatically",
++    types: { narration: { title: "Short-drama narration", description: "Tell the story with voice-over" }, translation: { title: "Video translation", description: "Translate and dub in multiple languages" }, remix: { title: "Short-drama remix", description: "Extract highlights without editing skills" } },
++    typeSelector: { title: "Choose creation type", ariaLabel: "Creation type" },
++    upload: { title: "Upload footage", chooseVideos: "Choose video files", addMore: "Add more", dragPrefix: "Drag videos here, or", chooseFile: "choose files", limits: "MP4 / MOV / AVI, up to 5 GB each, {count} files maximum", selectedVideos: "Selected videos", uploadSubtitle: "Upload subtitles for {name}", removeVideo: "Remove {name}" },
++    subtitle: { matched: "SRT matched", aiRecognition: "Not uploaded; AI recognition will be used", pending: "Pending; AI recognition will be used", clickOrAi: "Upload subtitles or use AI recognition" },
++    summary: { title: "Creation summary", duration: "Total source duration", estimated: "Estimated usage", balance: "Current balance", next: "Next: Set parameters" },
++    messages: { invalidVideo: "Only MP4, MOV, or AVI files up to 5 GB are supported", maxVideos: "{type} supports up to {count} videos", tooMany: "{type} currently has {current} videos; the limit is {count}", settingsUnavailable: "Parameter settings are coming soon", invalidSubtitle: "Only SRT subtitle files up to 50 MB are supported" },
++  },
++  projects: {
++    routeHeading: "My projects", heading: "My projects", description: "Manage every creation task and result", search: "Search project names", create: "New creation", notice: "You can leave while tasks process; progress is saved automatically",
++    categories: { all: "All", narration: "Short-drama narration", translation: "Video translation", remix: "Short-drama remix" },
++    status: { all: "All statuses", complete: "Complete", processing: "Processing", processingPercent: "Processing {progress}%", draft: "Draft", failed: "Generation failed" },
++    filters: { ariaLabel: "Project filters", types: "Project types", status: "Filter by status" },
++    table: { project: "Project", type: "Type", status: "Status", created: "Created", credits: "Credits", actions: "Actions", progress: "{name} progress: {progress}%" },
++    actions: { result: "View result", export: "Export", progress: "View progress", continue: "Continue editing", reason: "View reason", retry: "Generate again" },
++    empty: { title: "No matching projects", description: "Change the filters or start a new creation" },
++    pagination: { ariaLabel: "Project pagination", previous: "Previous page", next: "Next page", page: "Page {page}", perPage: "{count} per page" },
++    messages: { unavailable: "{name}: {action} is coming soon", pageChanged: "Switched to page {page}" },
++  },
++};
+diff -ruN /tmp/narrato-i18n/task4-before/src/i18n/locales/ja.js docs/web/homepage-prototype/src/i18n/locales/ja.js
+--- /tmp/narrato-i18n/task4-before/src/i18n/locales/ja.js	2026-07-15 22:09:33
++++ docs/web/homepage-prototype/src/i18n/locales/ja.js	2026-07-15 22:15:50
+@@ -30,4 +30,46 @@
+   return Object.fromEntries(Object.entries(value).map(([key, child]) => [key, localize(child)]));
+ }
+ 
+-export const ja = localize(zhCN);
++const localized = localize(zhCN);
++export const ja = {
++  ...localized,
++  dashboard: {
++    routeHeading: "ワークスペース概要", footer: "影创工坊 · AI制作をもっとシンプルに", thumbnailUnavailable: "{name}のサムネイルを表示できません", thumbnailAlt: "{name}のサムネイル", coverAlt: "{name}のカバー",
++    nav: { overview: "ワークスペース概要", create: "新規制作", projects: "マイプロジェクト", narration: "ショートドラマ解説", translation: "動画翻訳", remix: "ショートドラマリミックス", credits: "制作クレジット", account: "アカウント" },
++    mobile: { navigation: "モバイルワークスペースナビゲーション", overview: "概要", create: "新規", projects: "プロジェクト", account: "マイページ" },
++    sidebar: { navigation: "ワークスペースナビゲーション", tools: "ツール", account: "アカウント" },
++    header: { home: "影创工坊ホーム", accountActions: "アカウントのクイック操作", viewBalance: "制作クレジット残高 {balance}", recharge: "チャージ" },
++    membership: { title: "メンバーシップをアップグレード", description: "機能を増やして、制作をさらに効率化" },
++    creation: { eyebrow: "新しいAI制作を始める", title: "新規制作", description: "素材をアップロードしてガイドに沿って完成" },
++    quickStart: { eyebrow: "ツールを選択", title: "クイックスタート" },
++    tools: { narration: { title: "ショートドラマ解説", description: "物語を理解し、解説動画を効率よく生成" }, translation: { title: "動画翻訳", description: "多言語字幕と吹き替えをまとめて処理" }, remix: { title: "ショートドラマリミックス", description: "ハイライトを抽出してリミックスを自動作成" } },
++    promotion: { ariaLabel: "キャンペーン情報", eyebrow: "期間限定クリエイティブブースト", title: "今週のアップグレードでクレジット20%増量", action: "詳細を見る", close: "キャンペーンを閉じる" },
++    recent: { eyebrow: "最近のアクティビティ", title: "最近のプロジェクト", viewAll: "すべて表示", creditsUsed: "{count} 消費" },
++    status: { complete: "完了", processing: "処理中 {progress}%", draft: "下書き" },
++    credits: { resource: "アカウントリソース", title: "制作クレジット", balance: "現在の残高", monthlyUsed: "今月は {count} クレジット使用", recharge: "クレジットをチャージ" },
++    inspiration: { eyebrow: "もっと見る", title: "制作のヒント" },
++    inspirations: { storytelling: { title: "解説テンポガイド", description: "サスペンス・逆転・クライマックスの密度を調整" }, creativeRemix: { title: "人気リミックスのヒント", description: "最近の人気テーマから制作方向を発見" } },
++    toast: { close: "通知を閉じる" },
++    unavailable: { translation: "動画翻訳は準備中です", remix: "ショートドラマリミックスは準備中です", credits: "制作クレジット機能は準備中です", account: "アカウントセンターは準備中です", narration: "ショートドラマ解説は準備中です", upgrade: "メンバーシップのアップグレードは準備中です", creditDetails: "クレジット明細は準備中です", recharge: "チャージ機能は準備中です", rechargeCredits: "クレジットチャージは準備中です", promotion: "キャンペーン機能は準備中です", allProjects: "すべてのプロジェクト機能は準備中です", project: "{name}は準備中です", storytelling: "解説テンポガイドは準備中です", creativeRemix: "人気リミックスのヒントは準備中です" },
++  },
++  create: {
++    routeHeading: "新しい AI 動画を作成", description: "制作タイプを選択して素材をアップロード", autosave: "アップロード進捗は自動保存されます",
++    types: { narration: { title: "ショートドラマ解説", description: "ナレーションで物語を伝える" }, translation: { title: "動画翻訳", description: "多言語翻訳と吹き替え" }, remix: { title: "ショートドラマリミックス", description: "編集スキル不要でハイライトを抽出" } },
++    typeSelector: { title: "制作タイプを選択", ariaLabel: "制作タイプ" },
++    upload: { title: "素材をアップロード", chooseVideos: "動画ファイルを選択", addMore: "追加", dragPrefix: "動画をここにドラッグ、または", chooseFile: "ファイルを選択", limits: "MP4 / MOV / AVI、1ファイル最大5GB、最大{count}本", selectedVideos: "選択した動画", uploadSubtitle: "{name}の字幕をアップロード", removeVideo: "{name}を削除" },
++    subtitle: { matched: "SRT割り当て済み", aiRecognition: "未アップロード・AI認識を使用", pending: "認識待ち・AI認識を使用", clickOrAi: "字幕をアップロード、またはAI認識を使用" },
++    summary: { title: "制作サマリー", duration: "元動画の合計時間", estimated: "予想消費量", balance: "現在の残高", next: "次へ：パラメータ設定" },
++    messages: { invalidVideo: "5GB以内のMP4、MOV、AVIのみ対応しています", maxVideos: "{type}は最大{count}本までアップロードできます", tooMany: "{type}には現在{current}本あり、上限は{count}本です", settingsUnavailable: "パラメータ設定は準備中です", invalidSubtitle: "50MB以内のSRT字幕のみ対応しています" },
++  },
++  projects: {
++    routeHeading: "マイプロジェクト", heading: "マイプロジェクト", description: "すべての制作タスクと生成結果を管理", search: "プロジェクト名を検索", create: "新規制作", notice: "処理中にページを離れても進捗は自動保存されます",
++    categories: { all: "すべて", narration: "ショートドラマ解説", translation: "動画翻訳", remix: "ショートドラマリミックス" },
++    status: { all: "すべてのステータス", complete: "完了", processing: "処理中", processingPercent: "処理中 {progress}%", draft: "下書き", failed: "生成失敗" },
++    filters: { ariaLabel: "プロジェクトフィルター", types: "プロジェクトタイプ", status: "ステータスで絞り込む" },
++    table: { project: "プロジェクト", type: "タイプ", status: "ステータス", created: "作成日時", credits: "クレジット", actions: "操作", progress: "{name}の処理進捗 {progress}%" },
++    actions: { result: "結果を見る", export: "書き出し", progress: "進捗を見る", continue: "編集を続ける", reason: "理由を見る", retry: "再生成" },
++    empty: { title: "一致するプロジェクトがありません", description: "フィルターを変更するか新規制作を始めてください" },
++    pagination: { ariaLabel: "プロジェクトのページ切り替え", previous: "前のページ", next: "次のページ", page: "{page}ページ", perPage: "1ページ{count}件" },
++    messages: { unavailable: "{name}：{action}は準備中です", pageChanged: "{page}ページに切り替えました" },
++  },
++};
+diff -ruN /tmp/narrato-i18n/task4-before/src/i18n/locales/zh-CN.js docs/web/homepage-prototype/src/i18n/locales/zh-CN.js
+--- /tmp/narrato-i18n/task4-before/src/i18n/locales/zh-CN.js	2026-07-15 22:09:33
++++ docs/web/homepage-prototype/src/i18n/locales/zh-CN.js	2026-07-15 22:21:12
+@@ -100,6 +100,56 @@
+     footer: { navigation: "页脚导航", terms: "用户协议", termsFeedback: "用户协议待接入", privacy: "隐私政策", privacyFeedback: "隐私政策待接入" },
+     modal: { closePlayback: "关闭案例播放", close: "关闭案例", play: "播放", pause: "暂停", videoAlt: "{title}视频案例" }, toast: { close: "关闭提示" }, lowerGridLabel: "常见问题与开始创作",
+   },
++  dashboard: {
++    routeHeading: "工作台概览", footer: "影创工坊 · 让 AI 创作更简单", thumbnailUnavailable: "{name}缩略图不可用", thumbnailAlt: "{name}缩略图", coverAlt: "{name}封面",
++    nav: { overview: "工作台概览", create: "新建创作", projects: "我的项目", narration: "短剧解说", translation: "视频翻译", remix: "短剧混剪", credits: "创作点", account: "账户中心" },
++    mobile: { navigation: "移动工作台导航", overview: "概览", create: "新建", projects: "项目", account: "我的" },
++    sidebar: { navigation: "工作台主导航", tools: "工具", account: "账户" },
++    header: { home: "影创工坊", accountActions: "账户快捷操作", viewBalance: "查看创作点余额 {balance}", recharge: "去充值" },
++    membership: { title: "升级会员", description: "解锁更多权限，创作更高效" },
++    creation: { eyebrow: "开始一次新的 AI 创作", title: "新建创作", description: "上传素材，跟随引导完成专业出片" },
++    quickStart: { eyebrow: "选择工具", title: "快速开始" },
++    tools: {
++      narration: { title: "短剧解说", description: "智能识别剧情，高效生成解说成片" },
++      translation: { title: "视频翻译", description: "多语言字幕与配音一站式处理" },
++      remix: { title: "短剧混剪", description: "自动提取高光片段，快速完成混剪" },
++    },
++    promotion: { ariaLabel: "促销信息", eyebrow: "限时创作加速计划", title: "本周升级，额外获得 20% 创作点", action: "立即查看", close: "关闭促销信息" },
++    recent: { eyebrow: "最近动态", title: "最近项目", viewAll: "我的项目", creditsUsed: "消耗 {count}" },
++    status: { complete: "已完成", processing: "处理中 {progress}%", draft: "草稿" },
++    credits: { resource: "账户资源", title: "创作点", balance: "当前余额", monthlyUsed: "本月已使用 {count} 创作点", recharge: "充值创作点" },
++    inspiration: { eyebrow: "探索更多", title: "创作灵感" },
++    inspirations: {
++      storytelling: { title: "解说节奏指南", description: "掌握悬念、转折与高潮的叙事密度" },
++      creativeRemix: { title: "热门混剪灵感", description: "从近期热门题材中找到创作方向" },
++    },
++    toast: { close: "关闭提示" },
++    unavailable: {
++      translation: "视频翻译功能建设中", remix: "短剧混剪功能建设中", credits: "创作点功能建设中", account: "账户中心功能建设中", narration: "短剧解说功能建设中",
++      upgrade: "升级会员功能建设中", creditDetails: "创作点明细功能建设中", recharge: "充值功能建设中", rechargeCredits: "充值创作点功能建设中", promotion: "优惠活动功能建设中",
++      allProjects: "我的项目功能建设中", project: "{name}功能建设中", storytelling: "解说节奏指南功能建设中", creativeRemix: "热门混剪灵感功能建设中",
++    },
++  },
++  create: {
++    routeHeading: "创建新的 AI 视频", description: "选择创作类型并上传素材", autosave: "系统会自动保存上传进度",
++    types: { narration: { title: "短剧解说", description: "加旁白讲剧情" }, translation: { title: "视频翻译", description: "多语言翻译配音" }, remix: { title: "短剧混剪", description: "不用懂剪辑，智能提取高光" } },
++    typeSelector: { title: "选择创作类型", ariaLabel: "创作类型" },
++    upload: { title: "上传素材", chooseVideos: "选择视频文件", addMore: "继续添加", dragPrefix: "拖拽视频到这里，或", chooseFile: "点击选择文件", limits: "支持 MP4 / MOV / AVI，单个文件最大 5GB，最多 {count} 个", selectedVideos: "已选择视频", uploadSubtitle: "为 {name} 上传字幕", removeVideo: "删除 {name}" },
++    subtitle: { matched: "已匹配 SRT", aiRecognition: "点击上传字幕，或AI 智能识别", pending: "点击上传字幕，或AI 智能识别", clickOrAi: "点击上传字幕，或AI 智能识别" },
++    summary: { title: "创作小结", duration: "源视频总时长", estimated: "预计消耗", balance: "当前余额", next: "下一步：设置参数" },
++    messages: { invalidVideo: "仅支持 5GB 以内的 MP4、MOV 或 AVI 文件", maxVideos: "{type}最多上传 {count} 个视频", tooMany: "{type}当前有 {current} 个视频，最多支持 {count} 个", settingsUnavailable: "参数设置功能建设中", invalidSubtitle: "仅支持 50MB 以内的 SRT 字幕文件" },
++  },
++  projects: {
++    routeHeading: "我的项目", heading: "我的项目", description: "管理全部创作任务与生成结果", search: "搜索项目名称", create: "新建创作", notice: "任务处理中可离开页面，进度会自动保存",
++    categories: { all: "全部", narration: "短剧解说", translation: "视频翻译", remix: "短剧混剪" },
++    status: { all: "全部状态", complete: "已完成", processing: "处理中", processingPercent: "处理中 {progress}%", draft: "草稿", failed: "生成失败" },
++    filters: { ariaLabel: "项目筛选", types: "项目类型", status: "按状态筛选" },
++    table: { project: "项目", type: "类型", status: "状态", created: "创建时间", credits: "创作点", actions: "操作", progress: "{name}处理进度 {progress}%" },
++    actions: { result: "查看结果", export: "导出", progress: "查看进度", continue: "继续编辑", reason: "查看原因", retry: "重新生成" },
++    empty: { title: "暂无匹配项目", description: "试试更换筛选条件或新建创作" },
++    pagination: { ariaLabel: "项目分页", previous: "上一页", next: "下一页", page: "第 {page} 页", perPage: "{count} 条/页" },
++    messages: { unavailable: "{name}：{action}功能建设中", pageChanged: "已切换至第 {page} 页" },
++  },
+   errors: { notFound: { heading: "页面未找到", description: "你访问的页面不存在。", navigation: "错误页面导航", home: "返回官网", dashboard: "前往工作台" } },
+   titles: { home: "影创工坊｜AI 出片工作台", dashboard: "工作台概览｜影创工坊", create: "新建创作｜影创工坊", projects: "我的项目｜影创工坊", projectResult: "霸总短剧解说 01｜影创工坊", narrationSettings: "短剧解说设置｜影创工坊", narrationAnalysis: "AI 分析｜影创工坊", narrationEditor: "解说编辑器｜影创工坊", notFound: "页面未找到｜影创工坊" },
+ };
+diff -ruN /tmp/narrato-i18n/task4-before/src/pages/CreatePage.jsx docs/web/homepage-prototype/src/pages/CreatePage.jsx
+--- /tmp/narrato-i18n/task4-before/src/pages/CreatePage.jsx	2026-07-15 22:09:33
++++ docs/web/homepage-prototype/src/pages/CreatePage.jsx	2026-07-15 22:14:36
+@@ -9,6 +9,7 @@
+ import { DashboardToast } from "../components/dashboard/DashboardToast.jsx";
+ import { dashboardCredits, dashboardNavItems } from "../data/dashboardData.js";
+ import { creationTypes, initialCreateVideos } from "../data/createData.js";
++import { useI18n } from "../i18n/useI18n.js";
+ 
+ const VIDEO_EXTENSIONS = new Set(["mp4", "mov", "avi"]);
+ const VIDEO_SIZE_LIMIT = 5 * 1024 * 1024 * 1024;
+@@ -50,6 +51,7 @@
+ }
+ 
+ export function CreatePage() {
++  const { formatNumber, t } = useI18n();
+   const [toast, setToast] = useState({ id: 0, message: "" });
+   const [selectedType, setSelectedType] = useState("narration");
+   const [videos, setVideos] = useState(initialCreateVideos);
+@@ -84,23 +86,23 @@
+       const extension = file.name.split(".").pop()?.toLowerCase();
+       return VIDEO_EXTENSIONS.has(extension) && file.size <= VIDEO_SIZE_LIMIT;
+     });
+-    if (validFiles.length !== files.length) showUnavailable("仅支持 5GB 以内的 MP4、MOV 或 AVI 文件");
++    if (validFiles.length !== files.length) showUnavailable(t("create.messages.invalidVideo"));
+     if (!validFiles.length) return;
+     const availableCount = selectedCreationType.maxVideos - videos.length;
+     if (availableCount <= 0) {
+-      showUnavailable(`${selectedCreationType.title}最多上传 ${selectedCreationType.maxVideos} 个视频`);
++      showUnavailable(t("create.messages.maxVideos", { type: t(selectedCreationType.titleKey), count: formatNumber(selectedCreationType.maxVideos) }));
+       return;
+     }
+     const acceptedFiles = validFiles.slice(0, availableCount);
+     if (acceptedFiles.length < validFiles.length) {
+-      showUnavailable(`${selectedCreationType.title}最多上传 ${selectedCreationType.maxVideos} 个视频`);
++      showUnavailable(t("create.messages.maxVideos", { type: t(selectedCreationType.titleKey), count: formatNumber(selectedCreationType.maxVideos) }));
+     }
+     const newVideos = acceptedFiles.map((file, index) => ({
+         id: `${file.name}-${file.lastModified}-${file.size}-${Date.now()}-${index}`,
+         name: file.name,
+         durationSeconds: 0,
+         durationLabel: "--:--",
+-        subtitleStatus: "待识别，将使用 AI 识别",
++        subtitleStatusKey: "create.subtitle.pending",
+         statusTone: "warning",
+         subtitleName: null,
+         thumbnail: null,
+@@ -118,19 +120,19 @@
+ 
+   const handleNext = () => {
+     if (videos.length > selectedCreationType.maxVideos) {
+-      showUnavailable(`${selectedCreationType.title}当前有 ${videos.length} 个视频，最多支持 ${selectedCreationType.maxVideos} 个`);
++      showUnavailable(t("create.messages.tooMany", { type: t(selectedCreationType.titleKey), current: formatNumber(videos.length), count: formatNumber(selectedCreationType.maxVideos) }));
+       return;
+     }
+-    showUnavailable("参数设置功能建设中");
++    showUnavailable(t("create.messages.settingsUnavailable"));
+   };
+ 
+   const handleVideoSubtitle = (videoId, file) => {
+     if (!file.name.toLowerCase().endsWith(".srt") || file.size > SUBTITLE_SIZE_LIMIT) {
+-      showUnavailable("仅支持 50MB 以内的 SRT 字幕文件");
++      showUnavailable(t("create.messages.invalidSubtitle"));
+       return;
+     }
+     setVideos((current) => current.map((video) => video.id === videoId
+-      ? { ...video, subtitleName: file.name, subtitleStatus: file.name, statusTone: "success" }
++      ? { ...video, subtitleName: file.name, subtitleStatusKey: null, statusTone: "success" }
+       : video));
+   };
+ 
+@@ -141,8 +143,8 @@
+         <DashboardHeader credits={dashboardCredits} onUnavailable={showUnavailable} />
+         <main className="create-main">
+           <header className="create-heading">
+-            <h1 data-route-heading tabIndex="-1">创建新的 AI 视频</h1>
+-            <p>选择创作类型并上传素材</p>
++            <h1 data-route-heading tabIndex="-1">{t("create.routeHeading")}</h1>
++            <p>{t("create.description")}</p>
+           </header>
+           <div className="create-layout">
+             <div className="create-form">
+@@ -156,7 +158,7 @@
+                 onRemove={(id) => setVideos((current) => current.filter((video) => video.id !== id))}
+                 onSubtitleSelect={handleVideoSubtitle}
+               />
+-              <p className="create-autosave"><ShieldCheck aria-hidden="true" />系统会自动保存上传进度</p>
++              <p className="create-autosave"><ShieldCheck aria-hidden="true" />{t("create.autosave")}</p>
+             </div>
+             <CreationSummary
+               durationLabel={summary.durationLabel}
+diff -ruN /tmp/narrato-i18n/task4-before/src/pages/DashboardPage.jsx docs/web/homepage-prototype/src/pages/DashboardPage.jsx
+--- /tmp/narrato-i18n/task4-before/src/pages/DashboardPage.jsx	2026-07-15 22:09:33
++++ docs/web/homepage-prototype/src/pages/DashboardPage.jsx	2026-07-15 22:14:36
+@@ -17,8 +17,10 @@
+   inspirations,
+   recentProjects,
+ } from "../data/dashboardData.js";
++import { useI18n } from "../i18n/useI18n.js";
+ 
+ export function DashboardPage() {
++  const { t } = useI18n();
+   const [bannerVisible, setBannerVisible] = useState(true);
+   const [toast, setToast] = useState({ id: 0, message: "" });
+   const showUnavailable = useCallback((message) => {
+@@ -33,7 +35,7 @@
+ 
+   return (
+     <div className="dashboard-shell" data-page="dashboard">
+-      <h1 className="sr-only" data-route-heading tabIndex="-1">工作台概览</h1>
++      <h1 className="sr-only" data-route-heading tabIndex="-1">{t("dashboard.routeHeading")}</h1>
+       <DashboardSidebar items={dashboardNavItems} onUnavailable={showUnavailable} />
+       <div className="dashboard-workspace">
+         <DashboardHeader credits={dashboardCredits} onUnavailable={showUnavailable} />
+@@ -51,7 +53,7 @@
+             </div>
+           </div>
+         </main>
+-        <footer className="dashboard-footer">影创工坊 · 让 AI 创作更简单</footer>
++        <footer className="dashboard-footer">{t("dashboard.footer")}</footer>
+       </div>
+       <DashboardMobileNav items={dashboardNavItems} onUnavailable={showUnavailable} />
+       {toast.message && <DashboardToast key={toast.id} message={toast.message} onClose={() => setToast(({ id }) => ({ id, message: "" }))} />}
+diff -ruN /tmp/narrato-i18n/task4-before/src/pages/ProjectsPage.jsx docs/web/homepage-prototype/src/pages/ProjectsPage.jsx
+--- /tmp/narrato-i18n/task4-before/src/pages/ProjectsPage.jsx	2026-07-15 22:09:33
++++ docs/web/homepage-prototype/src/pages/ProjectsPage.jsx	2026-07-15 22:14:37
+@@ -10,8 +10,10 @@
+ import { ProjectTable } from "../components/projects/ProjectTable.jsx";
+ import { dashboardCredits, dashboardNavItems } from "../data/dashboardData.js";
+ import { projectCategories, projects, projectStatusOptions } from "../data/projectsData.js";
++import { useI18n } from "../i18n/useI18n.js";
+ 
+ export function ProjectsPage() {
++  const { formatNumber, t } = useI18n();
+   const [query, setQuery] = useState("");
+   const [category, setCategory] = useState("all");
+   const [status, setStatus] = useState("all");
+@@ -32,19 +34,19 @@
+   }, [toast]);
+ 
+   return <div className="dashboard-shell projects-shell" data-page="projects">
+-    <h1 className="sr-only" data-route-heading tabIndex="-1">我的项目</h1>
++    <h1 className="sr-only" data-route-heading tabIndex="-1">{t("projects.routeHeading")}</h1>
+     <DashboardSidebar items={dashboardNavItems} onUnavailable={showToast} />
+     <div className="dashboard-workspace">
+       <DashboardHeader credits={dashboardCredits} onUnavailable={showToast} />
+       <main className="projects-main">
+         <section className="projects-heading" aria-labelledby="projects-title">
+-          <div><h2 id="projects-title">我的项目</h2><p>管理全部创作任务与生成结果</p></div>
+-          <div className="projects-heading__actions"><label className="project-search"><MagnifyingGlass aria-hidden="true" /><span className="sr-only">搜索项目名称</span><input value={query} onChange={(event) => updateFilter(setQuery)(event.target.value)} placeholder="搜索项目名称" /></label><Link to="/dashboard/create" className="projects-create"><MagicWand aria-hidden="true" />新建创作</Link></div>
++          <div><h2 id="projects-title">{t("projects.heading")}</h2><p>{t("projects.description")}</p></div>
++          <div className="projects-heading__actions"><label className="project-search"><MagnifyingGlass aria-hidden="true" /><span className="sr-only">{t("projects.search")}</span><input value={query} onChange={(event) => updateFilter(setQuery)(event.target.value)} placeholder={t("projects.search")} /></label><Link to="/dashboard/create" className="projects-create"><MagicWand aria-hidden="true" />{t("projects.create")}</Link></div>
+         </section>
+-        <div className="projects-notice"><Info aria-hidden="true" /><span>任务处理中可离开页面，进度会自动保存</span></div>
++        <div className="projects-notice"><Info aria-hidden="true" /><span>{t("projects.notice")}</span></div>
+         <ProjectFilters categories={projectCategories} activeCategory={category} onCategoryChange={updateFilter(setCategory)} status={status} statuses={projectStatusOptions} onStatusChange={updateFilter(setStatus)} />
+-        <ProjectTable projects={filteredProjects} onAction={(action, project) => showToast(`${project.title}：${action}功能建设中`)} />
+-        <ProjectPagination page={page} pages={2} onPageChange={(nextPage) => { setPage(nextPage); showToast(`已切换至第 ${nextPage} 页`); }} />
++        <ProjectTable projects={filteredProjects} onAction={(action, project) => showToast(t("projects.messages.unavailable", { name: project.title, action: t(`projects.actions.${action}`) }))} />
++        <ProjectPagination page={page} pages={2} onPageChange={(nextPage) => { setPage(nextPage); showToast(t("projects.messages.pageChanged", { page: formatNumber(nextPage) })); }} />
+       </main>
+     </div>
+     <DashboardMobileNav items={dashboardNavItems} onUnavailable={showToast} />
+diff -ruN /tmp/narrato-i18n/task4-before/src/styles/dashboard.css docs/web/homepage-prototype/src/styles/dashboard.css
+--- /tmp/narrato-i18n/task4-before/src/styles/dashboard.css	2026-07-15 22:09:33
++++ docs/web/homepage-prototype/src/styles/dashboard.css	2026-07-15 22:26:44
+@@ -165,17 +165,21 @@
+ 
+ .dashboard-header--mobile { display: none; }
+ 
+-.dashboard-account { display: flex; align-items: center; gap: 15px; }
+-.dashboard-account button {
++.dashboard-account-cluster,
++.dashboard-account { display: flex; min-width: 0; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 15px; }
++.dashboard-account > .language-switcher { flex: 0 0 auto; }
++.dashboard-account > .language-switcher .language-switcher__trigger { min-width: 44px; min-height: 44px; }
++.dashboard-account button,
++.dashboard-account-cluster > .dashboard-account__avatar {
+   display: inline-flex;
+   align-items: center;
+   justify-content: center;
+-  min-height: 40px;
++  min-height: 44px;
+   border: 1px solid transparent;
+   color: var(--dashboard-text);
+   cursor: pointer;
+ }
+-.dashboard-account__balance { gap: 9px; padding: 0 3px; background: transparent; }
++.dashboard-account__balance { min-width: 0; gap: 9px; padding: 0 3px; background: transparent; }
+ .dashboard-account__balance span { color: #b5bdcc; font-size: 16px; }
+ .dashboard-account__balance strong { font-size: 19px; font-weight: 530; letter-spacing: 0.03em; }
+ .dashboard-account__recharge { padding: 0 20px; border-color: var(--dashboard-purple-border); border-radius: 8px; background: linear-gradient(110deg, #4b27d9, var(--dashboard-primary-strong)); box-shadow: 0 8px 24px rgba(78, 39, 211, 0.24); }
+@@ -188,7 +192,8 @@
+   overflow: hidden;
+ }
+ .dashboard-account__avatar svg { width: 38px; height: 38px; color: #f1d0b5; opacity: 0.88; }
+-.dashboard-account button:hover { filter: brightness(1.14); border-color: var(--dashboard-primary); box-shadow: 0 10px 28px rgba(90, 50, 230, 0.28); }
++.dashboard-account button:hover,
++.dashboard-account-cluster > .dashboard-account__avatar:hover { filter: brightness(1.14); border-color: var(--dashboard-primary); box-shadow: 0 10px 28px rgba(90, 50, 230, 0.28); }
+ 
+ .dashboard-main {
+   display: grid;
+@@ -483,6 +488,7 @@
+   .dashboard-header--mobile .brand-mark { gap: 7px; }
+   .dashboard-header--mobile .brand-mark__symbol { width: 34px; height: 34px; }
+   .dashboard-header--mobile .brand-mark__text { font-size: 17px; white-space: nowrap; }
++  .dashboard-account-cluster,
+   .dashboard-account { gap: 10px; }
+   .dashboard-account button { min-width: 44px; min-height: 44px; }
+   .dashboard-account__balance {
+@@ -649,6 +655,10 @@
+ 
+ @media (max-width: 390px) {
+   .dashboard-header { padding-inline: 14px; }
++  .dashboard-header--mobile { flex: 1 1 auto; min-width: 0; }
++  .dashboard-account-cluster { flex: 0 1 auto; flex-wrap: nowrap; gap: 6px; }
++  .dashboard-account { flex-wrap: nowrap; gap: 6px; }
++  .dashboard-account > .language-switcher .language-switcher__trigger { padding-inline: 6px; }
+   .dashboard-header--mobile .brand-mark__text { font-size: 15px; }
+   .dashboard-account__balance { padding-inline: 10px !important; }
+   .dashboard-account__balance span { display: none; }
+diff -ruN /tmp/narrato-i18n/task4-before/scripts/verify-i18n.mjs docs/web/homepage-prototype/scripts/verify-i18n.mjs
+--- /tmp/narrato-i18n/task4-before/scripts/verify-i18n.mjs	2026-07-15 22:09:33
++++ docs/web/homepage-prototype/scripts/verify-i18n.mjs	2026-07-15 22:26:00
+@@ -19,6 +19,12 @@
+     heroHeading: "专为自媒体小白打造的AI 出片工作台",
+     notFoundHeading: "页面未找到",
+     notFoundTitle: "页面未找到｜影创工坊",
++    routeHeadings: { "/dashboard": "工作台概览", "/dashboard/create": "创建新的 AI 视频", "/dashboard/projects": "我的项目" },
++    dashboardTitle: "快速开始",
++    createTitle: "选择创作类型",
++    projectsTitle: "管理全部创作任务与生成结果",
++    accountActions: "账户快捷操作",
++    routeToasts: { "/dashboard": "充值功能建设中", "/dashboard/create": "参数设置功能建设中", "/dashboard/projects": "霸总短剧解说 01：导出功能建设中" },
+   },
+   en: {
+     language: "English",
+@@ -26,6 +32,12 @@
+     heroHeading: "Built for first-time creatorsAI Video Workspace",
+     notFoundHeading: "Page not found",
+     notFoundTitle: "Page not found | Narrato",
++    routeHeadings: { "/dashboard": "Workspace overview", "/dashboard/create": "Create a new AI video", "/dashboard/projects": "My projects" },
++    dashboardTitle: "Quick start",
++    createTitle: "Choose creation type",
++    projectsTitle: "Manage every creation task and result",
++    accountActions: "Account quick actions",
++    routeToasts: { "/dashboard": "Top-up is coming soon", "/dashboard/create": "Parameter settings are coming soon", "/dashboard/projects": "霸总短剧解说 01: Export is coming soon" },
+   },
+   ja: {
+     language: "日本語",
+@@ -33,6 +45,12 @@
+     heroHeading: "動画制作初心者のためのAI 動画制作ワークスペース",
+     notFoundHeading: "ページが見つかりません",
+     notFoundTitle: "ページが見つかりません｜影创工坊",
++    routeHeadings: { "/dashboard": "ワークスペース概要", "/dashboard/create": "新しい AI 動画を作成", "/dashboard/projects": "マイプロジェクト" },
++    dashboardTitle: "クイックスタート",
++    createTitle: "制作タイプを選択",
++    projectsTitle: "すべての制作タスクと生成結果を管理",
++    accountActions: "アカウントのクイック操作",
++    routeToasts: { "/dashboard": "チャージ機能は準備中です", "/dashboard/create": "パラメータ設定は準備中です", "/dashboard/projects": "霸总短剧解说 01：書き出しは準備中です" },
+   },
+ };
+ 
+@@ -176,6 +194,51 @@
+   for (const language of ["简体中文", "English", "日本語"]) {
+     await inlineSwitcher.getByRole("button", { name: language, exact: true }).waitFor();
+   }
++
++  for (const locale of ["zh-CN", "en", "ja"]) {
++    const expected = EXPECTED_COPY[locale];
++    for (const route of ["/dashboard", "/dashboard/create", "/dashboard/projects"]) {
++      await page.setViewportSize({ width: 1487, height: 900 });
++      await page.goto(`${baseUrl}${route}`);
++      await page.getByTestId("language-switcher-trigger").waitFor();
++      await selectLocale(locale);
++      assert.equal((await page.locator("[data-route-heading]").textContent()).trim(), expected.routeHeadings[route]);
++      if (route === "/dashboard") await page.getByRole("heading", { name: expected.dashboardTitle }).waitFor();
++      if (route === "/dashboard/create") await page.getByRole("heading", { name: expected.createTitle }).waitFor();
++      if (route === "/dashboard/projects") await page.getByText(expected.projectsTitle, { exact: true }).waitFor();
++
++      const action = route === "/dashboard"
++        ? page.locator(".dashboard-account__recharge")
++        : route === "/dashboard/create"
++          ? page.locator(".create-summary__next")
++          : page.locator(".project-actions__export").first();
++      await action.click();
++      await page.locator(".dashboard-toast").waitFor();
++      assert.equal((await page.locator(".dashboard-toast > span").innerText()).trim(), expected.routeToasts[route], `${locale} ${route} should show localized feedback`);
++
++      if (route === "/dashboard") {
++        assert.equal(await page.getByRole("group", { name: expected.accountActions }).count(), 1, `${locale} account actions should expose group semantics`);
++        assert.equal(await page.locator(".dashboard-account > .language-switcher + .dashboard-account__balance").count(), 1, `${locale} switcher should immediately precede balance`);
++        const accountTargetHeights = await page.locator(".dashboard-account__balance, .dashboard-account__recharge").evaluateAll((elements) => elements.map((element) => element.getBoundingClientRect().height));
++        assert.equal(accountTargetHeights.every((height) => height >= 44), true, `${locale} desktop account targets should be at least 44px high`);
++      }
++
++      for (const width of [1487, 768, 390]) {
++        await page.setViewportSize({ width, height: width === 390 ? 844 : 900 });
++        assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth), true, `${locale} ${route} must not overflow at ${width}px`);
++      }
++    }
++  }
++
++  await page.setViewportSize({ width: 1487, height: 900 });
++  await page.goto(`${baseUrl}/dashboard/projects`);
++  await selectLocale("en");
++  const projectSearch = page.locator(".project-search input");
++  await projectSearch.fill("霸总短剧解说 01");
++  await page.getByText("霸总短剧解说 01", { exact: true }).waitFor();
++  await selectLocale("ja");
++  assert.equal(await projectSearch.inputValue(), "霸总短剧解说 01");
++  await page.getByText("霸总短剧解说 01", { exact: true }).waitFor();
+ 
+   await context.close();
+   console.log("i18n public header verification passed");

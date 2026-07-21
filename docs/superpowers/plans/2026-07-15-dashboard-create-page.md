@@ -29,8 +29,7 @@
 - `docs/web/homepage-prototype/src/pages/CreatePage.jsx`: page shell, state, upload handlers, summary calculations, and toast lifecycle.
 - `docs/web/homepage-prototype/src/components/create/CreationTypeSelector.jsx`: accessible creation-type radio group.
 - `docs/web/homepage-prototype/src/components/create/VideoUploadPanel.jsx`: drag/drop and video file input.
-- `docs/web/homepage-prototype/src/components/create/UploadedVideoList.jsx`: ordered rows and deletion.
-- `docs/web/homepage-prototype/src/components/create/SubtitleUploadPanel.jsx`: optional SRT selection and removal.
+- `docs/web/homepage-prototype/src/components/create/UploadedVideoList.jsx`: ordered rows, deletion, and per-video SRT selection.
 - `docs/web/homepage-prototype/src/components/create/CreationSummary.jsx`: duration, cost, balance, and next-step action.
 - `docs/web/homepage-prototype/src/data/createData.js`: creation types and initial demo rows.
 - `docs/web/homepage-prototype/src/styles/create.css`: desktop and responsive styles.
@@ -40,6 +39,7 @@
 **Modify**
 
 - `docs/web/homepage-prototype/src/App.jsx`: register `CreatePage` route.
+- `docs/web/homepage-prototype/src/components/RouteEffects.jsx`: set the create-route document title.
 - `docs/web/homepage-prototype/src/main.jsx`: import `create.css`.
 - `docs/web/homepage-prototype/src/data/dashboardData.js`: set create navigation target and primary action target.
 - `docs/web/homepage-prototype/src/components/dashboard/CreationEntryCard.jsx`: render the primary action as a link when `action.to` exists.
@@ -52,6 +52,7 @@
 
 **Files:**
 - Modify: `docs/web/homepage-prototype/src/App.jsx`
+- Modify: `docs/web/homepage-prototype/src/components/RouteEffects.jsx`
 - Modify: `docs/web/homepage-prototype/src/data/dashboardData.js`
 - Modify: `docs/web/homepage-prototype/src/components/dashboard/CreationEntryCard.jsx`
 - Create: `docs/web/homepage-prototype/src/pages/CreatePage.jsx`
@@ -105,7 +106,6 @@ Run the same commands. Expected: routing verification passes with all three crea
 - Create: `docs/web/homepage-prototype/src/components/create/CreationTypeSelector.jsx`
 - Create: `docs/web/homepage-prototype/src/components/create/VideoUploadPanel.jsx`
 - Create: `docs/web/homepage-prototype/src/components/create/UploadedVideoList.jsx`
-- Create: `docs/web/homepage-prototype/src/components/create/SubtitleUploadPanel.jsx`
 - Create: `docs/web/homepage-prototype/src/components/create/CreationSummary.jsx`
 - Modify: `docs/web/homepage-prototype/src/pages/CreatePage.jsx`
 - Create: `docs/web/homepage-prototype/scripts/verify-create.mjs`
@@ -113,8 +113,7 @@ Run the same commands. Expected: routing verification passes with all three crea
 **Interfaces:**
 - `CreationTypeSelector({ types, selectedType, onChange })`.
 - `VideoUploadPanel({ videos, isDragging, onFiles, onDragStateChange, onRemove })`.
-- `UploadedVideoList({ videos, onRemove })`.
-- `SubtitleUploadPanel({ subtitle, onSelect, onRemove })`.
+- `UploadedVideoList({ videos, onRemove, onSubtitleSelect })`.
 - `CreationSummary({ durationLabel, estimatedCredits, balance, onNext })`.
 
 - [ ] **Step 1: Write interaction verification before components**
@@ -125,7 +124,9 @@ The Playwright script must assert:
 - clicking translation changes the selected button;
 - choosing two synthetic video files appends two rows;
 - removing a row reduces the count and reindexes visible row numbers;
-- choosing and removing an SRT file updates the subtitle region;
+- narration, translation, and remix enforce 5, 1, and 10 video limits;
+- switching to a lower-limit type is blocked with a Toast when existing videos exceed its limit;
+- choosing an SRT file updates only its corresponding video row;
 - clicking next shows `参数设置功能建设中` and stays on `/dashboard/create`;
 - no XHR or fetch request is emitted by file or next-step interactions.
 

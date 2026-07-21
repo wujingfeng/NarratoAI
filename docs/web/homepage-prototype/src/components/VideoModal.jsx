@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { ArrowsOut, Pause, Play, SpeakerHigh, X } from "@phosphor-icons/react";
+import { useI18n } from "../i18n/useI18n.js";
 
 export function VideoModal({ caseItem, onClose, returnFocusRef }) {
+  const { t } = useI18n();
   const [playing, setPlaying] = useState(false);
   const closeButtonRef = useRef(null);
 
@@ -38,19 +40,19 @@ export function VideoModal({ caseItem, onClose, returnFocusRef }) {
 
   return (
     <div className="video-modal" role="dialog" aria-modal="true" aria-labelledby="video-modal-title">
-      <button className="video-modal__backdrop" type="button" aria-label="关闭案例播放" onClick={onClose} />
+      <button className="video-modal__backdrop" type="button" aria-label={t("home.modal.closePlayback")} onClick={onClose} />
       <div className="video-modal__panel">
         <div className="video-modal__header">
           <span><small>{caseItem.toolName}</small><h2 id="video-modal-title">{caseItem.title}</h2></span>
-          <button ref={closeButtonRef} type="button" aria-label="关闭案例" onClick={onClose}><X size={24} /></button>
+          <button ref={closeButtonRef} type="button" aria-label={t("home.modal.close")} onClick={onClose}><X size={24} /></button>
         </div>
         <div className={`video-modal__stage ${playing ? "is-playing" : ""}`}>
-          <img src={caseItem.image} alt={`${caseItem.title}视频案例`} loading="eager" decoding="async" />
-          <button className="video-modal__center-play" type="button" aria-label={playing ? "暂停" : "播放"} onClick={() => setPlaying(!playing)}>
+          <img src={caseItem.image} alt={t("home.modal.videoAlt", { title: caseItem.title })} loading="eager" decoding="async" />
+          <button className="video-modal__center-play" type="button" aria-label={playing ? t("home.modal.pause") : t("home.modal.play")} onClick={() => setPlaying(!playing)}>
             {playing ? <Pause size={30} weight="fill" /> : <Play size={30} weight="fill" />}
           </button>
           <div className="video-modal__controls">
-            <button type="button" aria-label={playing ? "暂停" : "播放"} onClick={() => setPlaying(!playing)}>{playing ? <Pause size={18} weight="fill" /> : <Play size={18} weight="fill" />}</button>
+            <button type="button" aria-label={playing ? t("home.modal.pause") : t("home.modal.play")} onClick={() => setPlaying(!playing)}>{playing ? <Pause size={18} weight="fill" /> : <Play size={18} weight="fill" />}</button>
             <span>{playing ? caseItem.playingElapsed : "00:00"} / {caseItem.duration}</span>
             <div className="video-modal__progress"><span style={{ width: playing ? `${caseItem.progress}%` : "4%" }} /></div>
             <SpeakerHigh size={19} />

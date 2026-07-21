@@ -1,18 +1,27 @@
 import { ArrowUpRight } from "@phosphor-icons/react";
+import { Link } from "react-router-dom";
+import { useI18n } from "../../i18n/useI18n.js";
 
 export function CreationEntryCard({ action, onUnavailable }) {
+  const { t } = useI18n();
   const Icon = action.icon;
   return (
     <article className="creation-entry-card">
       <span className="creation-entry-card__icon" aria-hidden="true"><Icon /></span>
       <div>
-        <p className="creation-entry-card__eyebrow">开始一次新的 AI 创作</p>
-        <h2>新建创作</h2>
-        <p className="creation-entry-card__description">上传素材，跟随引导完成专业出片</p>
+        <p className="creation-entry-card__eyebrow">{t("dashboard.creation.eyebrow")}</p>
+        <h2>{t("dashboard.creation.title")}</h2>
+        <p className="creation-entry-card__description">{t("dashboard.creation.description")}</p>
       </div>
-      <button type="button" onClick={() => onUnavailable(action.unavailableMessage)}>
-        {action.label}<ArrowUpRight aria-hidden="true" />
-      </button>
+      {action.to ? (
+        <Link to={action.to} aria-label={t(action.labelKey)}>
+          {t(action.labelKey)}<ArrowUpRight aria-hidden="true" />
+        </Link>
+      ) : (
+        <button type="button" onClick={() => onUnavailable(t(action.unavailableMessageKey))}>
+          {t(action.labelKey)}<ArrowUpRight aria-hidden="true" />
+        </button>
+      )}
     </article>
   );
 }

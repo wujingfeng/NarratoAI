@@ -1,6 +1,8 @@
 import { CheckCircle, X } from "@phosphor-icons/react";
+import { useI18n } from "../i18n/useI18n.js";
 
 export function Toast({ message, onClose, isInert = false }) {
+  const { t } = useI18n();
   if (!message) return null;
 
   return (
@@ -13,7 +15,7 @@ export function Toast({ message, onClose, isInert = false }) {
     >
       <CheckCircle size={22} weight="fill" />
       <span>{message}</span>
-      <button type="button" aria-label="关闭提示" onClick={onClose}><X size={17} /></button>
+      <button type="button" aria-label={t("home.toast.close")} onClick={onClose}><X size={17} /></button>
     </div>
   );
 }

@@ -1,31 +1,37 @@
 import { UserCircle } from "@phosphor-icons/react";
 import { Link } from "react-router-dom";
 import { BrandMark } from "../BrandMark.jsx";
+import { LanguageSwitcher } from "../i18n/LanguageSwitcher.jsx";
+import { useI18n } from "../../i18n/useI18n.js";
 
 export function DashboardHeader({ credits, onUnavailable }) {
+  const { formatNumber, t } = useI18n();
   return (
     <header className="dashboard-header">
-      <Link className="dashboard-header--mobile" to="/" aria-label="影创工坊">
+      <Link className="dashboard-header--mobile" to="/" aria-label={t("dashboard.header.home")}>
         <BrandMark />
       </Link>
-      <div className="dashboard-account" aria-label="账户快捷操作">
-        <button
-          className="dashboard-account__balance"
-          type="button"
-          aria-label={`查看创作点余额 ${credits.balance.toLocaleString("en-US")}`}
-          onClick={() => onUnavailable("创作点明细功能建设中")}
-        >
-          <span>创作点</span>
-          <strong>{credits.balance.toLocaleString("en-US")}</strong>
-        </button>
-        <button className="dashboard-account__recharge" type="button" onClick={() => onUnavailable("充值功能建设中")}>
-          去充值
-        </button>
+      <div className="dashboard-account-cluster" role="group" aria-label={t("dashboard.header.accountActions")}>
+        <div className="dashboard-account">
+          <LanguageSwitcher compact />
+          <button
+            className="dashboard-account__balance"
+            type="button"
+            aria-label={t("dashboard.header.viewBalance", { balance: formatNumber(credits.balance) })}
+            onClick={() => onUnavailable(t("dashboard.unavailable.creditDetails"))}
+          >
+            <span>{t("dashboard.credits.title")}</span>
+            <strong>{formatNumber(credits.balance)}</strong>
+          </button>
+          <button className="dashboard-account__recharge" type="button" onClick={() => onUnavailable(t("dashboard.unavailable.recharge"))}>
+            {t("dashboard.header.recharge")}
+          </button>
+        </div>
         <button
           className="dashboard-account__avatar"
           type="button"
-          aria-label="账户中心"
-          onClick={() => onUnavailable("账户中心功能建设中")}
+          aria-label={t("dashboard.nav.account")}
+          onClick={() => onUnavailable(t("dashboard.unavailable.account"))}
         >
           <UserCircle aria-hidden="true" />
         </button>

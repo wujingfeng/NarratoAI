@@ -1,16 +1,18 @@
 import { BrandMark } from "./BrandMark.jsx";
+import { useI18n } from "../i18n/useI18n.js";
 
 export function SiteFooter({ onNavigate, onFeedback, isInert = false }) {
+  const { t } = useI18n();
   return (
     <footer className="site-footer" inert={isInert ? true : undefined} aria-hidden={isInert ? "true" : undefined}>
       <div className="page-container site-footer__inner">
         <button className="brand-button" type="button" onClick={() => onNavigate("hero")}><BrandMark compact /></button>
-        <nav aria-label="页脚导航">
-          <button type="button" onClick={() => onNavigate("capabilities")}>产品能力</button>
-          <button type="button" onClick={() => onNavigate("demo")}>案例 Demo</button>
-          <button type="button" onClick={() => onFeedback("价格页待接入")}>价格</button>
+        <nav aria-label={t("home.footer.navigation")}>
+          <button type="button" onClick={() => onNavigate("capabilities")}>{t("home.header.capabilities")}</button>
+          <button type="button" onClick={() => onNavigate("demo")}>{t("home.header.demo")}</button>
+          <button type="button" onClick={() => onFeedback(t("home.header.pricingFeedback"))}>{t("home.header.pricing")}</button>
         </nav>
-        <div className="site-footer__legal"><button type="button" onClick={() => onFeedback("用户协议待接入")}>用户协议</button><button type="button" onClick={() => onFeedback("隐私政策待接入")}>隐私政策</button></div>
+        <div className="site-footer__legal"><button type="button" onClick={() => onFeedback(t("home.footer.termsFeedback"))}>{t("home.footer.terms")}</button><button type="button" onClick={() => onFeedback(t("home.footer.privacyFeedback"))}>{t("home.footer.privacy")}</button></div>
       </div>
     </footer>
   );

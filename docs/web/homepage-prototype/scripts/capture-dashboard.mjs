@@ -28,6 +28,8 @@ async function capture(name, viewport, fullPage) {
     await page.goto(`${baseUrl}/dashboard`, { waitUntil: "networkidle" });
     await page.locator('[data-page="dashboard"]').waitFor();
     await page.evaluate(() => document.fonts.ready);
+    await page.waitForFunction(() => [...document.querySelectorAll(".case-masonry img")]
+      .every((image) => image.complete && image.naturalWidth > 0));
     await page.screenshot({
       path: new URL(`${name}.png`, outputDir).pathname,
       fullPage,

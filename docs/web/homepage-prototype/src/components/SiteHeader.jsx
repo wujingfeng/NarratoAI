@@ -1,8 +1,11 @@
 import { useEffect, useRef } from "react";
 import { List, X } from "@phosphor-icons/react";
 import { BrandMark } from "./BrandMark.jsx";
+import { LanguageSwitcher } from "./i18n/LanguageSwitcher.jsx";
+import { useI18n } from "../i18n/useI18n.js";
 
 export function SiteHeader({ activeSection, menuOpen, onMenuChange, onNavigate, onFeedback, isInert = false }) {
+  const { t } = useI18n();
   const menuPanelRef = useRef(null);
   const restoreFocusRef = useRef(null);
 
@@ -46,8 +49,8 @@ export function SiteHeader({ activeSection, menuOpen, onMenuChange, onNavigate, 
   }, [menuOpen, onMenuChange]);
 
   const navItems = [
-    { id: "capabilities", label: "产品能力" },
-    { id: "demo", label: "案例 Demo" },
+    { id: "capabilities", label: t("home.header.capabilities") },
+    { id: "demo", label: t("home.header.demo") },
   ];
 
   return (
@@ -57,10 +60,10 @@ export function SiteHeader({ activeSection, menuOpen, onMenuChange, onNavigate, 
         inert={menuOpen ? true : undefined}
         aria-hidden={menuOpen ? "true" : undefined}
       >
-        <button className="brand-button" type="button" onClick={() => onNavigate("hero")}>
+        <button className="brand-button" type="button" aria-label={t("home.header.home")} onClick={() => onNavigate("hero")}>
           <BrandMark />
         </button>
-        <nav className="desktop-nav" aria-label="主导航">
+        <nav className="desktop-nav" aria-label={t("home.header.primaryNavigation")}>
           {navItems.map((item) => (
             <button
               key={item.id}
@@ -71,16 +74,17 @@ export function SiteHeader({ activeSection, menuOpen, onMenuChange, onNavigate, 
               {item.label}
             </button>
           ))}
-          <button type="button" onClick={() => onFeedback("价格页待接入")}>价格</button>
+          <button type="button" onClick={() => onFeedback(t("home.header.pricingFeedback"))}>{t("home.header.pricing")}</button>
         </nav>
         <div className="header-actions">
-          <button className="login-button" type="button" onClick={() => onFeedback("登录流程待接入")}>
-            登录
+          <LanguageSwitcher />
+          <button className="login-button" type="button" onClick={() => onFeedback(t("home.header.loginFeedback"))}>
+            {t("common.login")}
           </button>
           <button
             className="menu-button"
             type="button"
-            aria-label={menuOpen ? "关闭菜单" : "打开菜单"}
+            aria-label={menuOpen ? t("common.closeMenu") : t("common.openMenu")}
             aria-expanded={menuOpen}
             onClick={() => onMenuChange(!menuOpen)}
           >
@@ -89,22 +93,23 @@ export function SiteHeader({ activeSection, menuOpen, onMenuChange, onNavigate, 
         </div>
       </div>
       <div className={`mobile-menu ${menuOpen ? "is-open" : ""}`} aria-hidden={!menuOpen} inert={!menuOpen ? true : undefined}>
-        <button className="mobile-menu__backdrop" type="button" aria-label="关闭菜单" onClick={() => onMenuChange(false)} />
-        <nav ref={menuPanelRef} className="mobile-menu__panel" aria-label="移动端导航">
+        <button className="mobile-menu__backdrop" type="button" aria-label={t("common.closeMenu")} onClick={() => onMenuChange(false)} />
+        <nav ref={menuPanelRef} className="mobile-menu__panel" aria-label={t("home.header.mobileNavigation")}>
           <div className="mobile-menu__top">
             <BrandMark compact />
-            <button type="button" aria-label="关闭菜单" onClick={() => onMenuChange(false)}><X size={26} /></button>
+            <button type="button" aria-label={t("common.closeMenu")} onClick={() => onMenuChange(false)}><X size={26} /></button>
           </div>
           {navItems.map((item, index) => (
             <button key={item.id} type="button" onClick={() => onNavigate(item.id)}>
               <span>0{index + 1}</span>{item.label}
             </button>
           ))}
-          <button type="button" onClick={() => { onMenuChange(false); onFeedback("价格页待接入"); }}>
-            <span>03</span>价格
+          <button type="button" onClick={() => { onMenuChange(false); onFeedback(t("home.header.pricingFeedback")); }}>
+            <span>03</span>{t("home.header.pricing")}
           </button>
-          <button className="mobile-menu__login" type="button" onClick={() => { onMenuChange(false); onFeedback("登录流程待接入"); }}>
-            登录影创工坊
+          <LanguageSwitcher inline />
+          <button className="mobile-menu__login" type="button" onClick={() => { onMenuChange(false); onFeedback(t("home.header.loginFeedback")); }}>
+            {t("home.header.loginFull")}
           </button>
         </nav>
       </div>

@@ -1,15 +1,17 @@
 import { Link } from "react-router-dom";
+import { useI18n } from "../i18n/useI18n.js";
 
 export function NotFoundPage() {
+  const { t } = useI18n();
   return (
     <main>
       <h1 data-route-heading tabIndex="-1">
-        页面未找到
+        {t("errors.notFound.heading")}
       </h1>
-      <p>你访问的页面不存在。</p>
-      <nav aria-label="错误页面导航">
-        <Link to="/">返回官网</Link>
-        <Link to="/dashboard">前往工作台</Link>
+      <p>{t("errors.notFound.description")}</p>
+      <nav aria-label={t("errors.notFound.navigation")}>
+        <Link to="/">{t("errors.notFound.home")}</Link>
+        <Link to="/dashboard">{t("errors.notFound.dashboard")}</Link>
       </nav>
     </main>
   );

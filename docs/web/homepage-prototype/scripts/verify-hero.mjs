@@ -18,6 +18,7 @@ async function ready(page, viewport) {
 
 async function inspectDesktop(width, height) {
   const page = await browser.newPage();
+  await page.addInitScript(() => localStorage.setItem("narrato.locale", "zh-CN"));
   await ready(page, { width, height });
 
   const metrics = await page.evaluate(() => {
@@ -74,7 +75,7 @@ async function inspectDesktop(width, height) {
       projectionBorder: projectionGlow.borderTopWidth,
       projectionFilter: projectionGlow.filter,
       transformStyle: wrapStyle.transformStyle,
-      tiltY: wrapStyle.getPropertyValue("--hero-tilt-y").trim(),
+      tiltY: wrapStyle.getPropertyValue("--hero-panel-rotate-y").trim(),
       boxReflect: workbenchStyle.webkitBoxReflect,
       mirrorFloorExists: Boolean(mirrorFloor),
       mirrorFloorHeight: mirrorFloor?.getBoundingClientRect().height || 0,
@@ -147,7 +148,7 @@ async function inspectDesktop(width, height) {
     check(metrics.violetToken === "#992bff", "紫色 token 必须严格使用 #992bff", metrics.violetToken);
     check(metrics.orangeToken === "#ff9922", "橙色 token 必须严格使用 #ff9922", metrics.orangeToken);
     check(metrics.authoredWorkbenchTransform.includes("perspective(1200px)"), "工作台透视必须使用 perspective(1200px)", metrics.authoredWorkbenchTransform);
-    check(metrics.authoredWorkbenchTransform.includes("rotateY(-7deg)"), "工作台主倾角必须使用 rotateY(-7deg)", metrics.authoredWorkbenchTransform);
+    check(metrics.authoredWorkbenchTransform.includes("rotateY(var(--hero-panel-rotate-y))"), "工作台主倾角必须消费共享 --hero-panel-rotate-y", metrics.authoredWorkbenchTransform);
     check(metrics.workbenchShadow.includes("64, 150, 255"), "霓虹阴影必须包含 #4096ff 蓝光");
     check(metrics.workbenchShadow.includes("153, 43, 255"), "霓虹阴影必须包含 #992bff 紫光");
     check(metrics.workbenchShadow.includes("0px 0px 8px"), "霓虹阴影必须具有近距离光晕层", metrics.workbenchShadow);
@@ -169,6 +170,7 @@ const desktop1200 = await inspectDesktop(1200, 900);
 const desktop1024 = await inspectDesktop(1024, 820);
 
 const mobile = await browser.newPage();
+await mobile.addInitScript(() => localStorage.setItem("narrato.locale", "zh-CN"));
 await ready(mobile, { width: 390, height: 844 });
 const mobileMetrics = await mobile.evaluate(() => ({
   pageWidth: document.documentElement.scrollWidth,
@@ -180,6 +182,7 @@ check(mobileMetrics.titleWhiteSpace === "nowrap", "移动端标题保持既定�
 await mobile.close();
 
 const reduced = await browser.newPage();
+await reduced.addInitScript(() => localStorage.setItem("narrato.locale", "zh-CN"));
 await reduced.emulateMedia({ reducedMotion: "reduce" });
 await ready(reduced, { width: 1920, height: 1080 });
 const reducedAnimation = await reduced.locator(".hero-copy h1 span").evaluate((node) => getComputedStyle(node).animationName);

@@ -1,10 +1,11 @@
 #!/usr/bin/env node
 
-import { access, readFile } from "node:fs/promises";
+import { access, mkdir, readFile } from "node:fs/promises";
 import { constants } from "node:fs";
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { inflateSync } from "node:zlib";
 import { chromium } from "playwright";
 
 const scriptDirectory = path.dirname(fileURLToPath(import.meta.url));
@@ -12,6 +13,8 @@ const projectRoot = path.resolve(scriptDirectory, "..");
 const requestedMode = process.argv.slice(2);
 const baseUrl = process.env.BASE_URL || "http://127.0.0.1:4173/";
 const executablePath = process.env.CHROME_PATH || "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
+const screenshotDirectory = path.join(projectRoot, "artifacts/screenshots");
+const screenshotBuffers = new Map();
 
 const passes = [];
 const failures = [];
@@ -48,6 +51,79 @@ function check(condition, message) {
   } else {
     failures.push(message);
   }
+}
+
+function decodePng(buffer) {
+  let offset = 8;
+  let width = 0;
+  let height = 0;
+  let channels = 0;
+  const idat = [];
+  while (offset < buffer.length) {
+    const length = buffer.readUInt32BE(offset);
+    const type = buffer.toString("ascii", offset + 4, offset + 8);
+    const data = buffer.subarray(offset + 8, offset + 8 + length);
+    if (type === "IHDR") {
+      width = data.readUInt32BE(0);
+      height = data.readUInt32BE(4);
+      check(data[8] === 8 && [2, 6].includes(data[9]), "截图像素 gate 需要 8-bit RGB/RGBA PNG");
+      channels = data[9] === 6 ? 4 : 3;
+    } else if (type === "IDAT") idat.push(data);
+    else if (type === "IEND") break;
+    offset += length + 12;
+  }
+  const raw = inflateSync(Buffer.concat(idat));
+  const stride = width * channels;
+  const pixels = Buffer.alloc(height * stride);
+  const paeth = (a, b, c) => {
+    const p = a + b - c;
+    const pa = Math.abs(p - a);
+    const pb = Math.abs(p - b);
+    const pc = Math.abs(p - c);
+    return pa <= pb && pa <= pc ? a : pb <= pc ? b : c;
+  };
+  let sourceOffset = 0;
+  for (let y = 0; y < height; y += 1) {
+    const filter = raw[sourceOffset++];
+    for (let x = 0; x < stride; x += 1) {
+      const value = raw[sourceOffset++];
+      const left = x >= channels ? pixels[y * stride + x - channels] : 0;
+      const up = y > 0 ? pixels[(y - 1) * stride + x] : 0;
+      const upperLeft = y > 0 && x >= channels ? pixels[(y - 1) * stride + x - channels] : 0;
+      const decoded = filter === 0 ? value
+        : filter === 1 ? value + left
+          : filter === 2 ? value + up
+            : filter === 3 ? value + Math.floor((left + up) / 2)
+              : value + paeth(left, up, upperLeft);
+      pixels[y * stride + x] = decoded & 255;
+    }
+  }
+  return { width, height, channels, pixels };
+}
+
+function compareScreenshotRegion(firstBuffer, secondBuffer, region) {
+  const first = decodePng(firstBuffer);
+  const second = decodePng(secondBuffer);
+  check(first.width === second.width && first.height === second.height, "截图像素 gate 的图片尺寸必须一致");
+  const x0 = Math.floor(first.width * region.x0);
+  const x1 = Math.ceil(first.width * region.x1);
+  const y0 = Math.floor(first.height * region.y0);
+  const y1 = Math.ceil(first.height * region.y1);
+  let difference = 0;
+  let darker = 0;
+  let count = 0;
+  for (let y = y0; y < y1; y += 2) {
+    for (let x = x0; x < x1; x += 2) {
+      const firstIndex = (y * first.width + x) * first.channels;
+      const secondIndex = (y * second.width + x) * second.channels;
+      const firstLuma = (first.pixels[firstIndex] + first.pixels[firstIndex + 1] + first.pixels[firstIndex + 2]) / 3;
+      const secondLuma = (second.pixels[secondIndex] + second.pixels[secondIndex + 1] + second.pixels[secondIndex + 2]) / 3;
+      difference += Math.abs(firstLuma - secondLuma);
+      if (firstLuma + 8 < secondLuma) darker += 1;
+      count += 1;
+    }
+  }
+  return { meanDifference: difference / count, darkerRatio: darker / count };
 }
 
 async function sourceExists(relativePath) {
@@ -257,6 +333,9 @@ async function readSceneMetrics(page) {
       canvasHeight: canvas?.height || 0,
       canvasPointerEvents: canvasStyle?.pointerEvents || "",
       canvasBackground: canvasStyle?.backgroundColor || "",
+      canvasOpacity: canvasStyle?.opacity || "",
+      canvasVisibility: canvasStyle?.visibility || "",
+      alignmentError: Number(scene?.dataset.threeAlignmentError || Number.NaN),
     };
   });
 }
@@ -293,6 +372,13 @@ function checkCommonLayout(metrics, label) {
   check(Boolean(metrics.workbench && metrics.workbench.width > 0 && metrics.workbench.height > 0), `${label} DOM 工作台必须保持可见`);
   check(Boolean(metrics.headline && metrics.headline.width > 0 && metrics.headline.height > 0), `${label} Hero 标题必须保持可见`);
   check(Boolean(metrics.cta && metrics.cta.width > 0 && metrics.cta.height > 0), `${label} Hero CTA 必须保持可见`);
+  if (metrics.headline && metrics.workbench) {
+    const overlaps = metrics.headline.left < metrics.workbench.right
+      && metrics.headline.right > metrics.workbench.left
+      && metrics.headline.top < metrics.workbench.bottom
+      && metrics.headline.bottom > metrics.workbench.top;
+    check(!overlaps, `${label} Hero 标题不得与工作台重叠`);
+  }
 }
 
 async function verifyCtaClick(page, label) {
@@ -307,10 +393,11 @@ async function verifyCtaClick(page, label) {
 }
 
 async function runBrowser() {
+  await mkdir(screenshotDirectory, { recursive: true });
   const browser = await chromium.launch({
     executablePath,
     headless: true,
-    args: ["--enable-webgl", "--ignore-gpu-blocklist", "--use-angle=swiftshader"],
+    args: ["--enable-webgl", "--ignore-gpu-blocklist"],
   });
   const browserErrors = [];
   const viewports = [
@@ -324,20 +411,31 @@ async function runBrowser() {
   try {
     for (const viewport of viewports) {
       const label = `${viewport.width}×${viewport.height}`;
+      console.log(`CHECK ${label}`);
       const page = await browser.newPage({ viewport });
+      await page.addInitScript(() => localStorage.setItem("narrato.locale", "zh-CN"));
       const pageErrors = [];
       page.on("pageerror", (error) => pageErrors.push(`pageerror: ${error.message}`));
+      page.on("response", (response) => {
+        if (response.status() >= 400) pageErrors.push(`response: ${response.status()} ${response.url()}`);
+      });
       page.on("console", (message) => {
-        if (message.type() === "error") pageErrors.push(`console: ${message.text()}`);
+        if (message.type() === "error" && !message.text().startsWith("Failed to load resource:")) {
+          pageErrors.push(`console: ${message.text()}`);
+        }
       });
 
       const didNavigate = await gotoAndCollectFailure(page, baseUrl, label, pageErrors);
+      console.log(`STEP  ${label} navigated=${didNavigate}`);
       if (didNavigate) {
         await page.evaluate(() => document.fonts?.ready);
+        console.log(`STEP  ${label} fonts`);
         await waitForSceneSettled(page);
+        console.log(`STEP  ${label} scene-settled`);
         await page.waitForTimeout(160);
 
         const metrics = await readSceneMetrics(page);
+        console.log(`STEP  ${label} metrics state=${metrics.state}`);
         checkCommonLayout(metrics, label);
         check(metrics.sceneExists, `${label} 必须挂载 .three-hero-scene`);
         check(metrics.state === "ready", `${label} Three 场景状态必须为 ready`, metrics.state || "missing");
@@ -347,19 +445,45 @@ async function runBrowser() {
         check(metrics.canvasWidth > 0 && metrics.canvasHeight > 0, `${label} WebGL canvas 必须具有渲染尺寸`, `${metrics.canvasWidth}×${metrics.canvasHeight}`);
         check(metrics.canvasPointerEvents === "none", `${label} WebGL canvas 必须不拦截 DOM 交互`, metrics.canvasPointerEvents || "missing");
         check(metrics.canvasBackground === "rgba(0, 0, 0, 0)", `${label} WebGL canvas 必须透明`, metrics.canvasBackground || "missing");
+        check(metrics.canvasOpacity === "1" && metrics.canvasVisibility === "visible", `${label} ready canvas 必须可见`, `opacity=${metrics.canvasOpacity}, visibility=${metrics.canvasVisibility}`);
+        check(Number.isFinite(metrics.alignmentError) && metrics.alignmentError <= 2, `${label} Three 投影边轨与 DOM 四边形误差不得超过 2px`, `${metrics.alignmentError}px`);
+
+        if (viewport.width === 1487) {
+          await page.evaluate(() => window.scrollTo({ top: document.querySelector("#demo").offsetTop + window.innerHeight, behavior: "instant" }));
+          await page.waitForFunction(() => document.querySelector(".three-hero-scene")?.dataset.threeLoop === "paused", { timeout: 5000 });
+          check(await page.locator(".three-hero-scene").getAttribute("data-three-loop") === "paused", `${label} Hero 离屏后渲染循环必须暂停`);
+          await page.evaluate(() => window.scrollTo({ top: 0, behavior: "instant" }));
+          await page.waitForFunction(() => ["running", "static"].includes(document.querySelector(".three-hero-scene")?.dataset.threeLoop), { timeout: 5000 });
+          check(await page.locator(".three-hero-scene").getAttribute("data-three-loop") === "running", `${label} Hero 回到视口后桌面渲染循环必须恢复`);
+        }
+
+        const screenshot = await page.screenshot({
+          path: path.join(screenshotDirectory, `three-hero-webgl-${viewport.width}.png`),
+          fullPage: false,
+        });
+        screenshotBuffers.set(`webgl-${viewport.width}`, screenshot);
       }
 
       if (pageErrors.length) {
         browserErrors.push(...pageErrors.map((error) => `${label} ${error}`));
       }
+      console.log(`STEP  ${label} closing-page`);
       await page.close();
+      console.log(`DONE  ${label}`);
     }
 
     const fallback = await browser.newPage({ viewport: { width: 1487, height: 1058 } });
+    await fallback.addInitScript(() => localStorage.setItem("narrato.locale", "zh-CN"));
+    console.log("CHECK threeFallback=1");
     const fallbackErrors = [];
     fallback.on("pageerror", (error) => fallbackErrors.push(`pageerror: ${error.message}`));
+    fallback.on("response", (response) => {
+      if (response.status() >= 400) fallbackErrors.push(`response: ${response.status()} ${response.url()}`);
+    });
     fallback.on("console", (message) => {
-      if (message.type() === "error") fallbackErrors.push(`console: ${message.text()}`);
+      if (message.type() === "error" && !message.text().startsWith("Failed to load resource:")) {
+        fallbackErrors.push(`console: ${message.text()}`);
+      }
     });
 
     const fallbackUrl = new URL(baseUrl);
@@ -380,6 +504,8 @@ async function runBrowser() {
       check(fallbackMetrics.sceneExists, "threeFallback=1 必须保留 Three 场景容器");
       check(fallbackMetrics.state === "fallback", "threeFallback=1 必须进入 fallback 状态", fallbackMetrics.state || "missing");
       check(fallbackMetrics.canvasExists === false, "threeFallback=1 不得创建 WebGL canvas");
+      await fallback.waitForTimeout(650);
+      screenshotBuffers.set("fallback-1487", await fallback.screenshot({ path: path.join(screenshotDirectory, "three-hero-fallback-1487.png"), fullPage: false }));
       await verifyCtaClick(fallback, "threeFallback=1");
     }
 
@@ -387,8 +513,47 @@ async function runBrowser() {
       browserErrors.push(...fallbackErrors.map((error) => `threeFallback=1 ${error}`));
     }
     await fallback.close();
+    console.log("DONE  threeFallback=1");
+
+    const reduced = await browser.newPage({ viewport: { width: 1487, height: 1058 } });
+    await reduced.addInitScript(() => localStorage.setItem("narrato.locale", "zh-CN"));
+    const reducedErrors = [];
+    reduced.on("pageerror", (error) => reducedErrors.push(`pageerror: ${error.message}`));
+    reduced.on("response", (response) => {
+      if (response.status() >= 400) reducedErrors.push(`response: ${response.status()} ${response.url()}`);
+    });
+    reduced.on("console", (message) => {
+      if (message.type() === "error" && !message.text().startsWith("Failed to load resource:")) {
+        reducedErrors.push(`console: ${message.text()}`);
+      }
+    });
+    await reduced.emulateMedia({ reducedMotion: "reduce" });
+    const didNavigateReduced = await gotoAndCollectFailure(reduced, baseUrl, "reduced-motion", reducedErrors);
+    if (didNavigateReduced) {
+      await waitForSceneSettled(reduced);
+      await reduced.waitForFunction(() => document.querySelector(".three-hero-scene")?.dataset.threeLoop === "static");
+      const reducedMetrics = await readSceneMetrics(reduced);
+      checkCommonLayout(reducedMetrics, "reduced-motion");
+      check(reducedMetrics.state === "fallback", "reduced-motion 必须进入真实 fallback", reducedMetrics.state);
+      check(reducedMetrics.loop === "static", "reduced-motion 渲染循环必须为 static", reducedMetrics.loop);
+      check(reducedMetrics.canvasExists === false, "reduced-motion fallback 不得保留 canvas");
+      screenshotBuffers.set("reduced-1487", await reduced.screenshot({ path: path.join(screenshotDirectory, "three-hero-reduced-motion-1487.png"), fullPage: false }));
+    }
+    browserErrors.push(...reducedErrors.map((error) => `reduced-motion ${error}`));
+    await reduced.close();
+
+    if (screenshotBuffers.has("webgl-1487") && screenshotBuffers.has("fallback-1487")) {
+      const visibleWebgl = compareScreenshotRegion(screenshotBuffers.get("webgl-1487"), screenshotBuffers.get("fallback-1487"), { x0: 0.34, x1: 0.96, y0: 0.55, y1: 0.78 });
+      check(visibleWebgl.meanDifference >= 1.2, "WebGL 截图必须在镜面/轨道区域产生可辨别像素贡献", `meanDifference=${visibleWebgl.meanDifference.toFixed(2)}`);
+    }
+    if (screenshotBuffers.has("reduced-1487") && screenshotBuffers.has("fallback-1487")) {
+      const blackBlock = compareScreenshotRegion(screenshotBuffers.get("reduced-1487"), screenshotBuffers.get("fallback-1487"), { x0: 0, x1: 0.36, y0: 0, y1: 0.62 });
+      check(blackBlock.darkerRatio < 0.08, "reduced-motion 截图不得出现大面积黑色合成块", `darkerRatio=${blackBlock.darkerRatio.toFixed(3)}`);
+    }
   } finally {
+    console.log("CHECK browser.close");
     await browser.close();
+    console.log("DONE  browser.close");
   }
 
   for (const error of browserErrors) {

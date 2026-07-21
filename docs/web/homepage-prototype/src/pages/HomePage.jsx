@@ -9,8 +9,10 @@ import { FinalCtaSection } from "../components/FinalCtaSection.jsx";
 import { SiteFooter } from "../components/SiteFooter.jsx";
 import { VideoModal } from "../components/VideoModal.jsx";
 import { Toast } from "../components/Toast.jsx";
+import { useI18n } from "../i18n/useI18n.js";
 
 export function HomePage() {
+  const { t } = useI18n();
   const navigate = useNavigate();
   const [activeTool, setActiveTool] = useState("narration");
   const [menuOpen, setMenuOpen] = useState(false);
@@ -86,7 +88,7 @@ export function HomePage() {
           onTemplate={startCreation}
         />
         <CapabilitySection activeTool={activeTool} onChooseTool={startCreation} />
-        <section className="lower-grid page-container" aria-label="常见问题与开始创作">
+        <section className="lower-grid page-container" aria-label={t("home.lowerGridLabel")}>
           <FaqSection />
           <FinalCtaSection onStart={startCreation} />
         </section>
