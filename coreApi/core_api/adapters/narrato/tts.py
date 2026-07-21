@@ -76,7 +76,8 @@ class FakeTtsProvider:
             output.writeframes(
                 b"".join(
                     struct.pack(
-                        "<h", as_int(800 * math.sin(2 * math.pi * 220 * i / sample_rate))
+                        "<h",
+                        as_int(800 * math.sin(2 * math.pi * 220 * i / sample_rate)),
                     )
                     for i in range(frames)
                 )

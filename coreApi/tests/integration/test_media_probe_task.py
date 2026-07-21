@@ -46,12 +46,16 @@ class FixtureDownloader:
     def __init__(self, source: Path) -> None:
         self.source = source
 
-    def download(self, url: str, destination: Path, *, max_bytes: int) -> DownloadReceipt:
+    def download(
+        self, url: str, destination: Path, *, max_bytes: int
+    ) -> DownloadReceipt:
         assert url.startswith("https://cdn.example.test/narrato/api/")
         assert self.source.stat().st_size <= max_bytes
         destination.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(self.source, destination)
-        return DownloadReceipt(url=url, size=destination.stat().st_size, content_type="video/mp4")
+        return DownloadReceipt(
+            url=url, size=destination.stat().st_size, content_type="video/mp4"
+        )
 
 
 @pytest.fixture
@@ -122,7 +126,9 @@ def test_media_probe_post_is_202_idempotent_and_dispatches_once(api_client):
     assert first.json()["data"]["status"] == "queued"
     assert dispatcher.task_ids == [task_id]
 
-    status = client.get(f"/api/v1/tasks/{task_id}", headers={"Authorization": AUTH["Authorization"]})
+    status = client.get(
+        f"/api/v1/tasks/{task_id}", headers={"Authorization": AUTH["Authorization"]}
+    )
     assert status.status_code == 200
     assert status.json()["data"]["artifacts"] == []
 
@@ -265,7 +271,9 @@ def test_retryable_failure_waits_for_due_dispatch_then_succeeds(session, tmp_pat
     retrying = service.get_task(task.id)
     assert retrying.status == CoreTaskStatus.RETRY_WAIT
     assert retrying.current_attempt_no == 1
-    assert [(item.attempt_no, item.status.value) for item in retrying.attempts] == [(1, "failed")]
+    assert [(item.attempt_no, item.status.value) for item in retrying.attempts] == [
+        (1, "failed")
+    ]
 
     pending = session.scalar(
         select(CoreDispatchOutbox).where(
@@ -341,7 +349,10 @@ def test_media_probe_idempotency_conflict_and_missing_status(api_client):
         "media_type": "video",
         "declared_extension": "mp4",
     }
-    assert client.post("/api/v1/media-probe/tasks", headers=AUTH, json=body).status_code == 202
+    assert (
+        client.post("/api/v1/media-probe/tasks", headers=AUTH, json=body).status_code
+        == 202
+    )
     body["source_url"] = "https://cdn.example.test/narrato/api/other.mp4"
     conflict = client.post("/api/v1/media-probe/tasks", headers=AUTH, json=body)
     assert conflict.status_code == 409
@@ -424,7 +435,9 @@ def test_media_handler_uses_real_probe_and_writes_terminal_outbox(session, tmp_p
     assert result["media_type"] == "video"
     assert result["duration_seconds"] > 0
     assert "/private/" not in str(result)
-    outboxes = session.scalars(select(CallbackOutbox).where(CallbackOutbox.core_task_id == task.id)).all()
+    outboxes = session.scalars(
+        select(CallbackOutbox).where(CallbackOutbox.core_task_id == task.id)
+    ).all()
     assert [row.payload["status"] for row in outboxes] == ["running", "succeeded"]
 
 
@@ -466,9 +479,7 @@ def test_media_handler_validates_srt_without_uploading_input(session, tmp_path):
     from core_api.tasks.service import TaskService
 
     subtitle = tmp_path / "fixture.srt"
-    subtitle.write_text(
-        "1\n00:00:00,000 --> 00:00:01,500\n字幕\n", encoding="utf-8"
-    )
+    subtitle.write_text("1\n00:00:00,000 --> 00:00:01,500\n字幕\n", encoding="utf-8")
     service = TaskService(session)
     task = service.create_core_task(
         caller="narrato-api",
@@ -494,6 +505,9 @@ def test_media_handler_validates_srt_without_uploading_input(session, tmp_path):
     finished = service.get_task(task.id)
     assert finished.status == CoreTaskStatus.SUCCEEDED
     assert finished.result["cue_count"] == 1
-    assert session.scalar(
-        select(CoreTask).where(CoreTask.id == task.id)
-    ).result.get("artifacts") is None
+    assert (
+        session.scalar(select(CoreTask).where(CoreTask.id == task.id)).result.get(
+            "artifacts"
+        )
+        is None
+    )

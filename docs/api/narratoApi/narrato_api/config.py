@@ -47,9 +47,7 @@ class Settings(BaseSettings):
     session_ttl_seconds: int = Field(default=2_592_000, ge=300, le=7_776_000)
     auth_redis_timeout_seconds: float = Field(default=3.0, gt=0, le=30)
     password_argon2_time_cost: int = Field(default=3, ge=1, le=10)
-    password_argon2_memory_cost_kib: int = Field(
-        default=65_536, ge=8_192, le=262_144
-    )
+    password_argon2_memory_cost_kib: int = Field(default=65_536, ge=8_192, le=262_144)
     password_argon2_parallelism: int = Field(default=2, ge=1, le=8)
     oss_endpoint: str = ""
     oss_bucket: str = ""
@@ -98,7 +96,9 @@ class Settings(BaseSettings):
             or self.verification_code_send_lease_seconds
             >= self.verification_code_ttl_seconds
         ):
-            raise ValueError("verification delivery timeouts must fit inside code lease and TTL")
+            raise ValueError(
+                "verification delivery timeouts must fit inside code lease and TTL"
+            )
         return self
 
 

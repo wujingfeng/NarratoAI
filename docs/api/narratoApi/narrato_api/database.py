@@ -66,6 +66,7 @@ def create_database_engine(
                 cursor.execute(f"PRAGMA busy_timeout={busy_timeout_ms}")
             finally:
                 cursor.close()
+
     return engine
 
 

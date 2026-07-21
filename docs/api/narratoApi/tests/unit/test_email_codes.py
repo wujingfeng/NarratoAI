@@ -5,7 +5,11 @@ import subprocess
 
 import pytest
 
-from narrato_api.auth.service import EmailCodeManager, InMemoryEmailCodeStore, normalize_email
+from narrato_api.auth.service import (
+    EmailCodeManager,
+    InMemoryEmailCodeStore,
+    normalize_email,
+)
 from narrato_api.integrations.mail_client import (
     CeleryMailDispatcher,
     seal_verification_code,
@@ -24,7 +28,10 @@ def test_codes_are_hashed_scoped_replaced_and_consumed_once() -> None:
     assert first.code is not None and first.code.isdigit() and len(first.code) == 6
     assert first.code not in repr(store.snapshot())
     assert "user@example.com" not in repr(store.snapshot())
-    assert manager.consume("user@example.com", first.code, purpose="password_reset") is False
+    assert (
+        manager.consume("user@example.com", first.code, purpose="password_reset")
+        is False
+    )
 
     second = manager.issue("user@example.com", purpose="register")
     assert second.created is True and second.code != first.code
@@ -64,7 +71,12 @@ def test_concurrent_code_consumption_has_one_winner() -> None:
 
 @pytest.mark.parametrize(
     "email",
-    [".foo@example.com", "foo.@example.com", "foo..bar@example.com", "foo@ｅxample.com"],
+    [
+        ".foo@example.com",
+        "foo.@example.com",
+        "foo..bar@example.com",
+        "foo@ｅxample.com",
+    ],
 )
 def test_email_parser_rejects_ambiguous_dot_and_idna_forms(email: str) -> None:
     with pytest.raises(ValueError, match="invalid email"):
@@ -79,15 +91,12 @@ def test_broker_payload_seals_code_and_binds_email_and_purpose() -> None:
         secret="mail-sealing-secret",
     )
     assert "123456" not in sealed
-    assert (
-        unseal_verification_code(
-            sealed,
-            email="user@example.com",
-            purpose="register",
-            secret="mail-sealing-secret",
-        )
-        == ("123456", True)
-    )
+    assert unseal_verification_code(
+        sealed,
+        email="user@example.com",
+        purpose="register",
+        secret="mail-sealing-secret",
+    ) == ("123456", True)
     with pytest.raises(ValueError):
         unseal_verification_code(
             sealed,
@@ -108,7 +117,8 @@ def test_celery_dispatcher_never_puts_plain_code_in_broker_kwargs() -> None:
             pass
 
     CeleryMailDispatcher(
-        celery=Producer(), sealing_secret="mail-sealing-secret"  # type: ignore[arg-type]
+        celery=Producer(),
+        sealing_secret="mail-sealing-secret",  # type: ignore[arg-type]
     ).enqueue(
         "user@example.com",
         "654321",
@@ -121,15 +131,12 @@ def test_celery_dispatcher_never_puts_plain_code_in_broker_kwargs() -> None:
     assert "654321" not in repr(captured)
     kwargs = captured["kwargs"]
     assert isinstance(kwargs, dict)
-    assert (
-        unseal_verification_code(
-            str(kwargs["sealed_code"]),
-            email="user@example.com",
-            purpose="password_reset",
-            secret="mail-sealing-secret",
-        )
-        == ("654321", False)
-    )
+    assert unseal_verification_code(
+        str(kwargs["sealed_code"]),
+        email="user@example.com",
+        purpose="password_reset",
+        secret="mail-sealing-secret",
+    ) == ("654321", False)
     assert captured["name"] == "narrato.auth.send_verification_email"
     assert captured["expires"] == 600
 

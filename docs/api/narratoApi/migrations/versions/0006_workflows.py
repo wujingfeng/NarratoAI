@@ -4,6 +4,7 @@ Revision ID: 0006_workflows
 Revises: 0005_asset_probe_reservations
 Create Date: 2026-07-17
 """
+
 from typing import Sequence
 
 import sqlalchemy as sa
@@ -26,7 +27,9 @@ def upgrade() -> None:
         sa.Column("definition", sa.JSON(), nullable=False),
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
         sa.PrimaryKeyConstraint("id"),
-        sa.UniqueConstraint("template_name", "version", name="uq_workflow_templates_name_version"),
+        sa.UniqueConstraint(
+            "template_name", "version", name="uq_workflow_templates_name_version"
+        ),
     )
     op.create_table(
         "workflows",
@@ -46,7 +49,9 @@ def upgrade() -> None:
         sa.CheckConstraint("state_version >= 0", name="ck_workflows_state_version"),
         sa.ForeignKeyConstraint(["project_id"], ["projects.id"], ondelete="RESTRICT"),
         sa.ForeignKeyConstraint(
-            ["template_snapshot_id"], ["workflow_template_snapshots.id"], ondelete="RESTRICT"
+            ["template_snapshot_id"],
+            ["workflow_template_snapshots.id"],
+            ondelete="RESTRICT",
         ),
         sa.ForeignKeyConstraint(["user_id"], ["users.id"], ondelete="RESTRICT"),
         sa.PrimaryKeyConstraint("id"),
@@ -72,9 +77,13 @@ def upgrade() -> None:
         sa.CheckConstraint("max_attempts >= 1", name="ck_workflow_nodes_max_attempts"),
         sa.ForeignKeyConstraint(["workflow_id"], ["workflows.id"], ondelete="RESTRICT"),
         sa.PrimaryKeyConstraint("id"),
-        sa.UniqueConstraint("workflow_id", "name", name="uq_workflow_nodes_workflow_name"),
+        sa.UniqueConstraint(
+            "workflow_id", "name", name="uq_workflow_nodes_workflow_name"
+        ),
     )
-    op.create_index("ix_workflow_nodes_workflow_state", "workflow_nodes", ["workflow_id", "state"])
+    op.create_index(
+        "ix_workflow_nodes_workflow_state", "workflow_nodes", ["workflow_id", "state"]
+    )
     op.create_table(
         "workflow_node_attempts",
         sa.Column("id", sa.String(length=64), nullable=False),
@@ -89,12 +98,20 @@ def upgrade() -> None:
             "state IN ('queued', 'running', 'completed', 'failed')",
             name="ck_workflow_node_attempts_state",
         ),
-        sa.CheckConstraint("attempt_number >= 1", name="ck_workflow_node_attempts_number"),
-        sa.ForeignKeyConstraint(["workflow_node_id"], ["workflow_nodes.id"], ondelete="RESTRICT"),
+        sa.CheckConstraint(
+            "attempt_number >= 1", name="ck_workflow_node_attempts_number"
+        ),
+        sa.ForeignKeyConstraint(
+            ["workflow_node_id"], ["workflow_nodes.id"], ondelete="RESTRICT"
+        ),
         sa.PrimaryKeyConstraint("id"),
-        sa.UniqueConstraint("core_task_id", name="uq_workflow_node_attempts_core_task_id"),
         sa.UniqueConstraint(
-            "workflow_node_id", "attempt_number", name="uq_workflow_node_attempts_node_number"
+            "core_task_id", name="uq_workflow_node_attempts_core_task_id"
+        ),
+        sa.UniqueConstraint(
+            "workflow_node_id",
+            "attempt_number",
+            name="uq_workflow_node_attempts_node_number",
         ),
     )
     op.create_index(
@@ -116,12 +133,17 @@ def upgrade() -> None:
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
         sa.Column("sent_at", sa.DateTime(timezone=True), nullable=True),
         sa.CheckConstraint(
-            "status IN ('pending', 'sending', 'sent', 'dead')", name="ck_workflow_outbox_status"
+            "status IN ('pending', 'sending', 'sent', 'dead')",
+            name="ck_workflow_outbox_status",
         ),
         sa.ForeignKeyConstraint(["workflow_id"], ["workflows.id"], ondelete="RESTRICT"),
-        sa.ForeignKeyConstraint(["workflow_node_id"], ["workflow_nodes.id"], ondelete="RESTRICT"),
+        sa.ForeignKeyConstraint(
+            ["workflow_node_id"], ["workflow_nodes.id"], ondelete="RESTRICT"
+        ),
         sa.PrimaryKeyConstraint("id"),
-        sa.UniqueConstraint("idempotency_key", name="uq_workflow_outbox_idempotency_key"),
+        sa.UniqueConstraint(
+            "idempotency_key", name="uq_workflow_outbox_idempotency_key"
+        ),
     )
     op.create_index(
         "ix_workflow_outbox_status_created", "workflow_outbox", ["status", "created_at"]
@@ -133,7 +155,9 @@ def downgrade() -> None:
 
     op.drop_index("ix_workflow_outbox_status_created", table_name="workflow_outbox")
     op.drop_table("workflow_outbox")
-    op.drop_index("ix_workflow_node_attempts_node_state", table_name="workflow_node_attempts")
+    op.drop_index(
+        "ix_workflow_node_attempts_node_state", table_name="workflow_node_attempts"
+    )
     op.drop_table("workflow_node_attempts")
     op.drop_index("ix_workflow_nodes_workflow_state", table_name="workflow_nodes")
     op.drop_table("workflow_nodes")

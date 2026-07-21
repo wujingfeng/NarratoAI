@@ -23,7 +23,9 @@ def test_failure_refund_is_applied_once_as_a_reverse_ledger_entry() -> None:
             )
         )
     billing = BillingService(sessions)
-    billing.grant("usr_refund", 100, reason="operator_grant", idempotency_key="grant:one")
+    billing.grant(
+        "usr_refund", 100, reason="operator_grant", idempotency_key="grant:one"
+    )
     billing.charge_project("usr_refund", "prj_refund", 20)
     billing.refund_failed_project("prj_refund")
     billing.refund_failed_project("prj_refund")

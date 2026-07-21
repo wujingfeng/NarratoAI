@@ -61,9 +61,7 @@ def _error_response(
     request_id = _request_id(request)
     return JSONResponse(
         status_code=status_code,
-        content=envelope(
-            request_id=request_id, code=code, message=message, data=data
-        ),
+        content=envelope(request_id=request_id, code=code, message=message, data=data),
         headers={"X-Request-ID": request_id},
     )
 
@@ -132,8 +130,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 remember_cleanup_error(error, "LOGGING_CLEANUP_FAILED")
 
             ordered_errors = (
-                ([body_error] if body_error is not None else []) + cleanup_errors
-            )
+                [body_error] if body_error is not None else []
+            ) + cleanup_errors
             cancellation = next(
                 (
                     error
@@ -195,8 +193,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         """返回不包含请求体值和内部对象的字段错误。"""
 
         details = [
-            {"loc": list(item["loc"]), "type": item["type"]}
-            for item in error.errors()
+            {"loc": list(item["loc"]), "type": item["type"]} for item in error.errors()
         ]
         return _error_response(
             request,

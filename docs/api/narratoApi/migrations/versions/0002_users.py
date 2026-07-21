@@ -4,6 +4,7 @@ Revision ID: 0002_users
 Revises: 0001_business_base
 Create Date: 2026-07-17
 """
+
 from typing import Sequence
 
 import sqlalchemy as sa
@@ -27,9 +28,7 @@ def upgrade() -> None:
         sa.Column("password_version", sa.Integer(), nullable=False),
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
         sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False),
-        sa.CheckConstraint(
-            "status IN ('active', 'disabled')", name="ck_users_status"
-        ),
+        sa.CheckConstraint("status IN ('active', 'disabled')", name="ck_users_status"),
         sa.CheckConstraint(
             "email = lower(email) AND email = trim(email)",
             name="ck_users_email_normalized",

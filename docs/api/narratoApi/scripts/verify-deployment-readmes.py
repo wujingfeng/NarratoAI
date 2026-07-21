@@ -56,7 +56,9 @@ def main() -> int:
     core_readme = README_PATHS[1]
     for fragment in CORE_QUEUE_REQUIREMENTS:
         if fragment not in contents.get(core_readme, ""):
-            failures.append(f"{core_readme}: missing Core queue explanation {fragment!r}")
+            failures.append(
+                f"{core_readme}: missing Core queue explanation {fragment!r}"
+            )
 
     if failures:
         print("Deployment README validation failed:", file=sys.stderr)

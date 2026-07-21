@@ -192,7 +192,9 @@ class JianyingBuilder:
                 ):
                     raise JianyingInputError("JIANYING_VIDEO_METADATA_INVALID")
                 resource_entry.update(
-                    width=as_int(width), height=as_int(height), duration=as_float(duration)
+                    width=as_int(width),
+                    height=as_int(height),
+                    duration=as_float(duration),
                 )
             elif any(
                 item.get(key) is not None for key in ("width", "height", "duration")

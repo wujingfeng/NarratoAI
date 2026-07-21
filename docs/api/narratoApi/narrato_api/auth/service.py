@@ -84,7 +84,12 @@ def decode_session_identity(value: str) -> SessionIdentity:
     """严格解析 Redis 会话版本元数据。"""
 
     user_id, separator, version = value.rpartition("|")
-    if separator != "|" or not user_id or not version.isascii() or not version.isdigit():
+    if (
+        separator != "|"
+        or not user_id
+        or not version.isascii()
+        or not version.isdigit()
+    ):
         raise ValueError("invalid session identity")
     parsed = int(version)
     if parsed < 1:
@@ -372,7 +377,9 @@ class InMemoryEmailCodeStore:
             item = self._values.get(key)
             if item is None:
                 return False
-            if item.generation != generation or not hmac.compare_digest(item.digest, digest):
+            if item.generation != generation or not hmac.compare_digest(
+                item.digest, digest
+            ):
                 return False
             del self._values[key]
             return True
@@ -592,10 +599,10 @@ class AuthService:
 
         normalized = normalize_email(email)
         validate_password(password)
-        if not self.codes.consume(
-            normalized, verification_code, purpose="register"
-        ):
-            raise ApiError("INVALID_VERIFICATION_CODE", "Verification code is invalid", 400)
+        if not self.codes.consume(normalized, verification_code, purpose="register"):
+            raise ApiError(
+                "INVALID_VERIFICATION_CODE", "Verification code is invalid", 400
+            )
         user = User(
             id=_new_user_id(),
             email=normalized,
@@ -626,9 +633,7 @@ class AuthService:
             with self.session_factory() as session:
                 with session.begin():
                     user = session.scalar(
-                        select(User)
-                        .where(User.email == normalized)
-                        .with_for_update()
+                        select(User).where(User.email == normalized).with_for_update()
                     )
                     stored = user.password_hash if user is not None else None
                     verified = self.password_hasher.verify(stored, password)
@@ -685,14 +690,14 @@ class AuthService:
         if not self.codes.consume(
             normalized, verification_code, purpose="password_reset"
         ):
-            raise ApiError("INVALID_VERIFICATION_CODE", "Verification code is invalid", 400)
+            raise ApiError(
+                "INVALID_VERIFICATION_CODE", "Verification code is invalid", 400
+            )
         with self._account_lock(normalized):
             with self.session_factory() as session:
                 with session.begin():
                     user = session.scalar(
-                        select(User)
-                        .where(User.email == normalized)
-                        .with_for_update()
+                        select(User).where(User.email == normalized).with_for_update()
                     )
                     if user is None or user.status != "active":
                         raise ApiError(

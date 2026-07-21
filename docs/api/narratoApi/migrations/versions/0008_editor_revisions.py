@@ -25,9 +25,7 @@ def upgrade() -> None:
         sa.Column("project_id", sa.String(length=64), nullable=False),
         sa.Column("content", sa.JSON(), nullable=False),
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
-        sa.ForeignKeyConstraint(
-            ["project_id"], ["projects.id"], ondelete="RESTRICT"
-        ),
+        sa.ForeignKeyConstraint(["project_id"], ["projects.id"], ondelete="RESTRICT"),
         sa.PrimaryKeyConstraint("id"),
     )
 

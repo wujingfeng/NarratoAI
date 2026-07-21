@@ -18,8 +18,16 @@ def test_process_runner_returns_success_and_nonzero_output():
     failure = runner.run(
         [sys.executable, "-c", "import sys; print('bad', file=sys.stderr); sys.exit(7)"]
     )
-    assert (success.exit_code, success.stdout.strip(), success.timed_out) == (0, "ok", False)
-    assert (failure.exit_code, failure.stderr.strip(), failure.timed_out) == (7, "bad", False)
+    assert (success.exit_code, success.stdout.strip(), success.timed_out) == (
+        0,
+        "ok",
+        False,
+    )
+    assert (failure.exit_code, failure.stderr.strip(), failure.timed_out) == (
+        7,
+        "bad",
+        False,
+    )
 
 
 def test_process_runner_heartbeats_and_times_out_process_group():
@@ -66,8 +74,7 @@ def test_process_runner_drains_large_stdout_and_stderr_without_deadlock():
         [
             sys.executable,
             "-c",
-            "import os; data=b'x'*(2*1024*1024); "
-            "os.write(1,data); os.write(2,data)",
+            "import os; data=b'x'*(2*1024*1024); os.write(1,data); os.write(2,data)",
         ],
         timeout_seconds=2,
     )
@@ -99,7 +106,9 @@ def test_process_runner_reclaims_child_when_heartbeat_fails():
     """心跳回调异常时也终止并回收子进程。"""
 
     runner = ProcessRunner(heartbeat_interval_seconds=0.01)
-    with patch.object(runner, "_terminate_group", wraps=runner._terminate_group) as stop:
+    with patch.object(
+        runner, "_terminate_group", wraps=runner._terminate_group
+    ) as stop:
         with pytest.raises(RuntimeError, match="heartbeat failed"):
             runner.run(
                 [sys.executable, "-c", "import time; time.sleep(5)"],

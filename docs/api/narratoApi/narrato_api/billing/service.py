@@ -43,9 +43,7 @@ def _entry(
 
 def _locked_account(session: Session, user_id: str) -> CreditAccount:
     account = session.scalar(
-        select(CreditAccount)
-        .where(CreditAccount.user_id == user_id)
-        .with_for_update()
+        select(CreditAccount).where(CreditAccount.user_id == user_id).with_for_update()
     )
     if account is None:
         account = CreditAccount(user_id=user_id, balance=0)
@@ -115,7 +113,9 @@ class BillingService:
     def __init__(self, session_factory: SessionFactory) -> None:
         self.session_factory = session_factory
 
-    def grant(self, user_id: str, amount: int, *, reason: str, idempotency_key: str) -> bool:
+    def grant(
+        self, user_id: str, amount: int, *, reason: str, idempotency_key: str
+    ) -> bool:
         """运维充值；同一个业务幂等键只会增加一次余额。"""
 
         if amount <= 0:

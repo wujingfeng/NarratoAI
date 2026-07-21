@@ -54,6 +54,7 @@ _LOCAL_OPERATION_LOCK = threading.Lock()
 @dataclass(frozen=True, slots=True)
 class ReconciliationArtifact:
     """持久化补偿日志中的单个 OSS Artifact 安全事实。"""
+
     artifact_id: str
     kind: str
     object_key: str

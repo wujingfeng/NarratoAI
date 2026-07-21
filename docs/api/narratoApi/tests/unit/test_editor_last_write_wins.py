@@ -45,7 +45,9 @@ def _editor_service() -> tuple[EditorService, sessionmaker]:
     return EditorService(sessions), sessions
 
 
-def test_editor_draft_keeps_only_the_last_accepted_save_until_render_submission() -> None:
+def test_editor_draft_keeps_only_the_last_accepted_save_until_render_submission() -> (
+    None
+):
     service, sessions = _editor_service()
 
     first_id = service.save_draft(

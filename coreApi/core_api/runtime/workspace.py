@@ -93,7 +93,9 @@ class CoreTaskWorkspace:
 
         if area not in {"input", "temp", "output"}:
             raise WorkspaceSecurityError("WORKSPACE_AREA_INVALID")
-        flags = os.O_RDONLY | getattr(os, "O_DIRECTORY", 0) | getattr(os, "O_NOFOLLOW", 0)
+        flags = (
+            os.O_RDONLY | getattr(os, "O_DIRECTORY", 0) | getattr(os, "O_NOFOLLOW", 0)
+        )
         try:
             descriptor = os.open(self.base_dir, flags)
             relative = (self.root / area).relative_to(self.base_dir)

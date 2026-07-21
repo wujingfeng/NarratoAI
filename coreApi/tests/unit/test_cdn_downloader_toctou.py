@@ -23,11 +23,15 @@ def test_downloader_rejects_replaced_workspace_ancestor(tmp_path):
     workspace.input_dir.symlink_to(outside, target_is_directory=True)
     downloader = HttpCdnDownloader(
         CdnUrlPolicy({"cdn.example.test"}),
-        transport=httpx.MockTransport(lambda _request: httpx.Response(200, content=b"owned")),
+        transport=httpx.MockTransport(
+            lambda _request: httpx.Response(200, content=b"owned")
+        ),
     )
 
     with pytest.raises(DownloadTemporaryError, match="SOURCE_DOWNLOAD_FAILED"):
-        downloader.download("https://cdn.example.test/narrato/api/source.mp4", target, max_bytes=100)
+        downloader.download(
+            "https://cdn.example.test/narrato/api/source.mp4", target, max_bytes=100
+        )
     assert not (outside / "source.mp4").exists()
 
 
@@ -38,7 +42,9 @@ def test_downloader_does_not_delete_preexisting_destination(tmp_path):
     destination.write_bytes(b"keep")
     downloader = HttpCdnDownloader(
         CdnUrlPolicy({"cdn.example.test"}),
-        transport=httpx.MockTransport(lambda _request: httpx.Response(200, content=b"new")),
+        transport=httpx.MockTransport(
+            lambda _request: httpx.Response(200, content=b"new")
+        ),
     )
     with pytest.raises(DownloadTemporaryError):
         downloader.download(

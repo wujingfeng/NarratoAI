@@ -55,7 +55,11 @@ def _ffprobe_binary() -> str:
 def _normalize_container(format_name: object, path: str) -> str:
     """将 FFprobe 的复合容器名归一化为稳定短名称。"""
 
-    names = [part.strip().lower() for part in str(format_name or "").split(",") if part.strip()]
+    names = [
+        part.strip().lower()
+        for part in str(format_name or "").split(",")
+        if part.strip()
+    ]
     suffix = Path(path).suffix.lower().lstrip(".")
     aliases = {"m4v": "mp4", "m4a": "mp4", "qt": "mov", "matroska": "mkv"}
 
@@ -118,20 +122,37 @@ def probe_media(path: str) -> MediaInfo:
             raise TypeError("根节点不是对象")
         raw_streams = payload.get("streams", [])
         raw_format = payload.get("format", {})
-        if not isinstance(raw_streams, list) or not all(isinstance(stream, dict) for stream in raw_streams):
+        if not isinstance(raw_streams, list) or not all(
+            isinstance(stream, dict) for stream in raw_streams
+        ):
             raise TypeError("streams 不是对象数组")
         if not isinstance(raw_format, dict):
             raise TypeError("format 不是对象")
 
         streams = raw_streams
         format_data = raw_format
-        video_stream = next((stream for stream in streams if stream.get("codec_type") == "video"), None)
-        audio_stream = next((stream for stream in streams if stream.get("codec_type") == "audio"), None)
+        video_stream = next(
+            (stream for stream in streams if stream.get("codec_type") == "video"), None
+        )
+        audio_stream = next(
+            (stream for stream in streams if stream.get("codec_type") == "audio"), None
+        )
         duration = _positive_float(format_data.get("duration"))
         if duration <= 0:
-            duration = max((_positive_float(stream.get("duration")) for stream in streams), default=0.0)
-        width = int(video_stream["width"]) if video_stream and video_stream.get("width") else None
-        height = int(video_stream["height"]) if video_stream and video_stream.get("height") else None
+            duration = max(
+                (_positive_float(stream.get("duration")) for stream in streams),
+                default=0.0,
+            )
+        width = (
+            int(video_stream["width"])
+            if video_stream and video_stream.get("width")
+            else None
+        )
+        height = (
+            int(video_stream["height"])
+            if video_stream and video_stream.get("height")
+            else None
+        )
     except (AttributeError, TypeError, ValueError) as exc:
         raise MediaProbeError(f"FFprobe 返回结构无效: {exc}") from exc
     if duration <= 0:

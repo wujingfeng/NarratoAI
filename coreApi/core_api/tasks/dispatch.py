@@ -110,7 +110,9 @@ class DispatchOutboxPublisher:
             # Broker 原始异常可能含 URI/凭据，只持久化稳定分类。
             row.attempt_count += 1
             row.last_error = "DISPATCH_FAILED"
-            row.available_at = observed_at + timedelta(seconds=self.failure_delay_seconds)
+            row.available_at = observed_at + timedelta(
+                seconds=self.failure_delay_seconds
+            )
             row.recover_after = None
             self.session.commit()
             return False
@@ -151,9 +153,5 @@ class DispatchOutboxPublisher:
         ).all()
         sent = 0
         for task_id in ids:
-            sent += int(
-                self.publish_task(
-                    task_id, dispatcher, now=observed_at
-                )
-            )
+            sent += int(self.publish_task(task_id, dispatcher, now=observed_at))
         return sent

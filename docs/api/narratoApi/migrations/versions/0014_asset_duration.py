@@ -1,4 +1,5 @@
 """记录媒体探测后的真实时长，供项目费用快照使用。"""
+
 from typing import Sequence
 
 import sqlalchemy as sa

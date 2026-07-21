@@ -38,7 +38,9 @@ def test_http_callback_client_uses_private_bearer_idempotency_and_retries_reject
         CallbackDeliveryResult.RETRY,
         CallbackDeliveryResult.SUCCESS,
     ]
-    assert all(request.headers["Authorization"] == "Bearer callback-secret" for request in seen)
+    assert all(
+        request.headers["Authorization"] == "Bearer callback-secret" for request in seen
+    )
     assert all(request.headers["X-Idempotency-Key"] == "evt_1" for request in seen)
     assert all(request.method == "POST" for request in seen)
     assert all(json.loads(request.content) == event for request in seen)
@@ -76,7 +78,10 @@ def test_all_non_2xx_callback_statuses_remain_retryable():
                 lambda _request, current=status: httpx.Response(current)
             ),
         )
-        assert client.deliver({"event_id": f"evt_{status}"}) == CallbackDeliveryResult.RETRY
+        assert (
+            client.deliver({"event_id": f"evt_{status}"})
+            == CallbackDeliveryResult.RETRY
+        )
 
 
 def test_http_callback_client_maps_network_timeout_to_retry():
@@ -115,9 +120,7 @@ def test_http_callback_client_rejects_late_success_when_transport_swallows_cance
     """传输层吞掉取消并迟到返回 2xx 时也不得把超时请求标记成功。"""
 
     class CancellationResistantTransport(httpx.AsyncBaseTransport):
-        async def handle_async_request(
-            self, request: httpx.Request
-        ) -> httpx.Response:
+        async def handle_async_request(self, request: httpx.Request) -> httpx.Response:
             try:
                 await asyncio.sleep(0.14)
             except asyncio.CancelledError:
@@ -132,5 +135,7 @@ def test_http_callback_client_rejects_late_success_when_transport_swallows_cance
     )
     started = time.monotonic()
 
-    assert client.deliver({"event_id": "evt_late_success"}) == CallbackDeliveryResult.RETRY
+    assert (
+        client.deliver({"event_id": "evt_late_success"}) == CallbackDeliveryResult.RETRY
+    )
     assert time.monotonic() - started >= 0.12

@@ -18,7 +18,9 @@ def test_register_artifact_is_committed_by_its_caller() -> None:
     with Session(engine) as session:
         session.add(User(id="usr_1", email="owner@example.com", password_hash="hash"))
         session.add(
-            Project(id="prj_1", user_id="usr_1", product="short_drama", status="completed")
+            Project(
+                id="prj_1", user_id="usr_1", product="short_drama", status="completed"
+            )
         )
         session.commit()
 

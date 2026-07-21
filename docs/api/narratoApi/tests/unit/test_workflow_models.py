@@ -23,34 +23,44 @@ def test_workflow_models_define_ownership_dependencies_and_lookup_constraints() 
     Base.metadata.create_all(engine)
     inspector = inspect(engine)
 
-    assert {item["referred_table"] for item in inspector.get_foreign_keys("workflows")} == {
+    assert {
+        item["referred_table"] for item in inspector.get_foreign_keys("workflows")
+    } == {
         "users",
         "projects",
         "workflow_template_snapshots",
     }
-    assert {item["referred_table"] for item in inspector.get_foreign_keys("workflow_nodes")} == {
-        "workflows"
-    }
-    assert {item["referred_table"] for item in inspector.get_foreign_keys("workflow_node_attempts")} == {
-        "workflow_nodes"
-    }
-    assert {item["referred_table"] for item in inspector.get_foreign_keys("workflow_outbox")} == {
+    assert {
+        item["referred_table"] for item in inspector.get_foreign_keys("workflow_nodes")
+    } == {"workflows"}
+    assert {
+        item["referred_table"]
+        for item in inspector.get_foreign_keys("workflow_node_attempts")
+    } == {"workflow_nodes"}
+    assert {
+        item["referred_table"] for item in inspector.get_foreign_keys("workflow_outbox")
+    } == {
         "workflows",
         "workflow_nodes",
     }
-    assert {item["referred_table"] for item in inspector.get_foreign_keys("workflow_reconciliation_events")} == {
-        "workflow_node_attempts"
-    }
-    assert {item["name"] for item in inspector.get_unique_constraints("workflow_nodes")} >= {
-        "uq_workflow_nodes_workflow_name"
-    }
-    assert {item["name"] for item in inspector.get_unique_constraints("workflow_node_attempts")} >= {
-        "uq_workflow_node_attempts_node_number"
-    }
-    assert {item["name"] for item in inspector.get_unique_constraints("workflow_outbox")} >= {
-        "uq_workflow_outbox_idempotency_key"
-    }
-    assert {item["name"] for item in inspector.get_unique_constraints("workflow_reconciliation_events")} >= {
+    assert {
+        item["referred_table"]
+        for item in inspector.get_foreign_keys("workflow_reconciliation_events")
+    } == {"workflow_node_attempts"}
+    assert {
+        item["name"] for item in inspector.get_unique_constraints("workflow_nodes")
+    } >= {"uq_workflow_nodes_workflow_name"}
+    assert {
+        item["name"]
+        for item in inspector.get_unique_constraints("workflow_node_attempts")
+    } >= {"uq_workflow_node_attempts_node_number"}
+    assert {
+        item["name"] for item in inspector.get_unique_constraints("workflow_outbox")
+    } >= {"uq_workflow_outbox_idempotency_key"}
+    assert {
+        item["name"]
+        for item in inspector.get_unique_constraints("workflow_reconciliation_events")
+    } >= {
         "uq_workflow_reconciliation_events_attempt_event",
         "uq_workflow_reconciliation_events_attempt_state_version",
     }
@@ -59,12 +69,16 @@ def test_workflow_models_define_ownership_dependencies_and_lookup_constraints() 
     }
 
 
-def test_workflow_records_persist_versioned_dag_and_reject_duplicate_node_attempt() -> None:
+def test_workflow_records_persist_versioned_dag_and_reject_duplicate_node_attempt() -> (
+    None
+):
     engine = create_database_engine("sqlite:///:memory:")
     Base.metadata.create_all(engine)
     with Session(engine) as session:
         session.add(User(id="usr_1", email="owner@example.com", password_hash="hash"))
-        session.add(Project(id="prj_1", user_id="usr_1", product="short_drama", status="queued"))
+        session.add(
+            Project(id="prj_1", user_id="usr_1", product="short_drama", status="queued")
+        )
         session.flush()
         session.add(
             WorkflowTemplateSnapshot(

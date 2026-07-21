@@ -66,9 +66,7 @@ def _run_smtp_subprocess(
             "email": email,
             "verification_code": verification_code,
             "purpose": purpose,
-            "validity_minutes": math.ceil(
-                settings.verification_code_ttl_seconds / 60
-            ),
+            "validity_minutes": math.ceil(settings.verification_code_ttl_seconds / 60),
         },
         separators=(",", ":"),
     ).encode()
@@ -91,7 +89,9 @@ def _run_smtp_subprocess(
             if remaining <= 0:
                 raise TimeoutError("SMTP delivery deadline exceeded")
             try:
-                process.communicate(input=first_input, timeout=min(heartbeat, remaining))
+                process.communicate(
+                    input=first_input, timeout=min(heartbeat, remaining)
+                )
                 first_input = None
                 break
             except subprocess.TimeoutExpired:
@@ -188,13 +188,9 @@ def register_auth_tasks(app: Celery, settings: Settings) -> None:
                         verification_code=verification_code,
                     )
             except BaseException:
-                store.release(
-                    purpose, email_hash, generation, digest, claim_id
-                )
+                store.release(purpose, email_hash, generation, digest, claim_id)
                 raise
-            if not store.mark_sent(
-                purpose, email_hash, generation, digest, claim_id
-            ):
+            if not store.mark_sent(purpose, email_hash, generation, digest, claim_id):
                 raise ApiError(
                     "AUTH_SERVICE_UNAVAILABLE",
                     "Authentication service unavailable",

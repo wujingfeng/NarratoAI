@@ -180,7 +180,11 @@ def test_attempt_workspace_isolated_and_never_reuses_dirty_attempt(tmp_path):
     second = CoreTaskWorkspace.create(tmp_path, "ctask_01ABC", 2)
 
     assert first.input_dir != second.input_dir
-    assert first.input_dir.is_dir() and first.temp_dir.is_dir() and first.output_dir.is_dir()
+    assert (
+        first.input_dir.is_dir()
+        and first.temp_dir.is_dir()
+        and first.output_dir.is_dir()
+    )
     with pytest.raises(FileExistsError):
         CoreTaskWorkspace.create(tmp_path, "ctask_01ABC", 1)
 

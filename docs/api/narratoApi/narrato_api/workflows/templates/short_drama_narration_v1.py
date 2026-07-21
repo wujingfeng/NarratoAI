@@ -27,9 +27,7 @@ SHORT_DRAMA_NARRATION_TEMPLATE_V1 = WorkflowTemplate(
     nodes=(
         WorkflowNodeTemplate(name="media_probe"),
         WorkflowNodeTemplate(name="asr", depends_on=("media_probe",)),
-        WorkflowNodeTemplate(
-            name="video_analysis", depends_on=("media_probe", "asr")
-        ),
+        WorkflowNodeTemplate(name="video_analysis", depends_on=("media_probe", "asr")),
         WorkflowNodeTemplate(name="script_generation", depends_on=("video_analysis",)),
         WorkflowNodeTemplate(
             name="waiting_for_edit",

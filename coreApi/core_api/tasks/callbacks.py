@@ -114,9 +114,7 @@ class HttpCallbackClient:
         started_at = time.monotonic()
         try:
             status_code = asyncio.run(
-                asyncio.wait_for(
-                    self._post(event), timeout=self.total_timeout
-                )
+                asyncio.wait_for(self._post(event), timeout=self.total_timeout)
             )
         except (TimeoutError, httpx.HTTPError):
             return CallbackDeliveryResult.RETRY
@@ -253,9 +251,7 @@ class CallbackOutboxPublisher:
             claim_seconds=self.minimum_claim_seconds,
         )
 
-    def _claim(
-        self, row_id: str, *, observed_at: datetime
-    ) -> CallbackOutbox | None:
+    def _claim(self, row_id: str, *, observed_at: datetime) -> CallbackOutbox | None:
         """在网络调用前原子增加次数并持久化下一投递时间。"""
 
         candidate = self.session.get(CallbackOutbox, row_id)

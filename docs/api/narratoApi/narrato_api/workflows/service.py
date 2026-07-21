@@ -58,7 +58,11 @@ def _snapshot_nodes(definition: dict[str, Any]) -> list[dict[str, Any]]:
                 "max_attempts": max_attempts,
             }
         )
-    if any(dependency not in names for node in normalized for dependency in node["depends_on"]):
+    if any(
+        dependency not in names
+        for node in normalized
+        for dependency in node["depends_on"]
+    ):
         raise ValueError("workflow template dependency is missing")
     return normalized
 
@@ -77,7 +81,9 @@ class WorkflowService:
         with self.session_factory() as session:
             with session.begin():
                 project = session.scalar(
-                    select(Project).where(Project.id == project_id, Project.user_id == user_id)
+                    select(Project).where(
+                        Project.id == project_id, Project.user_id == user_id
+                    )
                 )
                 if project is None:
                     raise WorkflowNotFoundError("project not found")
@@ -124,7 +130,9 @@ class WorkflowService:
         with self.session_factory() as session:
             with session.begin():
                 existing = session.scalar(
-                    select(WorkflowOutbox).where(WorkflowOutbox.idempotency_key == idempotency_key)
+                    select(WorkflowOutbox).where(
+                        WorkflowOutbox.idempotency_key == idempotency_key
+                    )
                 )
                 if existing is not None:
                     return False
@@ -133,7 +141,9 @@ class WorkflowService:
                 )
                 if workflow is None:
                     raise WorkflowNotFoundError("workflow not found")
-                if not transition_workflow_state(workflow.state, target_state, actor=actor):
+                if not transition_workflow_state(
+                    workflow.state, target_state, actor=actor
+                ):
                     return False
                 workflow.state = target_state
                 workflow.state_version += 1
@@ -144,7 +154,10 @@ class WorkflowService:
                         workflow_node_id=None,
                         event_type="workflow.state_changed",
                         idempotency_key=idempotency_key,
-                        payload={"state": workflow.state, "state_version": workflow.state_version},
+                        payload={
+                            "state": workflow.state,
+                            "state_version": workflow.state_version,
+                        },
                         status="pending",
                     )
                 )

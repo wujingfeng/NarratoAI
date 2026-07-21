@@ -9,7 +9,12 @@ from narrato_api.auth.models import User
 from narrato_api.database import Base
 from narrato_api.projects.models import Project
 from narrato_api.workflows.dispatcher import WorkflowOutboxDispatcher
-from narrato_api.workflows.models import Workflow, WorkflowOutbox, WorkflowTemplateSnapshot, utc_now
+from narrato_api.workflows.models import (
+    Workflow,
+    WorkflowOutbox,
+    WorkflowTemplateSnapshot,
+    utc_now,
+)
 
 
 def _dispatcher() -> tuple[WorkflowOutboxDispatcher, sessionmaker, str]:
@@ -18,8 +23,17 @@ def _dispatcher() -> tuple[WorkflowOutboxDispatcher, sessionmaker, str]:
     sessions = sessionmaker(bind=engine, expire_on_commit=False)
     event_id = "wob_dispatch"
     with sessions.begin() as session:
-        session.add(User(id="usr_dispatch", email="dispatch@example.com", password_hash="hash"))
-        session.add(Project(id="prj_dispatch", user_id="usr_dispatch", product="short_drama", status="queued"))
+        session.add(
+            User(id="usr_dispatch", email="dispatch@example.com", password_hash="hash")
+        )
+        session.add(
+            Project(
+                id="prj_dispatch",
+                user_id="usr_dispatch",
+                product="short_drama",
+                status="queued",
+            )
+        )
         session.add(
             WorkflowTemplateSnapshot(
                 id="tpl_dispatch",
@@ -50,7 +64,9 @@ def _dispatcher() -> tuple[WorkflowOutboxDispatcher, sessionmaker, str]:
     return WorkflowOutboxDispatcher(sessions), sessions, event_id
 
 
-def test_pending_event_is_claimed_once_and_woken_with_its_stable_idempotency_key() -> None:
+def test_pending_event_is_claimed_once_and_woken_with_its_stable_idempotency_key() -> (
+    None
+):
     dispatcher, sessions, event_id = _dispatcher()
     wakes: list[tuple[str, str]] = []
 
@@ -63,7 +79,11 @@ def test_pending_event_is_claimed_once_and_woken_with_its_stable_idempotency_key
 
     with sessions() as session:
         event = session.get(WorkflowOutbox, event_id)
-    assert event is not None and (event.status, event.attempt_count, event.sent_at is not None) == (
+    assert event is not None and (
+        event.status,
+        event.attempt_count,
+        event.sent_at is not None,
+    ) == (
         "sent",
         1,
         True,

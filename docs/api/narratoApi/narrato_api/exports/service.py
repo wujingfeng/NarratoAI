@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 from hashlib import sha256
-from typing import Any, NotRequired, Protocol, TypedDict
+from typing import Any, NotRequired, Protocol, TypedDict, cast
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -89,11 +89,11 @@ def build_jianying_manifest(
         for field in ("size", "checksum", "content_type"):
             value = getattr(artifact, field)
             if value is not None:
-                resource[field] = value
+                cast(dict[str, Any], resource)[field] = value
         for field in ("width", "height", "duration"):
             value = getattr(artifact, field)
             if value is not None:
-                resource[field] = value
+                cast(dict[str, Any], resource)[field] = value
         resources.append(resource)
 
     return {"package_name": "jianying-export.zip", "resources": resources}

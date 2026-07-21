@@ -76,9 +76,7 @@ async def run_bounded_oss_readiness_probe(
 ) -> None:
     """在专用双线程 executor 中执行 OSS 探针，避免污染全局线程池。"""
 
-    await (executor or _DEFAULT_OSS_READINESS_EXECUTOR).run(
-        checker, timeout=timeout
-    )
+    await (executor or _DEFAULT_OSS_READINESS_EXECUTOR).run(checker, timeout=timeout)
 
 
 class ReadinessChecker(Protocol):
@@ -228,6 +226,7 @@ def get_oss_readiness_checker(
             read_timeout=settings.readiness_timeout_seconds,
         )
     except ValueError:
+
         def unavailable() -> None:
             """将无效 OSS 配置统一转换为安全未就绪。"""
 
@@ -258,9 +257,7 @@ def get_request_id(request: Request) -> str:
 
 
 def require_service_token(
-    credentials: Annotated[
-        HTTPAuthorizationCredentials | None, Depends(_bearer)
-    ],
+    credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(_bearer)],
     settings: Annotated[Settings, Depends(get_settings)],
 ) -> None:
     """集中校验 narratoApi 调用 Core 的固定 Bearer Token。"""

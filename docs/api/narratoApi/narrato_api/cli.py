@@ -41,7 +41,9 @@ def main(argv: list[str] | None = None) -> int:
     sessions = sessionmaker(bind=engine, expire_on_commit=False)
     try:
         with sessions() as session:
-            user = session.scalar(select(User).where(User.email == args.email.strip().lower()))
+            user = session.scalar(
+                select(User).where(User.email == args.email.strip().lower())
+            )
             if user is None:
                 raise ValueError("user not found")
             user_id = user.id

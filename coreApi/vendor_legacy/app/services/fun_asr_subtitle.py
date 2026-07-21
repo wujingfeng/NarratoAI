@@ -54,7 +54,9 @@ class UploadPolicy:
     max_file_size_mb: Optional[float] = None
 
 
-def _auth_headers(api_key: str, extra: Optional[dict[str, str]] = None) -> dict[str, str]:
+def _auth_headers(
+    api_key: str, extra: Optional[dict[str, str]] = None
+) -> dict[str, str]:
     headers = {
         "Authorization": f"Bearer {api_key}",
         "Content-Type": "application/json",
@@ -68,7 +70,9 @@ def _raise_for_http(response: requests.Response, action: str) -> None:
     try:
         response.raise_for_status()
     except Exception as exc:  # requests may be mocked with generic exceptions
-        raise FunAsrError(f"{action}失败，请检查阿里百炼 API Key、网络或服务状态") from exc
+        raise FunAsrError(
+            f"{action}失败，请检查阿里百炼 API Key、网络或服务状态"
+        ) from exc
 
 
 def _json(response: requests.Response, action: str) -> dict[str, Any]:
@@ -124,7 +128,9 @@ def _local_base_url(api_url: str = "") -> str:
         if path.endswith(suffix):
             path = path[: -len(suffix)].rstrip("/")
             break
-    return urlunparse(parsed._replace(path=path, params="", query="", fragment="")).rstrip("/")
+    return urlunparse(
+        parsed._replace(path=path, params="", query="", fragment="")
+    ).rstrip("/")
 
 
 def _local_asr_url(api_url: str = "") -> str:
@@ -213,7 +219,9 @@ def _response_text(response: requests.Response) -> str:
     return str(content)
 
 
-def request_upload_policy(api_key: str, model: str = MODEL_NAME, session=requests) -> UploadPolicy:
+def request_upload_policy(
+    api_key: str, model: str = MODEL_NAME, session=requests
+) -> UploadPolicy:
     """Request Bailian temporary-storage upload policy for the target model."""
     api_key = _require_api_key(api_key)
     response = _session_get(
@@ -253,7 +261,9 @@ def _validate_file_size(local_file: str, policy: UploadPolicy) -> None:
         )
 
 
-def upload_to_temporary_oss(local_file: str, policy: UploadPolicy, session=requests) -> str:
+def upload_to_temporary_oss(
+    local_file: str, policy: UploadPolicy, session=requests
+) -> str:
     """Upload local file to temporary OSS and return `oss://...` URL."""
     if not os.path.isfile(local_file):
         raise FunAsrError(f"待转写文件不存在: {local_file}")
@@ -271,7 +281,9 @@ def upload_to_temporary_oss(local_file: str, policy: UploadPolicy, session=reque
     }
     with open(local_file, "rb") as file_obj:
         files = {"file": (_safe_upload_name(local_file), file_obj)}
-        response = _session_post(session, policy.upload_host, data=data, files=files, timeout=120)
+        response = _session_post(
+            session, policy.upload_host, data=data, files=files, timeout=120
+        )
     _raise_for_http(response, "上传文件到阿里百炼临时存储")
     return f"oss://{key}"
 
@@ -354,7 +366,9 @@ def poll_transcription_task(
     raise FunAsrError(f"Fun-ASR 转写任务超时，最后状态: {last_status}")
 
 
-def download_transcription_result(transcription_url: str, session=requests) -> dict[str, Any]:
+def download_transcription_result(
+    transcription_url: str, session=requests
+) -> dict[str, Any]:
     if not transcription_url:
         raise FunAsrError("Fun-ASR 结果缺少 transcription_url")
     response = _session_get(session, transcription_url, timeout=60)
@@ -382,7 +396,9 @@ def _timestamp_ms(value: Any, field_name: str) -> float:
     try:
         return float(value)
     except (TypeError, ValueError) as exc:
-        raise FunAsrError(f"Fun-ASR 转写结果时间戳无效: {field_name}={value!r}") from exc
+        raise FunAsrError(
+            f"Fun-ASR 转写结果时间戳无效: {field_name}={value!r}"
+        ) from exc
 
 
 def _speaker_prefix(speaker_id: Any) -> str:
@@ -420,7 +436,9 @@ def _flush_block(blocks: list[dict[str, Any]], current: dict[str, Any]) -> None:
         blocks.append(current.copy())
 
 
-def _blocks_from_words(sentence: dict[str, Any], max_chars: int, max_duration: float) -> list[dict[str, Any]]:
+def _blocks_from_words(
+    sentence: dict[str, Any], max_chars: int, max_duration: float
+) -> list[dict[str, Any]]:
     words = sentence.get("words") or []
     blocks: list[dict[str, Any]] = []
     current: Optional[dict[str, Any]] = None
@@ -440,7 +458,12 @@ def _blocks_from_words(sentence: dict[str, Any], max_chars: int, max_duration: f
         end_ms = _timestamp_ms(end, "word.end_time")
 
         if current is None:
-            current = {"start": start_ms, "end": end_ms, "text": text, "speaker_id": speaker_id}
+            current = {
+                "start": start_ms,
+                "end": end_ms,
+                "text": text,
+                "speaker_id": speaker_id,
+            }
         else:
             should_split_before = (
                 speaker_id != current.get("speaker_id")
@@ -449,7 +472,12 @@ def _blocks_from_words(sentence: dict[str, Any], max_chars: int, max_duration: f
             )
             if should_split_before:
                 _flush_block(blocks, current)
-                current = {"start": start_ms, "end": end_ms, "text": text, "speaker_id": speaker_id}
+                current = {
+                    "start": start_ms,
+                    "end": end_ms,
+                    "text": text,
+                    "speaker_id": speaker_id,
+                }
             else:
                 current["text"] += text
                 current["end"] = end_ms
@@ -476,14 +504,18 @@ def _split_text(text: str, max_chars: int) -> list[str]:
     return [chunk for chunk in chunks if chunk]
 
 
-def _blocks_from_sentence(sentence: dict[str, Any], max_chars: int) -> list[dict[str, Any]]:
+def _blocks_from_sentence(
+    sentence: dict[str, Any], max_chars: int
+) -> list[dict[str, Any]]:
     text = str(sentence.get("text") or "").strip()
     if not text:
         return []
     start = sentence.get("begin_time", 0)
     end = sentence.get("end_time")
     start_ms = _timestamp_ms(start, "sentence.begin_time")
-    end_ms = _timestamp_ms(end, "sentence.end_time") if end is not None else start_ms + 500
+    end_ms = (
+        _timestamp_ms(end, "sentence.end_time") if end is not None else start_ms + 500
+    )
     chunks = _split_text(text, max_chars)
     if not chunks:
         return []
@@ -508,7 +540,9 @@ def _blocks_from_sentence(sentence: dict[str, Any], max_chars: int) -> list[dict
     return blocks
 
 
-def fun_asr_result_to_srt(result_json: dict[str, Any], max_chars: int = 20, max_duration: float = 3.5) -> str:
+def fun_asr_result_to_srt(
+    result_json: dict[str, Any], max_chars: int = 20, max_duration: float = 3.5
+) -> str:
     """Convert downloaded Fun-ASR JSON into fine-grained SRT.
 
     Official downloaded schema is `transcripts[*].sentences[*].words[*]`.
@@ -547,7 +581,9 @@ def copy_srt_file(source_file: str, subtitle_file: str = "") -> str:
     if not os.path.isfile(source_file):
         raise FunAsrError(f"本地 FunASR-Pack 返回的字幕文件不存在: {source_file}")
     if not subtitle_file:
-        subtitle_file = os.path.join(_subtitle_dir(), f"fun_asr_local_{int(time.time())}.srt")
+        subtitle_file = os.path.join(
+            _subtitle_dir(), f"fun_asr_local_{int(time.time())}.srt"
+        )
     parent = os.path.dirname(subtitle_file)
     if parent:
         os.makedirs(parent, exist_ok=True)
@@ -556,7 +592,9 @@ def copy_srt_file(source_file: str, subtitle_file: str = "") -> str:
     return subtitle_file
 
 
-def request_local_fun_asr_health(api_url: str = LOCAL_FUN_ASR_API_URL, session=requests) -> dict[str, Any]:
+def request_local_fun_asr_health(
+    api_url: str = LOCAL_FUN_ASR_API_URL, session=requests
+) -> dict[str, Any]:
     """Fetch FunASR-Pack health metadata from the local service."""
     response = _session_get(session, f"{_local_base_url(api_url)}/health", timeout=10)
     return _local_json(response, "检查本地 FunASR-Pack 服务")
@@ -593,7 +631,8 @@ def request_local_fun_asr(
         rest_data["enable_spk"] = "true" if enable_spk else "false"
 
     openai_data: dict[str, str] = {
-        "model": (model or LOCAL_FUN_ASR_OPENAI_MODEL).strip() or LOCAL_FUN_ASR_OPENAI_MODEL,
+        "model": (model or LOCAL_FUN_ASR_OPENAI_MODEL).strip()
+        or LOCAL_FUN_ASR_OPENAI_MODEL,
         "response_format": "verbose_json",
     }
     if enable_spk is not None:
@@ -601,13 +640,17 @@ def request_local_fun_asr(
 
     rest_url = _local_asr_url(api_url)
     openai_url = _local_openai_transcriptions_url(api_url)
-    attempts = [
-        (openai_url, openai_data),
-        (rest_url, rest_data),
-    ] if _local_fun_asr_prefers_openai(api_url) else [
-        (rest_url, rest_data),
-        (openai_url, openai_data),
-    ]
+    attempts = (
+        [
+            (openai_url, openai_data),
+            (rest_url, rest_data),
+        ]
+        if _local_fun_asr_prefers_openai(api_url)
+        else [
+            (rest_url, rest_data),
+            (openai_url, openai_data),
+        ]
+    )
 
     last_response = None
     for index, (url, data) in enumerate(attempts):
@@ -702,7 +745,9 @@ def _openai_segment_ms(value: Any, field_name: str) -> float:
     return _timestamp_ms(value, field_name) * 1000
 
 
-def _blocks_from_openai_segments(result_json: dict[str, Any], max_chars: int) -> list[dict[str, Any]]:
+def _blocks_from_openai_segments(
+    result_json: dict[str, Any], max_chars: int
+) -> list[dict[str, Any]]:
     segments = result_json.get("segments") or []
     if not isinstance(segments, list):
         return []
@@ -717,7 +762,11 @@ def _blocks_from_openai_segments(result_json: dict[str, Any], max_chars: int) ->
         start = segment.get("start", segment.get("start_time", 0))
         end = segment.get("end", segment.get("end_time"))
         start_ms = _openai_segment_ms(start, "openai.segment.start")
-        end_ms = _openai_segment_ms(end, "openai.segment.end") if end is not None else start_ms + 500
+        end_ms = (
+            _openai_segment_ms(end, "openai.segment.end")
+            if end is not None
+            else start_ms + 500
+        )
         blocks.extend(
             _blocks_from_sentence(
                 {
@@ -732,7 +781,9 @@ def _blocks_from_openai_segments(result_json: dict[str, Any], max_chars: int) ->
     return blocks
 
 
-def _blocks_from_local_timestamp(item: dict[str, Any], max_chars: int, max_duration: float) -> list[dict[str, Any]]:
+def _blocks_from_local_timestamp(
+    item: dict[str, Any], max_chars: int, max_duration: float
+) -> list[dict[str, Any]]:
     text = str(item.get("text") or "").strip()
     timestamps = item.get("timestamp") or []
     if not text or not isinstance(timestamps, list):
@@ -830,10 +881,16 @@ def firered_asr_result_to_srt(result_json: dict[str, Any]) -> str:
             text = str(sentence.get("text") or "").strip()
             if not text:
                 continue
-            start = sentence.get("start_ms", sentence.get("begin_time", sentence.get("start_time", 0)))
+            start = sentence.get(
+                "start_ms", sentence.get("begin_time", sentence.get("start_time", 0))
+            )
             end = sentence.get("end_ms", sentence.get("end_time"))
             start_ms = _timestamp_ms(start, "firered.sentence.start_ms")
-            end_ms = _timestamp_ms(end, "firered.sentence.end_ms") if end is not None else start_ms + 500
+            end_ms = (
+                _timestamp_ms(end, "firered.sentence.end_ms")
+                if end is not None
+                else start_ms + 500
+            )
             blocks.append({"start": start_ms, "end": end_ms, "text": text})
 
     if not blocks:
@@ -899,7 +956,9 @@ def create_with_local_fun_asr(
     except FunAsrError:
         raise
     except Exception as exc:
-        raise FunAsrError("本地 FunASR-Pack 字幕转写失败，请检查服务地址、文件或模型状态") from exc
+        raise FunAsrError(
+            "本地 FunASR-Pack 字幕转写失败，请检查服务地址、文件或模型状态"
+        ) from exc
 
 
 def create_with_local_firered_asr(
@@ -949,7 +1008,9 @@ def create_with_local_firered_asr(
     except FunAsrError:
         raise
     except Exception as exc:
-        raise FunAsrError("本地ASR字幕转写失败，请检查 FireRedASR2-AED-Pack 服务地址、文件或模型状态") from exc
+        raise FunAsrError(
+            "本地ASR字幕转写失败，请检查 FireRedASR2-AED-Pack 服务地址、文件或模型状态"
+        ) from exc
 
 
 def create_with_fun_asr(
@@ -966,7 +1027,9 @@ def create_with_fun_asr(
     try:
         policy = request_upload_policy(api_key, session=session)
         oss_url = upload_to_temporary_oss(local_file, policy, session=session)
-        task_id = submit_transcription_task(api_key, oss_url, speaker_count=speaker_count, session=session)
+        task_id = submit_transcription_task(
+            api_key, oss_url, speaker_count=speaker_count, session=session
+        )
         task_result = poll_transcription_task(
             api_key,
             task_id,
@@ -983,4 +1046,6 @@ def create_with_fun_asr(
     except FunAsrError:
         raise
     except Exception as exc:
-        raise FunAsrError("Fun-ASR 字幕转写失败，请检查文件、网络或阿里百炼服务状态") from exc
+        raise FunAsrError(
+            "Fun-ASR 字幕转写失败，请检查文件、网络或阿里百炼服务状态"
+        ) from exc

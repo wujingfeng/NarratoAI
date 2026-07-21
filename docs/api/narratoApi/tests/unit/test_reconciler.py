@@ -6,7 +6,12 @@ from sqlalchemy.orm import sessionmaker
 from narrato_api.auth.models import User
 from narrato_api.database import Base
 from narrato_api.projects.models import Project
-from narrato_api.workflows.models import Workflow, WorkflowNode, WorkflowNodeAttempt, WorkflowTemplateSnapshot
+from narrato_api.workflows.models import (
+    Workflow,
+    WorkflowNode,
+    WorkflowNodeAttempt,
+    WorkflowTemplateSnapshot,
+)
 from narrato_api.workflows.reconciler import WorkflowReconciler
 
 
@@ -15,8 +20,19 @@ def _reconciler() -> tuple[WorkflowReconciler, sessionmaker]:
     Base.metadata.create_all(engine)
     sessions = sessionmaker(bind=engine, expire_on_commit=False)
     with sessions.begin() as session:
-        session.add(User(id="usr_reconcile", email="reconcile@example.com", password_hash="hash"))
-        session.add(Project(id="prj_reconcile", user_id="usr_reconcile", product="short_drama", status="queued"))
+        session.add(
+            User(
+                id="usr_reconcile", email="reconcile@example.com", password_hash="hash"
+            )
+        )
+        session.add(
+            Project(
+                id="prj_reconcile",
+                user_id="usr_reconcile",
+                product="short_drama",
+                status="queued",
+            )
+        )
         session.add(
             WorkflowTemplateSnapshot(
                 id="tpl_reconcile",
@@ -35,7 +51,12 @@ def _reconciler() -> tuple[WorkflowReconciler, sessionmaker]:
             )
         )
         session.add(
-            WorkflowNode(id="wnd_reconcile", workflow_id="wfl_reconcile", name="media_probe", state="running")
+            WorkflowNode(
+                id="wnd_reconcile",
+                workflow_id="wfl_reconcile",
+                name="media_probe",
+                state="running",
+            )
         )
         session.add(
             WorkflowNodeAttempt(
@@ -72,13 +93,20 @@ def test_callback_and_polling_converge_on_one_terminal_event() -> None:
         node = session.get(WorkflowNode, "wnd_reconcile")
         workflow = session.get(Workflow, "wfl_reconcile")
 
-    assert attempt is not None and (attempt.state, attempt.state_version, attempt.result) == (
+    assert attempt is not None and (
+        attempt.state,
+        attempt.state_version,
+        attempt.result,
+    ) == (
         "completed",
         3,
         {"artifact_id": "art_1"},
     )
     assert node is not None and node.state == "completed"
-    assert workflow is not None and (workflow.state, workflow.state_version) == ("completed", 2)
+    assert workflow is not None and (workflow.state, workflow.state_version) == (
+        "completed",
+        2,
+    )
 
 
 def test_stale_or_same_version_terminal_results_do_not_overwrite_completion() -> None:
@@ -111,7 +139,11 @@ def test_stale_or_same_version_terminal_results_do_not_overwrite_completion() ->
         node = session.get(WorkflowNode, "wnd_reconcile")
         workflow = session.get(Workflow, "wfl_reconcile")
 
-    assert attempt is not None and (attempt.state, attempt.state_version, attempt.result) == (
+    assert attempt is not None and (
+        attempt.state,
+        attempt.state_version,
+        attempt.result,
+    ) == (
         "completed",
         3,
         {"artifact_id": "art_1"},

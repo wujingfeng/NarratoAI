@@ -80,14 +80,16 @@ def test_dispatch_message_is_fenced_and_future_event_cannot_be_forced(session):
     session.commit()
 
     recorder = MessageRecorder()
-    assert DispatchOutboxPublisher(session).publish_task(
-        task.id, recorder, now=utc_now()
-    ) is False
+    assert (
+        DispatchOutboxPublisher(session).publish_task(task.id, recorder, now=utc_now())
+        is False
+    )
     assert recorder.messages == []
 
-    assert DispatchOutboxPublisher(session).publish_task(
-        task.id, recorder, now=future
-    ) is True
+    assert (
+        DispatchOutboxPublisher(session).publish_task(task.id, recorder, now=future)
+        is True
+    )
     assert recorder.messages == [
         {
             "task_id": task.id,
@@ -109,20 +111,26 @@ def test_fenced_claim_ignores_old_duplicate_and_future_wakes(session):
         now=not_before,
     )
     assert first is not None
-    assert service.claim_dispatched_task(
-        task.id,
-        expected_state_version=0,
-        not_before=not_before,
-        now=not_before,
-    ) is None
+    assert (
+        service.claim_dispatched_task(
+            task.id,
+            expected_state_version=0,
+            not_before=not_before,
+            now=not_before,
+        )
+        is None
+    )
 
     retry_task = _task(service, "future-claim")
-    assert service.claim_dispatched_task(
-        retry_task.id,
-        expected_state_version=retry_task.state_version,
-        not_before=not_before + timedelta(seconds=60),
-        now=not_before,
-    ) is None
+    assert (
+        service.claim_dispatched_task(
+            retry_task.id,
+            expected_state_version=retry_task.state_version,
+            not_before=not_before + timedelta(seconds=60),
+            now=not_before,
+        )
+        is None
+    )
     assert retry_task.current_attempt_no == 0
 
 
@@ -197,13 +205,16 @@ def test_recovery_scanner_rearms_lost_queued_and_expires_running(session):
     assert running_attempt.status == AttemptStatus.EXPIRED
     assert running.status == CoreTaskStatus.RETRY_WAIT
     assert running.current_attempt_no == 1
-    assert session.scalar(
-        select(CoreDispatchOutbox).where(
-            CoreDispatchOutbox.core_task_id == running.id,
-            CoreDispatchOutbox.state_version == running.state_version,
-            CoreDispatchOutbox.status == DispatchStatus.PENDING,
+    assert (
+        session.scalar(
+            select(CoreDispatchOutbox).where(
+                CoreDispatchOutbox.core_task_id == running.id,
+                CoreDispatchOutbox.state_version == running.state_version,
+                CoreDispatchOutbox.status == DispatchStatus.PENDING,
+            )
         )
-    ) is not None
+        is not None
+    )
     assert scanner.recover(now=observed) == 0
 
 

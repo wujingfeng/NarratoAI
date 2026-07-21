@@ -12,7 +12,9 @@ repository_root = str(Path(__file__).resolve().parents[2])
 if repository_root in sys.path:
     sys.path.remove(repository_root)
 sys.path.insert(0, repository_root)
-for module_name in [name for name in sys.modules if name == "app" or name.startswith("app.")]:
+for module_name in [
+    name for name in sys.modules if name == "app" or name.startswith("app.")
+]:
     del sys.modules[module_name]
 
 import pytest
@@ -59,8 +61,8 @@ def app(settings):
 
     application = create_app(settings=settings)
     application.dependency_overrides[get_settings] = lambda: settings
-    application.dependency_overrides[get_readiness_checker] = (
-        lambda: FakeReadinessChecker()
+    application.dependency_overrides[get_readiness_checker] = lambda: (
+        FakeReadinessChecker()
     )
     return application
 
@@ -93,6 +95,7 @@ def session(tmp_path):
         cursor = dbapi_connection.cursor()
         cursor.execute("PRAGMA foreign_keys=ON")
         cursor.close()
+
     Base.metadata.create_all(engine)
     with Session(engine, expire_on_commit=False) as database_session:
         yield database_session
@@ -119,5 +122,6 @@ def task(task_service):
         input_snapshot={"video_url": "https://cdn.example.test/video.mp4"},
     )
 
+
 # 固定 source-checkout 测试使用完整 monorepo app，而非 editable wheel 的 vendor 子集。
-__import__('app')
+__import__("app")

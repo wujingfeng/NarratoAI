@@ -6,7 +6,9 @@ from narrato_api.projects.service import ProjectStateConflict, ensure_project_de
 
 
 @pytest.mark.parametrize("status", ["completed", "failed"])
-def test_only_terminal_projects_pass_the_deletion_eligibility_guard(status: str) -> None:
+def test_only_terminal_projects_pass_the_deletion_eligibility_guard(
+    status: str,
+) -> None:
     ensure_project_deletable(status)
 
 

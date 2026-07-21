@@ -20,9 +20,13 @@ from narrato_api.projects.models import DeletionJob, Project
 class FakeAuthService:
     def resolve_user(self, token: str) -> User:
         if token == "owner-token":
-            return User(id="usr_owner", email="owner@example.test", password_hash="hash")
+            return User(
+                id="usr_owner", email="owner@example.test", password_hash="hash"
+            )
         if token == "other-token":
-            return User(id="usr_other", email="other@example.test", password_hash="hash")
+            return User(
+                id="usr_other", email="other@example.test", password_hash="hash"
+            )
         raise RuntimeError("unexpected token")
 
 
@@ -171,8 +175,13 @@ def test_non_terminal_or_missing_project_cannot_request_deletion(
     )
 
     expected_status = 409 if project_id == "prj_draft" else 404
-    expected_code = "PROJECT_NOT_TERMINAL" if project_id == "prj_draft" else "PROJECT_NOT_FOUND"
-    assert (response.status_code, response.json()["code"]) == (expected_status, expected_code)
+    expected_code = (
+        "PROJECT_NOT_TERMINAL" if project_id == "prj_draft" else "PROJECT_NOT_FOUND"
+    )
+    assert (response.status_code, response.json()["code"]) == (
+        expected_status,
+        expected_code,
+    )
 
 
 def test_foreign_project_cannot_request_deletion(

@@ -13,7 +13,10 @@ from core_api.api.dependencies import (
     require_service_token,
 )
 from core_api.api.errors import ApiError
-from core_api.api.routes.task_creation import create_atomic_task, require_idempotency_key
+from core_api.api.routes.task_creation import (
+    create_atomic_task,
+    require_idempotency_key,
+)
 from core_api.api.routes.tasks import TaskDispatcher, get_task_dispatcher
 from core_api.config import Settings
 from core_api.infrastructure.oss_client import CdnUrlPolicy, InputSecurityError
@@ -49,7 +52,9 @@ def create_media_probe_task(
             payload.source_url
         )
     except (InputSecurityError, ValueError) as exc:
-        raise ApiError("SOURCE_URL_REJECTED", "媒体 URL 不符合 CDN 安全策略", 422) from exc
+        raise ApiError(
+            "SOURCE_URL_REJECTED", "媒体 URL 不符合 CDN 安全策略", 422
+        ) from exc
     snapshot = payload.model_dump(exclude={"caller_task_id"})
     snapshot["source_url"] = source_url
     return create_atomic_task(

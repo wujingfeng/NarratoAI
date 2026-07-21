@@ -4,6 +4,7 @@ Revision ID: 0007_workflow_reconciliation
 Revises: 0006_workflows
 Create Date: 2026-07-17
 """
+
 from typing import Sequence
 
 import sqlalchemy as sa
@@ -19,7 +20,9 @@ def upgrade() -> None:
     """为节点尝试增加版本，并创建事件与版本的去重事实表。"""
 
     with op.batch_alter_table("workflow_node_attempts") as batch_op:
-        batch_op.add_column(sa.Column("state_version", sa.Integer(), nullable=False, server_default="0"))
+        batch_op.add_column(
+            sa.Column("state_version", sa.Integer(), nullable=False, server_default="0")
+        )
         batch_op.create_check_constraint(
             "ck_workflow_node_attempts_state_version", "state_version >= 0"
         )
@@ -36,11 +39,15 @@ def upgrade() -> None:
             "state_version >= 0", name="ck_workflow_reconciliation_events_state_version"
         ),
         sa.ForeignKeyConstraint(
-            ["workflow_node_attempt_id"], ["workflow_node_attempts.id"], ondelete="RESTRICT"
+            ["workflow_node_attempt_id"],
+            ["workflow_node_attempts.id"],
+            ondelete="RESTRICT",
         ),
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint(
-            "workflow_node_attempt_id", "event_id", name="uq_workflow_reconciliation_events_attempt_event"
+            "workflow_node_attempt_id",
+            "event_id",
+            name="uq_workflow_reconciliation_events_attempt_event",
         ),
         sa.UniqueConstraint(
             "workflow_node_attempt_id",
@@ -55,5 +62,7 @@ def downgrade() -> None:
 
     op.drop_table("workflow_reconciliation_events")
     with op.batch_alter_table("workflow_node_attempts") as batch_op:
-        batch_op.drop_constraint("ck_workflow_node_attempts_state_version", type_="check")
+        batch_op.drop_constraint(
+            "ck_workflow_node_attempts_state_version", type_="check"
+        )
         batch_op.drop_column("state_version")

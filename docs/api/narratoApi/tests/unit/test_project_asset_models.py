@@ -11,7 +11,9 @@ from narrato_api.database import Base, create_database_engine
 from narrato_api.projects.models import Project
 
 
-def test_project_and_asset_models_have_owner_foreign_keys_and_named_constraints() -> None:
+def test_project_and_asset_models_have_owner_foreign_keys_and_named_constraints() -> (
+    None
+):
     engine = create_database_engine("sqlite:///:memory:")
     Base.metadata.create_all(engine)
     inspector = inspect(engine)
@@ -19,7 +21,10 @@ def test_project_and_asset_models_have_owner_foreign_keys_and_named_constraints(
     project_foreign_keys = inspector.get_foreign_keys("projects")
     asset_foreign_keys = inspector.get_foreign_keys("assets")
     assert {item["referred_table"] for item in project_foreign_keys} == {"users"}
-    assert {item["referred_table"] for item in asset_foreign_keys} == {"users", "projects"}
+    assert {item["referred_table"] for item in asset_foreign_keys} == {
+        "users",
+        "projects",
+    }
     assert {item["name"] for item in inspector.get_check_constraints("projects")} >= {
         "ck_projects_status"
     }

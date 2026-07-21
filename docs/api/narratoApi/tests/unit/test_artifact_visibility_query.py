@@ -43,7 +43,9 @@ def _register_artifact(
     )
 
 
-def test_list_registered_artifacts_returns_completed_projects_artifacts_in_stable_order() -> None:
+def test_list_registered_artifacts_returns_completed_projects_artifacts_in_stable_order() -> (
+    None
+):
     from narrato_api.artifacts.service import list_registered_artifacts
 
     engine = create_engine("sqlite://")
@@ -51,8 +53,12 @@ def test_list_registered_artifacts_returns_completed_projects_artifacts_in_stabl
     created_at = datetime(2026, 7, 17, tzinfo=timezone.utc)
 
     with Session(engine) as session:
-        project = _create_project(session, project_id="prj_completed", status="completed")
-        other_project = _create_project(session, project_id="prj_other", status="completed")
+        project = _create_project(
+            session, project_id="prj_completed", status="completed"
+        )
+        other_project = _create_project(
+            session, project_id="prj_other", status="completed"
+        )
         _register_artifact(
             session,
             artifact_id="art_b",

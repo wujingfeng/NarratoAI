@@ -282,7 +282,9 @@ def test_real_unified_provider_chain_never_logs_sensitive_exception(monkeypatch)
     async def fail(**_):
         raise RuntimeError(sensitive)
 
-    client = SimpleNamespace(chat=SimpleNamespace(completions=SimpleNamespace(create=fail)))
+    client = SimpleNamespace(
+        chat=SimpleNamespace(completions=SimpleNamespace(create=fail))
+    )
     monkeypatch.setattr(provider, "_build_client", lambda **_: client)
     monkeypatch.setattr(LLMServiceManager, "get_text_provider", lambda *_: provider)
     captured = []

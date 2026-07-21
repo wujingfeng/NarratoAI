@@ -77,11 +77,7 @@ def test_code_fsm_lua_uses_redis_time_not_client_epoch() -> None:
 
     source = inspect.getsource(redis_store.RedisEmailCodeStore)
     assert "time.time" not in source
-    clocked = [
-        script
-        for script in redis_store.AUTH_LUA_SCRIPTS
-        if "now_ms" in script
-    ]
+    clocked = [script for script in redis_store.AUTH_LUA_SCRIPTS if "now_ms" in script]
     assert clocked and all("redis.call('TIME')" in script for script in clocked)
 
 

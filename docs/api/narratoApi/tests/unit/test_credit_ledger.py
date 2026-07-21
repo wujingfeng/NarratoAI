@@ -54,7 +54,9 @@ def test_charge_is_idempotent_and_records_a_single_immutable_debit() -> None:
             select(CreditLedger).where(CreditLedger.reference_id == "prj_1")
         ).all()
         assert account is not None and account.balance == 80
-        assert [(entry.entry_type, entry.amount) for entry in entries] == [("charge", -20)]
+        assert [(entry.entry_type, entry.amount) for entry in entries] == [
+            ("charge", -20)
+        ]
 
 
 def test_cli_grant_is_idempotent_against_a_migrated_sqlite_database(

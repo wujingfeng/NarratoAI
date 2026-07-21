@@ -55,7 +55,9 @@ class WorkflowReconciler:
         """按事件和状态版本原子应用一个 Core 终态，重复或过期结果无副作用。"""
 
         if not core_task_id or not event_id or state_version < 0:
-            raise ValueError("core_task_id, event_id and non-negative state_version are required")
+            raise ValueError(
+                "core_task_id, event_id and non-negative state_version are required"
+            )
         if state not in {"succeeded", "failed"}:
             raise ValueError("only terminal Core states can be reconciled")
         with self.session_factory() as session:
@@ -78,7 +80,9 @@ class WorkflowReconciler:
                 if node is None:
                     raise LookupError("workflow node not found")
                 workflow = session.scalar(
-                    select(Workflow).where(Workflow.id == node.workflow_id).with_for_update()
+                    select(Workflow)
+                    .where(Workflow.id == node.workflow_id)
+                    .with_for_update()
                 )
                 if workflow is None:
                     raise LookupError("workflow not found")

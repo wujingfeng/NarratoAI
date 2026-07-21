@@ -47,7 +47,9 @@ def create_atomic_task(
             idempotency_key=idempotency_key,
             input_snapshot=dict(input_snapshot),
             caller_task_id=caller_task_id,
-            idempotency_payload=(dict(idempotency_payload) if idempotency_payload else None),
+            idempotency_payload=(
+                dict(idempotency_payload) if idempotency_payload else None
+            ),
         )
     except IdempotencyConflictError as exc:
         raise ApiError("IDEMPOTENCY_CONFLICT", "幂等键对应的请求体不同", 409) from exc

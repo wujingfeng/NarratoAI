@@ -38,9 +38,7 @@ class CoreCallbackReceipt(StrictModel):
 
 
 def require_core_callback_token(
-    credentials: Annotated[
-        HTTPAuthorizationCredentials | None, Depends(_bearer)
-    ],
+    credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(_bearer)],
     settings: Annotated[Settings, Depends(get_settings)],
 ) -> None:
     """校验 Core 专用回调 Bearer，绝不复用请求方向 Token。"""
@@ -72,7 +70,9 @@ def get_workflow_reconciler(request: Request) -> WorkflowReconciler:
 def receive_core_callback(
     body: CoreCallbackEvent,
     idempotency_key: Annotated[str | None, Header(alias="X-Idempotency-Key")] = None,
-    reconciler: Annotated[WorkflowReconciler | None, Depends(get_workflow_reconciler)] = None,
+    reconciler: Annotated[
+        WorkflowReconciler | None, Depends(get_workflow_reconciler)
+    ] = None,
     request_id: Annotated[str, Depends(get_request_id)] = "",
 ) -> ApiResponse[CoreCallbackReceipt]:
     """接收 Core 终态事件，要求 Header 和正文使用同一个事件 ID。"""
@@ -90,7 +90,11 @@ def receive_core_callback(
         event_id=body.event_id,
         state_version=body.state_version,
         state=body.status,
-        result={"result": body.result, "error": body.error, "attempt_no": body.attempt_no},
+        result={
+            "result": body.result,
+            "error": body.error,
+            "attempt_no": body.attempt_no,
+        },
     )
     return ApiResponse(
         code="CORE_CALLBACK_ACCEPTED",

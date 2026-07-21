@@ -2,7 +2,15 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Index, Integer, String, UniqueConstraint
+from sqlalchemy import (
+    CheckConstraint,
+    DateTime,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    UniqueConstraint,
+)
 from sqlalchemy.orm import Mapped, mapped_column
 
 from narrato_api.database import Base
@@ -18,7 +26,9 @@ class CreditAccount(Base):
     """用户当前创作点余额；每次变更必须由账本流水驱动。"""
 
     __tablename__ = "credit_accounts"
-    __table_args__ = (CheckConstraint("balance >= 0", name="ck_credit_accounts_balance"),)
+    __table_args__ = (
+        CheckConstraint("balance >= 0", name="ck_credit_accounts_balance"),
+    )
 
     user_id: Mapped[str] = mapped_column(
         String(64), ForeignKey("users.id", ondelete="RESTRICT"), primary_key=True
@@ -43,7 +53,9 @@ class CreditLedger(Base):
             "entry_type IN ('signup_bonus', 'operator_grant', 'charge', 'refund')",
             name="ck_credit_ledger_entry_type",
         ),
-        UniqueConstraint("user_id", "idempotency_key", name="uq_credit_ledger_idempotency"),
+        UniqueConstraint(
+            "user_id", "idempotency_key", name="uq_credit_ledger_idempotency"
+        ),
         Index("ix_credit_ledger_reference", "reference_id"),
     )
 
@@ -70,7 +82,9 @@ class ProductPrice(Base):
         CheckConstraint(
             "credits_per_minute > 0", name="ck_product_prices_credits_per_minute"
         ),
-        UniqueConstraint("product", "version", name="uq_product_prices_product_version"),
+        UniqueConstraint(
+            "product", "version", name="uq_product_prices_product_version"
+        ),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)

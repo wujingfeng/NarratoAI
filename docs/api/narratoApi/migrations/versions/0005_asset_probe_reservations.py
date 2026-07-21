@@ -4,6 +4,7 @@ Revision ID: 0005_asset_probe_reservations
 Revises: 0004_projects_assets
 Create Date: 2026-07-17
 """
+
 from typing import Sequence
 
 import sqlalchemy as sa
@@ -18,9 +19,12 @@ depends_on: str | None = None
 def upgrade() -> None:
     """追加异步探测关联和过期预留字段。"""
 
-    op.add_column("assets", sa.Column("core_task_id", sa.String(length=128), nullable=True))
     op.add_column(
-        "assets", sa.Column("reservation_expires_at", sa.DateTime(timezone=True), nullable=True)
+        "assets", sa.Column("core_task_id", sa.String(length=128), nullable=True)
+    )
+    op.add_column(
+        "assets",
+        sa.Column("reservation_expires_at", sa.DateTime(timezone=True), nullable=True),
     )
 
 

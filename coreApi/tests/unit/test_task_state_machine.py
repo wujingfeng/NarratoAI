@@ -48,9 +48,7 @@ def test_idempotent_create_rejects_changed_body(task_service):
     }
     task_service.create_core_task(**base, input_snapshot={"asset_id": "asset_1"})
     with pytest.raises(IdempotencyConflictError, match="IDEMPOTENCY_CONFLICT"):
-        task_service.create_core_task(
-            **base, input_snapshot={"asset_id": "asset_2"}
-        )
+        task_service.create_core_task(**base, input_snapshot={"asset_id": "asset_2"})
 
 
 def test_stale_attempt_cannot_complete_task(task_service, task, session):
@@ -99,9 +97,9 @@ def test_retry_limit_means_initial_plus_three_automatic_retries(task_service):
     for expected_no in (2, 3, 4):
         attempt.lease_expires_at = utc_now() - timedelta(seconds=1)
         task_service.session.commit()
-        assert task_service.expire_and_restart(
-            attempt.id, retry_delay_seconds=0
-        ) is None
+        assert (
+            task_service.expire_and_restart(attempt.id, retry_delay_seconds=0) is None
+        )
         current = task_service.get_task(core_task.id)
         attempt = task_service.claim_dispatched_task(
             core_task.id,
@@ -113,9 +111,7 @@ def test_retry_limit_means_initial_plus_three_automatic_retries(task_service):
 
     attempt.lease_expires_at = utc_now() - timedelta(seconds=1)
     task_service.session.commit()
-    assert task_service.expire_and_restart(
-        attempt.id, retry_delay_seconds=0
-    ) is None
+    assert task_service.expire_and_restart(attempt.id, retry_delay_seconds=0) is None
     session_task = task_service.get_task(core_task.id)
     assert session_task.status == CoreTaskStatus.FAILED
     assert session_task.current_attempt_no == 4
@@ -144,7 +140,9 @@ def test_duplicate_claim_does_not_create_second_attempt(task_service, task, sess
     assert [item.id for item in attempts] == [first.id]
 
 
-def test_retryable_failure_preserves_error_and_schedules_retry(task_service, task, session):
+def test_retryable_failure_preserves_error_and_schedules_retry(
+    task_service, task, session
+):
     """临时错误进入 retry_wait，直到可靠调度后才领取新 attempt。"""
 
     first = task_service.start_attempt(task.id)
@@ -236,7 +234,9 @@ def test_database_rejects_invalid_persisted_statuses(session, task_service, task
 
     attempt = task_service.start_attempt(task.id)
     constraints = {
-        table: {item["name"] for item in inspect(session.bind).get_check_constraints(table)}
+        table: {
+            item["name"] for item in inspect(session.bind).get_check_constraints(table)
+        }
         for table in ("core_tasks", "core_task_attempts", "callback_outbox")
     }
     assert "core_task_status" in constraints["core_tasks"]

@@ -101,8 +101,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         """返回不含请求体和内部对象的字段校验错误。"""
 
         details = [
-            {"loc": list(item["loc"]), "type": item["type"]}
-            for item in error.errors()
+            {"loc": list(item["loc"]), "type": item["type"]} for item in error.errors()
         ]
         return _error_response(
             request,

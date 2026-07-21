@@ -187,9 +187,9 @@ def auth_header(catalog_settings):
 
 
 def test_voice_catalog_has_same_shape_for_all_providers(catalog_client, auth_header):
-    items = catalog_client.get(
-        "/api/v1/capabilities", headers=auth_header
-    ).json()["data"]["voices"]
+    items = catalog_client.get("/api/v1/capabilities", headers=auth_header).json()[
+        "data"
+    ]["voices"]
     expected = {
         "voice_id",
         "provider_code",
@@ -243,9 +243,9 @@ def test_catalog_hides_disabled_and_unresolved_capabilities(
 
 
 def test_model_catalog_uses_normalized_shape(catalog_client, auth_header):
-    items = catalog_client.get(
-        "/api/v1/capabilities", headers=auth_header
-    ).json()["data"]["models"]
+    items = catalog_client.get("/api/v1/capabilities", headers=auth_header).json()[
+        "data"
+    ]["models"]
     assert items and all(
         set(item)
         == {
@@ -278,14 +278,10 @@ def test_require_capability_never_falls_back(catalog_session, catalog_settings):
     )
 
     disabled_model = catalog_session.scalar(
-        select(CoreModel).where(
-            CoreModel.provider_model_code == "alpha-disabled-model"
-        )
+        select(CoreModel).where(CoreModel.provider_model_code == "alpha-disabled-model")
     )
     disabled_voice = catalog_session.scalar(
-        select(CoreVoice).where(
-            CoreVoice.provider_voice_code == "alpha-disabled-voice"
-        )
+        select(CoreVoice).where(CoreVoice.provider_voice_code == "alpha-disabled-voice")
     )
     failing_calls = (
         lambda: service.require_model("model_unknown"),
@@ -327,7 +323,9 @@ def test_seed_is_idempotent_updates_config_and_preserves_operator_disable(sessio
         ),
     )
     seed_capabilities(session, (initial,))
-    provider = session.scalar(select(CoreProvider).where(CoreProvider.code == "seed-provider"))
+    provider = session.scalar(
+        select(CoreProvider).where(CoreProvider.code == "seed-provider")
+    )
     model = session.scalar(select(CoreModel))
     voice = session.scalar(select(CoreVoice))
     original_ids = (provider.id, model.id, voice.id)
@@ -359,7 +357,9 @@ def test_seed_is_idempotent_updates_config_and_preserves_operator_disable(sessio
     seed_capabilities(session, (updated,))
     seed_capabilities(session, (updated,))
 
-    provider = session.scalar(select(CoreProvider).where(CoreProvider.code == "seed-provider"))
+    provider = session.scalar(
+        select(CoreProvider).where(CoreProvider.code == "seed-provider")
+    )
     model = session.scalar(select(CoreModel))
     voice = session.scalar(select(CoreVoice))
     assert (provider.id, model.id, voice.id) == original_ids
@@ -550,7 +550,9 @@ def test_seed_is_idempotent_under_concurrent_sessions(tmp_path):
         assert results[0] == results[1]
 
     with Session(engine) as database_session:
-        assert database_session.scalar(select(func.count()).select_from(CoreProvider)) == 5
+        assert (
+            database_session.scalar(select(func.count()).select_from(CoreProvider)) == 5
+        )
         assert database_session.scalar(select(func.count()).select_from(CoreModel)) == 5
         assert database_session.scalar(select(func.count()).select_from(CoreVoice)) == 5
         provider = database_session.scalar(
@@ -614,15 +616,18 @@ def test_seed_rolls_back_entire_batch_when_late_voice_insert_fails(tmp_path):
         database_session.rollback()
 
     with Session(engine) as verification_session:
-        assert verification_session.scalar(
-            select(func.count()).select_from(CoreProvider)
-        ) == 0
-        assert verification_session.scalar(
-            select(func.count()).select_from(CoreModel)
-        ) == 0
-        assert verification_session.scalar(
-            select(func.count()).select_from(CoreVoice)
-        ) == 0
+        assert (
+            verification_session.scalar(select(func.count()).select_from(CoreProvider))
+            == 0
+        )
+        assert (
+            verification_session.scalar(select(func.count()).select_from(CoreModel))
+            == 0
+        )
+        assert (
+            verification_session.scalar(select(func.count()).select_from(CoreVoice))
+            == 0
+        )
 
 
 def test_seed_composes_with_outer_transaction_and_caller_rollback(tmp_path):
@@ -661,12 +666,15 @@ def test_seed_composes_with_outer_transaction_and_caller_rollback(tmp_path):
                 raise CallerRollback()
 
     with Session(engine) as verification_session:
-        assert verification_session.scalar(
-            select(func.count()).select_from(CoreProvider)
-        ) == 0
-        assert verification_session.scalar(
-            select(func.count()).select_from(CoreModel)
-        ) == 0
-        assert verification_session.scalar(
-            select(func.count()).select_from(CoreVoice)
-        ) == 0
+        assert (
+            verification_session.scalar(select(func.count()).select_from(CoreProvider))
+            == 0
+        )
+        assert (
+            verification_session.scalar(select(func.count()).select_from(CoreModel))
+            == 0
+        )
+        assert (
+            verification_session.scalar(select(func.count()).select_from(CoreVoice))
+            == 0
+        )

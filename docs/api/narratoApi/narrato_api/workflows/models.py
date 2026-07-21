@@ -3,7 +3,17 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Any
 
-from sqlalchemy import Boolean, CheckConstraint, DateTime, ForeignKey, Index, Integer, JSON, String, UniqueConstraint
+from sqlalchemy import (
+    Boolean,
+    CheckConstraint,
+    DateTime,
+    ForeignKey,
+    Index,
+    Integer,
+    JSON,
+    String,
+    UniqueConstraint,
+)
 from sqlalchemy.orm import Mapped, mapped_column
 
 from narrato_api.database import Base
@@ -20,7 +30,9 @@ class WorkflowTemplateSnapshot(Base):
 
     __tablename__ = "workflow_template_snapshots"
     __table_args__ = (
-        UniqueConstraint("template_name", "version", name="uq_workflow_templates_name_version"),
+        UniqueConstraint(
+            "template_name", "version", name="uq_workflow_templates_name_version"
+        ),
     )
 
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
@@ -55,7 +67,9 @@ class Workflow(Base):
         String(64), ForeignKey("projects.id", ondelete="RESTRICT"), nullable=False
     )
     template_snapshot_id: Mapped[str] = mapped_column(
-        String(64), ForeignKey("workflow_template_snapshots.id", ondelete="RESTRICT"), nullable=False
+        String(64),
+        ForeignKey("workflow_template_snapshots.id", ondelete="RESTRICT"),
+        nullable=False,
     )
     state: Mapped[str] = mapped_column(String(32), nullable=False, default="draft")
     state_version: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
@@ -109,9 +123,13 @@ class WorkflowNodeAttempt(Base):
             name="ck_workflow_node_attempts_state",
         ),
         CheckConstraint("attempt_number >= 1", name="ck_workflow_node_attempts_number"),
-        CheckConstraint("state_version >= 0", name="ck_workflow_node_attempts_state_version"),
+        CheckConstraint(
+            "state_version >= 0", name="ck_workflow_node_attempts_state_version"
+        ),
         UniqueConstraint(
-            "workflow_node_id", "attempt_number", name="uq_workflow_node_attempts_node_number"
+            "workflow_node_id",
+            "attempt_number",
+            name="uq_workflow_node_attempts_node_number",
         ),
         UniqueConstraint("core_task_id", name="uq_workflow_node_attempts_core_task_id"),
         Index("ix_workflow_node_attempts_node_state", "workflow_node_id", "state"),
@@ -129,7 +147,9 @@ class WorkflowNodeAttempt(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=utc_now
     )
-    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    completed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
 
 
 class WorkflowReconciliationEvent(Base):
@@ -137,9 +157,13 @@ class WorkflowReconciliationEvent(Base):
 
     __tablename__ = "workflow_reconciliation_events"
     __table_args__ = (
-        CheckConstraint("state_version >= 0", name="ck_workflow_reconciliation_events_state_version"),
+        CheckConstraint(
+            "state_version >= 0", name="ck_workflow_reconciliation_events_state_version"
+        ),
         UniqueConstraint(
-            "workflow_node_attempt_id", "event_id", name="uq_workflow_reconciliation_events_attempt_event"
+            "workflow_node_attempt_id",
+            "event_id",
+            name="uq_workflow_reconciliation_events_attempt_event",
         ),
         UniqueConstraint(
             "workflow_node_attempt_id",
@@ -150,7 +174,9 @@ class WorkflowReconciliationEvent(Base):
 
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
     workflow_node_attempt_id: Mapped[str] = mapped_column(
-        String(64), ForeignKey("workflow_node_attempts.id", ondelete="RESTRICT"), nullable=False
+        String(64),
+        ForeignKey("workflow_node_attempts.id", ondelete="RESTRICT"),
+        nullable=False,
     )
     event_id: Mapped[str] = mapped_column(String(128), nullable=False)
     state_version: Mapped[int] = mapped_column(Integer, nullable=False)
@@ -167,7 +193,8 @@ class WorkflowOutbox(Base):
     __tablename__ = "workflow_outbox"
     __table_args__ = (
         CheckConstraint(
-            "status IN ('pending', 'sending', 'sent', 'dead')", name="ck_workflow_outbox_status"
+            "status IN ('pending', 'sending', 'sent', 'dead')",
+            name="ck_workflow_outbox_status",
         ),
         UniqueConstraint("idempotency_key", name="uq_workflow_outbox_idempotency_key"),
         Index("ix_workflow_outbox_status_created", "status", "created_at"),
@@ -191,4 +218,6 @@ class WorkflowOutbox(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=utc_now
     )
-    sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    sent_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )

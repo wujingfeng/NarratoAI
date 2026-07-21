@@ -16,7 +16,12 @@ from narrato_api.billing.models import ProductPrice
 from narrato_api.billing.pricing import estimate_short_drama_cost
 from narrato_api.billing.service import InsufficientCreditsError, _apply_credit
 from narrato_api.projects.models import DeletionJob, Project
-from narrato_api.workflows.models import Workflow, WorkflowNode, WorkflowOutbox, WorkflowTemplateSnapshot
+from narrato_api.workflows.models import (
+    Workflow,
+    WorkflowNode,
+    WorkflowOutbox,
+    WorkflowTemplateSnapshot,
+)
 from narrato_api.workflows.service import _new_id, _snapshot_nodes
 
 
@@ -79,15 +84,26 @@ def create_project(session: Session, *, user_id: str, product: str) -> Project:
     """创建短剧解说草稿；对 Web 的 kebab-case 产品名做唯一映射。"""
 
     if product != "short-drama-narration":
-        raise ProjectLifecycleConflict("PROJECT_PRODUCT_UNSUPPORTED", "Project product is unsupported")
-    project = Project(id=_new_project_id(), user_id=user_id, product="short_drama_narration", status="draft")
+        raise ProjectLifecycleConflict(
+            "PROJECT_PRODUCT_UNSUPPORTED", "Project product is unsupported"
+        )
+    project = Project(
+        id=_new_project_id(),
+        user_id=user_id,
+        product="short_drama_narration",
+        status="draft",
+    )
     session.add(project)
     session.flush()
     return project
 
 
-def _owned_project(session: Session, *, user_id: str, project_id: str, lock: bool = False) -> Project:
-    statement = select(Project).where(Project.id == project_id, Project.user_id == user_id)
+def _owned_project(
+    session: Session, *, user_id: str, project_id: str, lock: bool = False
+) -> Project:
+    statement = select(Project).where(
+        Project.id == project_id, Project.user_id == user_id
+    )
     if lock:
         statement = statement.with_for_update()
     project = session.scalar(statement)
@@ -100,20 +116,40 @@ def _ready_quote(session: Session, *, project: Project) -> tuple[int, int, int]:
     assets = list(session.scalars(select(Asset).where(Asset.project_id == project.id)))
     videos = [asset for asset in assets if asset.asset_type == "video"]
     if not videos or any(asset.status != "ready" for asset in assets):
-        raise ProjectLifecycleConflict("PROJECT_ASSETS_NOT_READY", "Project assets are not ready")
+        raise ProjectLifecycleConflict(
+            "PROJECT_ASSETS_NOT_READY", "Project assets are not ready"
+        )
     if any(asset.duration_seconds is None for asset in videos):
-        raise ProjectLifecycleConflict("PROJECT_DURATION_UNAVAILABLE", "Project media duration is unavailable")
-    price = session.scalar(select(ProductPrice).where(ProductPrice.product == project.product).order_by(ProductPrice.version.desc()))
+        raise ProjectLifecycleConflict(
+            "PROJECT_DURATION_UNAVAILABLE", "Project media duration is unavailable"
+        )
+    price = session.scalar(
+        select(ProductPrice)
+        .where(ProductPrice.product == project.product)
+        .order_by(ProductPrice.version.desc())
+    )
     if price is None:
-        raise ProjectLifecycleConflict("PROJECT_PRICE_UNAVAILABLE", "Project price is unavailable")
+        raise ProjectLifecycleConflict(
+            "PROJECT_PRICE_UNAVAILABLE", "Project price is unavailable"
+        )
     total_seconds = int(sum(asset.duration_seconds or 0 for asset in videos))
-    return estimate_short_drama_cost(total_seconds, credits_per_minute=price.credits_per_minute), total_seconds, price.credits_per_minute
+    return (
+        estimate_short_drama_cost(
+            total_seconds, credits_per_minute=price.credits_per_minute
+        ),
+        total_seconds,
+        price.credits_per_minute,
+    )
 
 
-def estimate_project_cost(session: Session, *, user_id: str, project_id: str) -> tuple[int, int, int]:
+def estimate_project_cost(
+    session: Session, *, user_id: str, project_id: str
+) -> tuple[int, int, int]:
     """返回由已验证媒体真实时长和当前产品价目计算的报价。"""
 
-    return _ready_quote(session, project=_owned_project(session, user_id=user_id, project_id=project_id))
+    return _ready_quote(
+        session, project=_owned_project(session, user_id=user_id, project_id=project_id)
+    )
 
 
 def start_project(session: Session, *, user_id: str, project_id: str) -> str:
@@ -121,20 +157,66 @@ def start_project(session: Session, *, user_id: str, project_id: str) -> str:
 
     project = _owned_project(session, user_id=user_id, project_id=project_id, lock=True)
     if project.status not in {"draft", "ready"}:
-        raise ProjectLifecycleConflict("PROJECT_NOT_STARTABLE", "Project cannot be started")
+        raise ProjectLifecycleConflict(
+            "PROJECT_NOT_STARTABLE", "Project cannot be started"
+        )
     credits, _, _ = _ready_quote(session, project=project)
-    snapshot = session.scalar(select(WorkflowTemplateSnapshot).where(WorkflowTemplateSnapshot.template_name == project.product).order_by(WorkflowTemplateSnapshot.created_at.desc()))
+    snapshot = session.scalar(
+        select(WorkflowTemplateSnapshot)
+        .where(WorkflowTemplateSnapshot.template_name == project.product)
+        .order_by(WorkflowTemplateSnapshot.created_at.desc())
+    )
     if snapshot is None:
-        raise ProjectLifecycleConflict("PROJECT_WORKFLOW_UNAVAILABLE", "Project workflow is unavailable")
+        raise ProjectLifecycleConflict(
+            "PROJECT_WORKFLOW_UNAVAILABLE", "Project workflow is unavailable"
+        )
     try:
-        _apply_credit(session, user_id=user_id, entry_type="charge", amount=-credits, idempotency_key=f"charge:{project.id}", reference_id=project.id, reason="project_charge")
+        _apply_credit(
+            session,
+            user_id=user_id,
+            entry_type="charge",
+            amount=-credits,
+            idempotency_key=f"charge:{project.id}",
+            reference_id=project.id,
+            reason="project_charge",
+        )
     except InsufficientCreditsError as error:
-        raise ProjectLifecycleConflict("INSUFFICIENT_CREDITS", "Insufficient credits") from error
-    workflow = Workflow(id=_new_id("wfl"), user_id=user_id, project_id=project.id, template_snapshot_id=snapshot.id, state="queued", state_version=1)
+        raise ProjectLifecycleConflict(
+            "INSUFFICIENT_CREDITS", "Insufficient credits"
+        ) from error
+    workflow = Workflow(
+        id=_new_id("wfl"),
+        user_id=user_id,
+        project_id=project.id,
+        template_snapshot_id=snapshot.id,
+        state="queued",
+        state_version=1,
+    )
     session.add(workflow)
     for node in _snapshot_nodes(snapshot.definition):
-        session.add(WorkflowNode(id=_new_id("wnd"), workflow_id=workflow.id, name=node["name"], state="queued", depends_on=node["depends_on"], retryable=node["retryable"], manual_gate=node["manual_gate"], max_attempts=node["max_attempts"]))
-    session.add(WorkflowOutbox(id=_new_id("obx"), workflow_id=workflow.id, workflow_node_id=None, event_type="workflow.state_changed", idempotency_key=f"workflow-state:queued:{project.id}", payload={"state": "queued", "state_version": 1}, status="pending"))
+        session.add(
+            WorkflowNode(
+                id=_new_id("wnd"),
+                workflow_id=workflow.id,
+                name=node["name"],
+                state="queued",
+                depends_on=node["depends_on"],
+                retryable=node["retryable"],
+                manual_gate=node["manual_gate"],
+                max_attempts=node["max_attempts"],
+            )
+        )
+    session.add(
+        WorkflowOutbox(
+            id=_new_id("obx"),
+            workflow_id=workflow.id,
+            workflow_node_id=None,
+            event_type="workflow.state_changed",
+            idempotency_key=f"workflow-state:queued:{project.id}",
+            payload={"state": "queued", "state_version": 1},
+            status="pending",
+        )
+    )
     project.status = "queued"
     return workflow.id
 

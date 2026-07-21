@@ -62,9 +62,7 @@ def _extension(value: str, *, video_only: bool = False) -> str:
     return normalized
 
 
-def validate_video(
-    probe: ProbeResult, *, declared_extension: str
-) -> dict[str, Any]:
+def validate_video(probe: ProbeResult, *, declared_extension: str) -> dict[str, Any]:
     """校验 10 分钟上限、真实视频流和容器并返回统一元数据。"""
 
     extension = _extension(declared_extension, video_only=True)
@@ -131,7 +129,9 @@ def parse_srt(content: bytes) -> dict[str, Any]:
     if not content or len(content) > SRT_MAX_BYTES:
         raise SrtConstraintError("SRT_SIZE_INVALID")
     text, encoding = _decode_srt(content)
-    blocks = [block for block in re.split(r"\r?\n\s*\r?\n", text.strip()) if block.strip()]
+    blocks = [
+        block for block in re.split(r"\r?\n\s*\r?\n", text.strip()) if block.strip()
+    ]
     if not blocks:
         raise SrtConstraintError("SRT_EMPTY")
     previous_end = 0.0

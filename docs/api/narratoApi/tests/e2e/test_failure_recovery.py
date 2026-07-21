@@ -12,12 +12,18 @@ def test_terminal_core_failure_marks_workflow_and_project_failed_once() -> None:
     reconciler = WorkflowReconciler(sessions)
 
     assert reconciler.reconcile_callback(
-        core_task_id="ctask_e2e_1", event_id="evt_failed", state_version=3,
-        state="failed", result={"code": "PROVIDER_UNAVAILABLE"},
+        core_task_id="ctask_e2e_1",
+        event_id="evt_failed",
+        state_version=3,
+        state="failed",
+        result={"code": "PROVIDER_UNAVAILABLE"},
     )
     assert not reconciler.reconcile_polling(
-        core_task_id="ctask_e2e_1", event_id="evt_failed_retry", state_version=3,
-        state="failed", result={"code": "PROVIDER_UNAVAILABLE"},
+        core_task_id="ctask_e2e_1",
+        event_id="evt_failed_retry",
+        state_version=3,
+        state="failed",
+        result={"code": "PROVIDER_UNAVAILABLE"},
     )
 
     with sessions() as session:

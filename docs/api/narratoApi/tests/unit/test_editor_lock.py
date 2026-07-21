@@ -11,7 +11,11 @@ from narrato_api.database import Base
 from narrato_api.editor.models import EditorRevision
 from narrato_api.editor.service import EditorLockedError
 from narrato_api.projects.models import Project
-from narrato_api.workflows.models import Workflow, WorkflowOutbox, WorkflowTemplateSnapshot
+from narrato_api.workflows.models import (
+    Workflow,
+    WorkflowOutbox,
+    WorkflowTemplateSnapshot,
+)
 
 
 def _editor_service():
@@ -21,7 +25,9 @@ def _editor_service():
     Base.metadata.create_all(engine)
     sessions = sessionmaker(bind=engine, expire_on_commit=False)
     with sessions.begin() as session:
-        session.add(User(id="usr_editor", email="editor@example.com", password_hash="hash"))
+        session.add(
+            User(id="usr_editor", email="editor@example.com", password_hash="hash")
+        )
         session.add(
             Project(
                 id="prj_editor",
@@ -94,9 +100,9 @@ def test_submit_render_locks_editor_and_persists_one_outbox_event() -> None:
         True,
     )
     assert workflow is not None and workflow.state == "render_queued"
-    assert [(event.event_type, event.idempotency_key, event.status) for event in events] == [
-        ("workflow.render_requested", "render-submit:prj_editor:one", "pending")
-    ]
+    assert [
+        (event.event_type, event.idempotency_key, event.status) for event in events
+    ] == [("workflow.render_requested", "render-submit:prj_editor:one", "pending")]
     assert [revision.content for revision in revisions] == [{"tracks": ["final"]}]
 
     with pytest.raises(EditorLockedError):

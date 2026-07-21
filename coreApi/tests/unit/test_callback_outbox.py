@@ -218,15 +218,16 @@ def test_callback_publisher_replays_after_process_crash(session, task_service, t
     with pytest.raises(SystemExit, match="worker lost"):
         CallbackOutboxPublisher(
             session, base_backoff_seconds=1, minimum_claim_seconds=0
-        ).publish_pending(
-            CrashClient(), now=now
-        )
+        ).publish_pending(CrashClient(), now=now)
     row = session.scalar(select(CallbackOutbox))
     assert row is not None and row.attempt_count == 1 and row.status.value == "pending"
     replay = RecordingCallbackClient(CallbackDeliveryResult.SUCCESS)
-    assert CallbackOutboxPublisher(session).publish_pending(
-        replay, now=now + timedelta(seconds=1)
-    ) == 1
+    assert (
+        CallbackOutboxPublisher(session).publish_pending(
+            replay, now=now + timedelta(seconds=1)
+        )
+        == 1
+    )
     assert replay.events[0]["event_id"] == "evt_crash"
 
 
@@ -246,8 +247,11 @@ def test_two_publishers_atomically_claim_one_event(tmp_path):
     with Session(engine, expire_on_commit=False) as seed:
         service = TaskService(seed)
         item = service.create_core_task(
-            caller="narrato-api", route="/probe", task_type="asr",
-            idempotency_key="callback-concurrent", input_snapshot={"asset": "one"}
+            caller="narrato-api",
+            route="/probe",
+            task_type="asr",
+            idempotency_key="callback-concurrent",
+            input_snapshot={"asset": "one"},
         )
         service.mark_succeeded(item.id, event_id="evt_concurrent")
     lock = threading.Lock()
@@ -388,9 +392,7 @@ def test_late_http_success_remains_pending_in_outbox(session, task_service, task
     """超出总时限后才返回的 204 不能让持久 Outbox 进入 SENT。"""
 
     class CancellationResistantTransport(httpx.AsyncBaseTransport):
-        async def handle_async_request(
-            self, request: httpx.Request
-        ) -> httpx.Response:
+        async def handle_async_request(self, request: httpx.Request) -> httpx.Response:
             try:
                 await asyncio.sleep(0.14)
             except asyncio.CancelledError:

@@ -141,8 +141,12 @@ class CoreTaskAttempt(Base):
     )
     lease_token: Mapped[str] = mapped_column(String(128), nullable=False)
     lease_version: Mapped[int] = mapped_column(Integer, nullable=False)
-    lease_expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
-    heartbeat_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    lease_expires_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
+    heartbeat_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
     started_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=utc_now
     )
@@ -251,7 +255,9 @@ class CoreDispatchOutbox(Base):
         nullable=False,
         default=DispatchStatus.PENDING,
     )
-    available_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    available_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False
+    )
     attempt_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     last_error: Mapped[str | None] = mapped_column(String(80))
     sent_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

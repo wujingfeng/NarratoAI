@@ -40,7 +40,9 @@ def test_live_returns_typed_envelope_without_dependency_access(tmp_path) -> None
 
     app.dependency_overrides[get_readiness_checker] = lambda: must_not_run
     with TestClient(app) as client:
-        response = client.get("/api/v1/health/live", headers={"X-Request-ID": "req_live-1"})
+        response = client.get(
+            "/api/v1/health/live", headers={"X-Request-ID": "req_live-1"}
+        )
 
     assert response.status_code == 200
     assert response.headers["X-Request-ID"] == "req_live-1"
@@ -102,7 +104,12 @@ def test_readiness_rejects_incomplete_auth_and_mail_configuration(
 ) -> None:
     from narrato_api.api.dependencies import required_configuration_is_present
 
-    assert required_configuration_is_present(_settings(tmp_path).model_copy(update=updates)) is False
+    assert (
+        required_configuration_is_present(
+            _settings(tmp_path).model_copy(update=updates)
+        )
+        is False
+    )
 
 
 def test_ready_endpoint_fails_closed_for_missing_auth_secret(tmp_path) -> None:
@@ -174,7 +181,9 @@ def test_broker_probe_cleanup_closes_app_when_connection_close_fails(
         def close(self) -> None:
             events.append("app.close")
 
-    monkeypatch.setattr(dependencies_module, "create_celery_app", lambda _settings: App())
+    monkeypatch.setattr(
+        dependencies_module, "create_celery_app", lambda _settings: App()
+    )
     with pytest.raises(RuntimeError) as caught:
         dependencies_module.check_celery_broker(_settings(tmp_path))
     assert caught.value is close_error
@@ -206,7 +215,9 @@ def test_broker_probe_preserves_original_error_while_all_cleanup_runs(
             events.append("app.close")
             raise RuntimeError("secondary app cleanup")
 
-    monkeypatch.setattr(dependencies_module, "create_celery_app", lambda _settings: App())
+    monkeypatch.setattr(
+        dependencies_module, "create_celery_app", lambda _settings: App()
+    )
     with pytest.raises(KeyboardInterrupt) as caught:
         dependencies_module.check_celery_broker(_settings(tmp_path))
     assert caught.value is original
@@ -266,13 +277,17 @@ def test_shutdown_rejects_new_readiness_work() -> None:
 
 
 def test_default_readiness_timeout_is_bounded(tmp_path, monkeypatch) -> None:
-    settings = _settings(tmp_path).model_copy(update={"readiness_timeout_seconds": 0.02})
+    settings = _settings(tmp_path).model_copy(
+        update={"readiness_timeout_seconds": 0.02}
+    )
     app = create_app(settings)
 
     def slow_database() -> None:
         time.sleep(0.15)
 
-    monkeypatch.setattr("narrato_api.api.dependencies.check_database", lambda _settings: slow_database())
+    monkeypatch.setattr(
+        "narrato_api.api.dependencies.check_database", lambda _settings: slow_database()
+    )
     started = time.monotonic()
     with TestClient(app, raise_server_exceptions=False) as client:
         response = client.get("/api/v1/health/ready")
@@ -293,9 +308,7 @@ def test_database_engine_applies_connect_and_statement_deadlines(monkeypatch) ->
         return real_create_engine("sqlite://")
 
     monkeypatch.setattr(database_module, "create_engine", capture)
-    create_database_engine(
-        "postgresql+psycopg://business@db/narrato", 2.1, 0.075
-    )
+    create_database_engine("postgresql+psycopg://business@db/narrato", 2.1, 0.075)
 
     connect_args = captured["connect_args"]
     assert isinstance(connect_args, dict)
@@ -305,9 +318,7 @@ def test_database_engine_applies_connect_and_statement_deadlines(monkeypatch) ->
 
 
 def test_sqlite_readiness_uses_busy_timeout(tmp_path) -> None:
-    engine = create_database_engine(
-        f"sqlite:///{tmp_path / 'busy.db'}", 1.0, 0.075
-    )
+    engine = create_database_engine(f"sqlite:///{tmp_path / 'busy.db'}", 1.0, 0.075)
     with engine.connect() as connection:
         assert connection.exec_driver_sql("PRAGMA busy_timeout").scalar_one() == 75
     engine.dispose()
@@ -333,7 +344,9 @@ def test_lifespan_disposes_database_pool_and_checker_rejects_after_shutdown(
     monkeypatch.setattr(
         dependencies_module, "create_redis_client", lambda _settings: FakeRedis()
     )
-    monkeypatch.setattr(dependencies_module, "check_celery_broker", lambda _settings: None)
+    monkeypatch.setattr(
+        dependencies_module, "check_celery_broker", lambda _settings: None
+    )
     app = create_app(settings)
     with TestClient(app) as client:
         assert client.get("/api/v1/health/ready").status_code == 200
@@ -365,7 +378,9 @@ def test_nested_apps_only_release_their_owned_database_engine(
     monkeypatch.setattr(
         dependencies_module, "create_redis_client", lambda _settings: FakeRedis()
     )
-    monkeypatch.setattr(dependencies_module, "check_celery_broker", lambda _settings: None)
+    monkeypatch.setattr(
+        dependencies_module, "check_celery_broker", lambda _settings: None
+    )
     settings_a = _settings(tmp_path).model_copy(
         update={"database_url": f"sqlite:///{tmp_path / 'a.db'}"}
     )
@@ -403,7 +418,9 @@ def test_nested_apps_with_same_settings_reference_count_shared_engine(
     monkeypatch.setattr(
         dependencies_module, "create_redis_client", lambda _settings: FakeRedis()
     )
-    monkeypatch.setattr(dependencies_module, "check_celery_broker", lambda _settings: None)
+    monkeypatch.setattr(
+        dependencies_module, "check_celery_broker", lambda _settings: None
+    )
     settings = _settings(tmp_path).model_copy(
         update={"database_url": f"sqlite:///{tmp_path / 'shared.db'}"}
     )

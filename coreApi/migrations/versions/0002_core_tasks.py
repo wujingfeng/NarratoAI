@@ -147,9 +147,7 @@ def downgrade() -> None:
 
     op.drop_index("ix_callback_outbox_pending", table_name="callback_outbox")
     op.drop_table("callback_outbox")
-    op.drop_index(
-        "ix_core_task_attempts_lease_expiry", table_name="core_task_attempts"
-    )
+    op.drop_index("ix_core_task_attempts_lease_expiry", table_name="core_task_attempts")
     op.drop_table("core_task_attempts")
     op.drop_index("ix_core_tasks_status_created_at", table_name="core_tasks")
     op.drop_table("core_tasks")

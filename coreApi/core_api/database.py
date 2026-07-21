@@ -35,6 +35,7 @@ def create_database_engine(database_url: str) -> Engine:
                 cursor.close()
                 if autocommit is not None:
                     dbapi_connection.autocommit = autocommit
+
     return engine
 
 

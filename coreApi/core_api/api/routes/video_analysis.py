@@ -116,7 +116,9 @@ class ShortDramaConfigSnapshot(BaseModel):
     max_tokens: int = Field(default=4096, ge=1, le=131072)
 
 
-def validate_max_tokens(config: ShortDramaConfigSnapshot, model_snapshot: dict[str, object]) -> None:
+def validate_max_tokens(
+    config: ShortDramaConfigSnapshot, model_snapshot: dict[str, object]
+) -> None:
     """创建任务时拒绝超过冻结模型上限的 token 配额。"""
     limits = model_snapshot.get("model_limits", {})
     provider_limits = model_snapshot.get("provider_limits", {})

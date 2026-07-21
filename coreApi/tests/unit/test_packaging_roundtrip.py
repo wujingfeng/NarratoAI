@@ -21,7 +21,9 @@ def test_vendored_legacy_sources_match_monorepo_source():
     repository_root = core_root.parent
     vendor_root = core_root / "vendor_legacy"
     for relative in LEGACY_FILES:
-        assert (vendor_root / relative).read_bytes() == (repository_root / relative).read_bytes()
+        assert (vendor_root / relative).read_bytes() == (
+            repository_root / relative
+        ).read_bytes()
 
 
 def test_sdist_roundtrip_preserves_selective_legacy_runtime(tmp_path):
@@ -30,7 +32,9 @@ def test_sdist_roundtrip_preserves_selective_legacy_runtime(tmp_path):
     shutil.copytree(
         source,
         checkout,
-        ignore=shutil.ignore_patterns(".venv", "build", "dist", "*.egg-info", "__pycache__"),
+        ignore=shutil.ignore_patterns(
+            ".venv", "build", "dist", "*.egg-info", "__pycache__"
+        ),
     )
     subprocess.run(
         [sys.executable, "-m", "build", "--sdist", "--no-isolation"],

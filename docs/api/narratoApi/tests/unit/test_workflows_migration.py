@@ -29,7 +29,9 @@ def test_alembic_migration_does_not_disable_business_logger(
     assert namespace.disabled is False
 
 
-def test_workflows_migration_upgrades_task_13b_head_with_durable_workflow_tables(tmp_path) -> None:
+def test_workflows_migration_upgrades_task_13b_head_with_durable_workflow_tables(
+    tmp_path,
+) -> None:
     project_root = Path(__file__).resolve().parents[2]
     database_path = tmp_path / "workflows.db"
     config = Config(str(project_root / "alembic.ini"))

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import asdict, dataclass
-from typing import Any
+from typing import Any, cast
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
@@ -65,7 +65,15 @@ class CoreJianyingManifestFile:
             )
         ):
             raise CoreClientError("Core Jianying manifest response is invalid")
-        return cls(**values)
+        return cls(
+            content=cast(str | None, values["content"]),
+            content_base64=cast(str | None, values["content_base64"]),
+            zip_path=values["zip_path"],
+            url=cast(str | None, values["url"]),
+            size=cast(int | None, values["size"]),
+            checksum=cast(str | None, values["checksum"]),
+            content_type=cast(str | None, values["content_type"]),
+        )
 
 
 @dataclass(frozen=True, slots=True)

@@ -10,9 +10,7 @@ from typing import Any
 from core_api.config import Settings
 
 _BEARER_PATTERN = re.compile(r"(?i)(bearer\s+)[A-Za-z0-9._~+/-]+")
-_URI_USERINFO_PATTERN = re.compile(
-    r"(?i)([a-z][a-z0-9+.-]*://)[^/@\s]+@"
-)
+_URI_USERINFO_PATTERN = re.compile(r"(?i)([a-z][a-z0-9+.-]*://)[^/@\s]+@")
 _NAMED_VALUE_PATTERN = re.compile(
     r"(?i)(?P<prefix>[\"']?(?P<name>[a-z][a-z0-9_.-]{0,63})"
     r"[\"']?\s*[=:]\s*)"
@@ -40,9 +38,7 @@ def _normalize_field_name(name: str) -> tuple[tuple[str, ...], str]:
 
     snake = re.sub(r"(?<=[a-z0-9])(?=[A-Z])", "_", name)
     parts = tuple(
-        part
-        for part in re.sub(r"[^a-z0-9]+", "_", snake.lower()).split("_")
-        if part
+        part for part in re.sub(r"[^a-z0-9]+", "_", snake.lower()).split("_") if part
     )
     return parts, "".join(parts)
 
@@ -53,7 +49,9 @@ def _is_sensitive_field(name: str) -> bool:
     parts, compact = _normalize_field_name(name)
     if any(part in _SENSITIVE_TERMS for part in parts):
         return True
-    if compact.endswith(("password", "passwd", "credential", "credentials", "token", "secret")):
+    if compact.endswith(
+        ("password", "passwd", "credential", "credentials", "token", "secret")
+    ):
         return True
     part_set = set(parts)
     if "key" in part_set and part_set.intersection(_KEY_NAMESPACES):
@@ -80,7 +78,7 @@ class JsonFormatter(logging.Formatter):
         def redact_named_value(match: re.Match[str]) -> str:
             # 使用与 structured extra 相同的键名判定，避免两套别名漂移。
             if _is_sensitive_field(match.group("name")):
-                return f'{match.group("prefix")}***'
+                return f"{match.group('prefix')}***"
             return match.group(0)
 
         result = _NAMED_VALUE_PATTERN.sub(redact_named_value, result)

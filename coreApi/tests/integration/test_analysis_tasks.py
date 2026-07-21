@@ -125,7 +125,9 @@ def test_analysis_post_requires_auth_and_model_capability(analysis_client):
     assert unavailable.json()["code"] == "CAPABILITY_UNAVAILABLE"
 
 
-def test_analysis_rejects_max_tokens_above_frozen_model_limit(analysis_client, settings):
+def test_analysis_rejects_max_tokens_above_frozen_model_limit(
+    analysis_client, settings
+):
     client, _, analysis_model, _ = analysis_client
     from sqlalchemy.orm import Session
 

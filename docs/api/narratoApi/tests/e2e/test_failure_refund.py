@@ -17,12 +17,18 @@ def test_terminal_failure_refunds_the_original_charge_exactly_once() -> None:
     reconciler = WorkflowReconciler(sessions)
 
     assert reconciler.reconcile_callback(
-        core_task_id="ctask_e2e_1", event_id="evt_refund", state_version=1,
-        state="failed", result={"code": "TERMINAL"},
+        core_task_id="ctask_e2e_1",
+        event_id="evt_refund",
+        state_version=1,
+        state="failed",
+        result={"code": "TERMINAL"},
     )
     assert not reconciler.reconcile_polling(
-        core_task_id="ctask_e2e_1", event_id="evt_refund_duplicate", state_version=1,
-        state="failed", result={"code": "TERMINAL"},
+        core_task_id="ctask_e2e_1",
+        event_id="evt_refund_duplicate",
+        state_version=1,
+        state="failed",
+        result={"code": "TERMINAL"},
     )
 
     with sessions() as session:
@@ -34,5 +40,6 @@ def test_terminal_failure_refunds_the_original_charge_exactly_once() -> None:
         ).all()
     assert account is not None and account.balance == 100
     assert [(entry.entry_type, entry.amount) for entry in entries] == [
-        ("charge", -25), ("refund", 25),
+        ("charge", -25),
+        ("refund", 25),
     ]

@@ -2,7 +2,16 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from sqlalchemy import BigInteger, CheckConstraint, DateTime, Float, ForeignKey, Index, String, UniqueConstraint
+from sqlalchemy import (
+    BigInteger,
+    CheckConstraint,
+    DateTime,
+    Float,
+    ForeignKey,
+    Index,
+    String,
+    UniqueConstraint,
+)
 from sqlalchemy.orm import Mapped, mapped_column
 
 from narrato_api.database import Base
@@ -40,7 +49,9 @@ class Asset(Base):
         String(64), ForeignKey("projects.id", ondelete="RESTRICT"), nullable=False
     )
     asset_type: Mapped[str] = mapped_column(String(16), nullable=False)
-    status: Mapped[str] = mapped_column(String(16), nullable=False, default="validating")
+    status: Mapped[str] = mapped_column(
+        String(16), nullable=False, default="validating"
+    )
     filename: Mapped[str] = mapped_column(String(255), nullable=False)
     bucket: Mapped[str] = mapped_column(String(255), nullable=False)
     object_key: Mapped[str] = mapped_column(String(1024), nullable=False)

@@ -43,7 +43,9 @@ def test_postgresql_account_query_compiles_with_row_lock() -> None:
 
 
 @pytest.fixture
-def auth_fixture(tmp_path) -> Iterator[tuple[TestClient, AuthService, FakeMailDispatcher]]:
+def auth_fixture(
+    tmp_path,
+) -> Iterator[tuple[TestClient, AuthService, FakeMailDispatcher]]:
     database_path = tmp_path / "auth.db"
     engine = create_engine(
         f"sqlite:///{database_path}", connect_args={"check_same_thread": False}
@@ -55,7 +57,9 @@ def auth_fixture(tmp_path) -> Iterator[tuple[TestClient, AuthService, FakeMailDi
     mail = FakeMailDispatcher()
     service = AuthService(
         session_factory=sessions,
-        password_hasher=PasswordHasher(time_cost=1, memory_cost_kib=8192, parallelism=1),
+        password_hasher=PasswordHasher(
+            time_cost=1, memory_cost_kib=8192, parallelism=1
+        ),
         codes=EmailCodeManager(code_store, secret="test-code-hmac", ttl_seconds=600),
         tokens=SingleSessionTokens(session_store, ttl_seconds=2_592_000),
         mail_dispatcher=mail,
@@ -114,18 +118,29 @@ def test_register_login_single_session_logout_and_me(auth_fixture) -> None:
     assert first.status_code == second.status_code == 200
     first_token = first.json()["data"]["token"]
     second_token = second.json()["data"]["token"]
-    assert client.get("/api/v1/users/me", headers={"Authorization": f"Bearer {first_token}"}).status_code == 401
+    assert (
+        client.get(
+            "/api/v1/users/me", headers={"Authorization": f"Bearer {first_token}"}
+        ).status_code
+        == 401
+    )
     current = client.get(
         "/api/v1/users/me", headers={"Authorization": f"Bearer {second_token}"}
     )
     assert current.status_code == 200
     assert current.json()["data"]["email"] == "user@example.com"
-    assert client.post(
-        "/api/v1/auth/logout", headers={"Authorization": f"Bearer {second_token}"}
-    ).status_code == 200
-    assert client.get(
-        "/api/v1/users/me", headers={"Authorization": f"Bearer {second_token}"}
-    ).status_code == 401
+    assert (
+        client.post(
+            "/api/v1/auth/logout", headers={"Authorization": f"Bearer {second_token}"}
+        ).status_code
+        == 200
+    )
+    assert (
+        client.get(
+            "/api/v1/users/me", headers={"Authorization": f"Bearer {second_token}"}
+        ).status_code
+        == 401
+    )
 
 
 @pytest.mark.parametrize(
@@ -173,17 +188,26 @@ def test_password_reset_is_non_enumerating_and_revokes_session(auth_fixture) -> 
         },
     )
     assert reset.status_code == 200
-    assert client.get(
-        "/api/v1/users/me", headers={"Authorization": f"Bearer {token}"}
-    ).status_code == 401
-    assert client.post(
-        "/api/v1/auth/login",
-        json={"email": "user@example.com", "password": "Correct-Horse-Battery-42"},
-    ).status_code == 401
-    assert client.post(
-        "/api/v1/auth/login",
-        json={"email": "user@example.com", "password": "Correct-Horse-Battery-42"},
-    ).status_code == 401
+    assert (
+        client.get(
+            "/api/v1/users/me", headers={"Authorization": f"Bearer {token}"}
+        ).status_code
+        == 401
+    )
+    assert (
+        client.post(
+            "/api/v1/auth/login",
+            json={"email": "user@example.com", "password": "Correct-Horse-Battery-42"},
+        ).status_code
+        == 401
+    )
+    assert (
+        client.post(
+            "/api/v1/auth/login",
+            json={"email": "user@example.com", "password": "Correct-Horse-Battery-42"},
+        ).status_code
+        == 401
+    )
 
 
 def test_invalid_credentials_and_bearer_use_same_public_401(auth_fixture) -> None:
@@ -220,7 +244,9 @@ def test_auth_dtos_forbid_extra_and_openapi_has_no_refresh_route(auth_fixture) -
     }
 
 
-def test_duplicate_registration_and_concurrent_registration_have_one_user(auth_fixture) -> None:
+def test_duplicate_registration_and_concurrent_registration_have_one_user(
+    auth_fixture,
+) -> None:
     _client, service, _mail = auth_fixture
     codes = [service.send_register_code("same@example.com") for _ in range(2)]
     code = next(item for item in reversed(codes) if item is not None)
@@ -240,7 +266,9 @@ def test_duplicate_registration_and_concurrent_registration_have_one_user(auth_f
     assert sum(item.startswith("usr_") for item in results) == 1
 
 
-def test_disabled_user_cannot_login_and_existing_token_is_rejected(auth_fixture) -> None:
+def test_disabled_user_cannot_login_and_existing_token_is_rejected(
+    auth_fixture,
+) -> None:
     client, service, mail = auth_fixture
     registered = _register(client, mail)
     login = client.post(
@@ -253,9 +281,12 @@ def test_disabled_user_cannot_login_and_existing_token_is_rejected(auth_fixture)
         assert user is not None
         user.status = "disabled"
         session.commit()
-    assert client.get(
-        "/api/v1/users/me", headers={"Authorization": f"Bearer {token}"}
-    ).status_code == 401
+    assert (
+        client.get(
+            "/api/v1/users/me", headers={"Authorization": f"Bearer {token}"}
+        ).status_code
+        == 401
+    )
 
 
 def test_code_send_endpoints_do_not_enumerate_accounts(auth_fixture) -> None:
@@ -269,9 +300,9 @@ def test_code_send_endpoints_do_not_enumerate_accounts(auth_fixture) -> None:
         "/api/v1/auth/register-code/send", json={"email": "missing@example.com"}
     )
     assert existing.status_code == missing.status_code == 202
-    assert {
-        key: existing.json()[key] for key in ("code", "message", "data")
-    } == {key: missing.json()[key] for key in ("code", "message", "data")}
+    assert {key: existing.json()[key] for key in ("code", "message", "data")} == {
+        key: missing.json()[key] for key in ("code", "message", "data")
+    }
     assert len(mail.messages) == before + 1
     assert mail.messages[-1].email == "missing@example.com"
     assert mail.cover_dispatches >= 1
@@ -289,7 +320,9 @@ def test_code_send_endpoints_do_not_enumerate_accounts(auth_fixture) -> None:
     assert mail.cover_dispatches >= 2
 
 
-def test_concurrent_code_sends_leave_only_latest_generation_consumable(auth_fixture) -> None:
+def test_concurrent_code_sends_leave_only_latest_generation_consumable(
+    auth_fixture,
+) -> None:
     _client, service, mail = auth_fixture
     with concurrent.futures.ThreadPoolExecutor(max_workers=12) as executor:
         results = list(
@@ -297,7 +330,9 @@ def test_concurrent_code_sends_leave_only_latest_generation_consumable(auth_fixt
                 lambda _: service.send_register_code("race@example.com"), range(24)
             )
         )
-    actual = [message for message in mail.messages if message.email == "race@example.com"]
+    actual = [
+        message for message in mail.messages if message.email == "race@example.com"
+    ]
     assert len(actual) == 24
     winners = [
         message.verification_code
@@ -351,7 +386,9 @@ def test_revoke_failure_does_not_commit_new_password(auth_fixture) -> None:
     original = store.revoke_user
 
     def fail(_user_id: str) -> None:
-        raise ApiError("AUTH_SERVICE_UNAVAILABLE", "Authentication service unavailable", 503)
+        raise ApiError(
+            "AUTH_SERVICE_UNAVAILABLE", "Authentication service unavailable", 503
+        )
 
     store.revoke_user = fail  # type: ignore[method-assign]
     with pytest.raises(ApiError):
@@ -514,7 +551,9 @@ def test_real_redis_code_lua_is_atomic_and_keeps_only_digests() -> None:
         client.close()
 
 
-def test_real_redis_resend_rotates_ttl_and_worker_claim_fences_stale_generation() -> None:
+def test_real_redis_resend_rotates_ttl_and_worker_claim_fences_stale_generation() -> (
+    None
+):
     client = _real_redis()
     prefix = f"narrato:test:{os.getpid()}:fsm:"
     store = RedisEmailCodeStore(client, prefix=prefix)
@@ -785,9 +824,7 @@ def test_real_redis_session_lua_replaces_without_sliding_ttl() -> None:
         with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
             issued = list(
                 executor.map(
-                    lambda version: tokens.issue(
-                        "usr_real", password_version=version
-                    ),
+                    lambda version: tokens.issue("usr_real", password_version=version),
                     range(3, 23),
                 )
             )

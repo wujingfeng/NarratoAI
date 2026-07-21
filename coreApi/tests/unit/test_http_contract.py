@@ -101,9 +101,7 @@ def test_service_bearer_dependency_accepts_configured_token(app, client):
 
 @pytest.mark.parametrize("request_id", ["has space", "x" * 129, "<script>"])
 def test_invalid_request_id_is_replaced(client, request_id):
-    response = client.get(
-        "/api/v1/health/live", headers={"X-Request-ID": request_id}
-    )
+    response = client.get("/api/v1/health/live", headers={"X-Request-ID": request_id})
 
     generated = response.headers["X-Request-ID"]
     assert generated != request_id
@@ -300,8 +298,7 @@ def test_importing_package_does_not_initialize_fastapi_app():
         [
             sys.executable,
             "-c",
-            "import sys; import core_api; "
-            "assert 'core_api.main' not in sys.modules",
+            "import sys; import core_api; assert 'core_api.main' not in sys.modules",
         ],
         check=False,
         capture_output=True,

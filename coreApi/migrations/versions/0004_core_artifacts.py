@@ -37,16 +37,16 @@ def upgrade() -> None:
         sa.Column("size", sa.Integer(), nullable=False),
         sa.Column("checksum", sa.String(length=80), nullable=True),
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
-        sa.ForeignKeyConstraint(["core_task_id"], ["core_tasks.id"], ondelete="CASCADE"),
+        sa.ForeignKeyConstraint(
+            ["core_task_id"], ["core_tasks.id"], ondelete="CASCADE"
+        ),
         sa.ForeignKeyConstraint(
             ["core_task_id", "attempt_no"],
             ["core_task_attempts.core_task_id", "core_task_attempts.attempt_no"],
             name="fk_core_artifacts_task_attempt",
             ondelete="CASCADE",
         ),
-        sa.CheckConstraint(
-            "attempt_no > 0", name="ck_core_artifacts_attempt_positive"
-        ),
+        sa.CheckConstraint("attempt_no > 0", name="ck_core_artifacts_attempt_positive"),
         sa.CheckConstraint("size > 0", name="ck_core_artifacts_size_positive"),
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint("object_key", name="uq_core_artifacts_object_key"),
@@ -80,7 +80,9 @@ def upgrade() -> None:
         sa.Column("recover_after", sa.DateTime(timezone=True), nullable=True),
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
         sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False),
-        sa.ForeignKeyConstraint(["core_task_id"], ["core_tasks.id"], ondelete="CASCADE"),
+        sa.ForeignKeyConstraint(
+            ["core_task_id"], ["core_tasks.id"], ondelete="CASCADE"
+        ),
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint(
             "core_task_id", "state_version", name="uq_core_dispatch_task_state"

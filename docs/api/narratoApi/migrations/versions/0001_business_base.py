@@ -4,6 +4,7 @@ Revision ID: 0001_business_base
 Revises:
 Create Date: 2026-07-17
 """
+
 from typing import Sequence
 
 revision: str = "0001_business_base"

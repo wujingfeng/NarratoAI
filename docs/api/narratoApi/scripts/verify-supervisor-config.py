@@ -40,7 +40,11 @@ PROGRAMS = (
     ProgramSpec(
         filename="narrato-api-web.conf",
         section="program:narrato-api-web",
-        command_fragments=(".venv/bin/uvicorn", "narrato_api.main:create_app", "--factory"),
+        command_fragments=(
+            ".venv/bin/uvicorn",
+            "narrato_api.main:create_app",
+            "--factory",
+        ),
     ),
     ProgramSpec(
         filename="narrato-api-worker.conf",
@@ -138,7 +142,9 @@ def _read_program(path: Path, section: str) -> configparser.SectionProxy:
     return parser[section]
 
 
-def _require_nonempty(program: configparser.SectionProxy, option: str, label: str) -> str:
+def _require_nonempty(
+    program: configparser.SectionProxy, option: str, label: str
+) -> str:
     value = program.get(option, "").strip()
     if not value:
         raise ValueError(f"{label}: missing {option}")
@@ -177,7 +183,9 @@ def _verify_program(spec: ProgramSpec) -> tuple[str, str]:
         spec.required_pythonpath is not None
         and f'PYTHONPATH="{spec.required_pythonpath}"' not in environment
     ):
-        raise ValueError(f"{label}: environment must provide repository-root PYTHONPATH")
+        raise ValueError(
+            f"{label}: environment must provide repository-root PYTHONPATH"
+        )
     for fragment in spec.command_fragments:
         if fragment not in command:
             raise ValueError(f"{label}: command is missing {fragment!r}")
@@ -188,14 +196,20 @@ def _verify_program(spec: ProgramSpec) -> tuple[str, str]:
     for option in ("autostart", "autorestart", "stopasgroup", "killasgroup"):
         _require_true(program, option, label)
 
-    if _require_nonempty(program, "stopsignal", label).upper() not in {"TERM", "INT", "QUIT"}:
+    if _require_nonempty(program, "stopsignal", label).upper() not in {
+        "TERM",
+        "INT",
+        "QUIT",
+    }:
         raise ValueError(f"{label}: stopsignal must be a graceful signal")
     stopwaitsecs = _require_nonempty(program, "stopwaitsecs", label)
     try:
         if int(stopwaitsecs) < 10:
             raise ValueError
     except ValueError as error:
-        raise ValueError(f"{label}: stopwaitsecs must be an integer of at least 10") from error
+        raise ValueError(
+            f"{label}: stopwaitsecs must be an integer of at least 10"
+        ) from error
 
     stdout_log = _require_nonempty(program, "stdout_logfile", label)
     stderr_log = _require_nonempty(program, "stderr_logfile", label)
@@ -215,7 +229,9 @@ def main() -> int:
             stdout_log, stderr_log = _verify_program(spec)
             for log_path in (stdout_log, stderr_log):
                 if log_path in seen_logs:
-                    raise ValueError(f"{spec.filename}: log path must be unique: {log_path}")
+                    raise ValueError(
+                        f"{spec.filename}: log path must be unique: {log_path}"
+                    )
                 seen_logs.add(log_path)
     except (OSError, ValueError, configparser.Error) as error:
         print(f"Supervisor configuration invalid: {error}", file=sys.stderr)

@@ -60,7 +60,9 @@ class FakeCoreClient:
 
 
 @pytest.fixture
-def upload_fixture(tmp_path) -> Iterator[tuple[TestClient, sessionmaker, FakeOssClient, FakeCoreClient]]:
+def upload_fixture(
+    tmp_path,
+) -> Iterator[tuple[TestClient, sessionmaker, FakeOssClient, FakeCoreClient]]:
     database_path = tmp_path / "uploads.db"
     engine = create_engine(f"sqlite:///{database_path}")
     Base.metadata.create_all(engine)
@@ -101,15 +103,25 @@ def _payload() -> dict[str, object]:
         "object_key": "narrato/api/2026/07/17/object.mp4",
     }
 
+
 def _issued_payload(client: TestClient) -> dict[str, object]:
     payload = _payload()
-    response = client.post("/api/v1/projects/prj_1/uploads/policy", headers={"Authorization": "Bearer valid-token"}, json={key: payload[key] for key in ("asset_type", "filename", "size_bytes", "content_type")})
+    response = client.post(
+        "/api/v1/projects/prj_1/uploads/policy",
+        headers={"Authorization": "Bearer valid-token"},
+        json={
+            key: payload[key]
+            for key in ("asset_type", "filename", "size_bytes", "content_type")
+        },
+    )
     assert response.status_code == 200
     payload["object_key"] = response.json()["data"]["key"]
     return payload
 
 
-def test_upload_complete_heads_object_dispatches_probe_and_marks_asset_ready(upload_fixture) -> None:
+def test_upload_complete_heads_object_dispatches_probe_and_marks_asset_ready(
+    upload_fixture,
+) -> None:
     client, sessions, oss, core = upload_fixture
 
     payload = _issued_payload(client)
@@ -128,7 +140,9 @@ def test_upload_complete_heads_object_dispatches_probe_and_marks_asset_ready(upl
         assert asset is not None and asset.status == "ready"
 
 
-def test_upload_complete_marks_asset_invalid_when_core_rejects_media(upload_fixture) -> None:
+def test_upload_complete_marks_asset_invalid_when_core_rejects_media(
+    upload_fixture,
+) -> None:
     client, sessions, _oss, core = upload_fixture
     core.result = MediaProbeResult(valid=False)
 
@@ -175,7 +189,9 @@ def test_complete_rejects_unissued_or_other_project_object_key(upload_fixture) -
     assert response.json()["code"] == "UPLOAD_OBJECT_REJECTED"
 
 
-def test_asset_read_reconciles_later_succeeded_core_probe_for_owner(upload_fixture) -> None:
+def test_asset_read_reconciles_later_succeeded_core_probe_for_owner(
+    upload_fixture,
+) -> None:
     client, sessions, _oss, core = upload_fixture
     core.result = MediaProbeResult(valid=None, core_task_id="core_1")
 
@@ -206,7 +222,9 @@ def test_asset_read_reconciles_later_succeeded_core_probe_for_owner(upload_fixtu
         assert asset is not None and asset.status == "ready"
 
 
-def test_upload_complete_maps_oss_head_failure_to_service_unavailable(upload_fixture) -> None:
+def test_upload_complete_maps_oss_head_failure_to_service_unavailable(
+    upload_fixture,
+) -> None:
     client, _sessions, oss, _core = upload_fixture
 
     from narrato_api.integrations.oss_client import OssClientError
@@ -225,7 +243,9 @@ def test_upload_complete_maps_oss_head_failure_to_service_unavailable(upload_fix
     assert response.json()["code"] == "OSS_UNAVAILABLE"
 
 
-def test_expired_upload_reservations_do_not_permanently_consume_video_quota(upload_fixture) -> None:
+def test_expired_upload_reservations_do_not_permanently_consume_video_quota(
+    upload_fixture,
+) -> None:
     client, sessions, _oss, _core = upload_fixture
     request = {
         "asset_type": "video",
@@ -234,14 +254,19 @@ def test_expired_upload_reservations_do_not_permanently_consume_video_quota(uplo
         "content_type": "video/mp4",
     }
     for _ in range(5):
-        assert client.post(
-            "/api/v1/projects/prj_1/uploads/policy",
-            headers={"Authorization": "Bearer valid-token"},
-            json=request,
-        ).status_code == 200
+        assert (
+            client.post(
+                "/api/v1/projects/prj_1/uploads/policy",
+                headers={"Authorization": "Bearer valid-token"},
+                json=request,
+            ).status_code
+            == 200
+        )
     with sessions.begin() as session:
         for asset in session.query(Asset).all():
-            asset.reservation_expires_at = datetime.now(timezone.utc) - timedelta(seconds=1)
+            asset.reservation_expires_at = datetime.now(timezone.utc) - timedelta(
+                seconds=1
+            )
 
     response = client.post(
         "/api/v1/projects/prj_1/uploads/policy",

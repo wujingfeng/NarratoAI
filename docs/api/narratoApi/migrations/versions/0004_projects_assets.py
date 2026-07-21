@@ -4,6 +4,7 @@ Revision ID: 0004_projects_assets
 Revises: 0003_billing
 Create Date: 2026-07-17
 """
+
 from typing import Sequence
 
 import sqlalchemy as sa
@@ -51,7 +52,9 @@ def upgrade() -> None:
         sa.Column("size_bytes", sa.BigInteger(), nullable=False),
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
         sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False),
-        sa.CheckConstraint("asset_type IN ('video', 'subtitle')", name="ck_assets_type"),
+        sa.CheckConstraint(
+            "asset_type IN ('video', 'subtitle')", name="ck_assets_type"
+        ),
         sa.CheckConstraint(
             "status IN ('validating', 'ready', 'invalid')", name="ck_assets_status"
         ),

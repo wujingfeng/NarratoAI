@@ -14,8 +14,15 @@ def test_fake_core_terminal_events_complete_full_short_drama_workflow() -> None:
     reconciler = WorkflowReconciler(sessions)
 
     assert names == (
-        "media_probe", "asr", "video_analysis", "script_generation", "waiting_for_edit",
-        "tts", "subtitle", "video_render", "publish_artifacts",
+        "media_probe",
+        "asr",
+        "video_analysis",
+        "script_generation",
+        "waiting_for_edit",
+        "tts",
+        "subtitle",
+        "video_render",
+        "publish_artifacts",
     )
     for index, _name in enumerate(names, start=1):
         assert reconciler.reconcile_callback(

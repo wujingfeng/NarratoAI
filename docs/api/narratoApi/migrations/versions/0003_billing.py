@@ -4,6 +4,7 @@ Revision ID: 0003_billing
 Revises: 0002_users
 Create Date: 2026-07-17
 """
+
 from typing import Sequence
 
 import sqlalchemy as sa
@@ -46,7 +47,9 @@ def upgrade() -> None:
         ),
         sa.ForeignKeyConstraint(["user_id"], ["users.id"], ondelete="RESTRICT"),
         sa.PrimaryKeyConstraint("id"),
-        sa.UniqueConstraint("user_id", "idempotency_key", name="uq_credit_ledger_idempotency"),
+        sa.UniqueConstraint(
+            "user_id", "idempotency_key", name="uq_credit_ledger_idempotency"
+        ),
     )
     op.create_index("ix_credit_ledger_reference", "credit_ledger", ["reference_id"])
     op.create_table(
@@ -61,7 +64,9 @@ def upgrade() -> None:
             "credits_per_minute > 0", name="ck_product_prices_credits_per_minute"
         ),
         sa.PrimaryKeyConstraint("id"),
-        sa.UniqueConstraint("product", "version", name="uq_product_prices_product_version"),
+        sa.UniqueConstraint(
+            "product", "version", name="uq_product_prices_product_version"
+        ),
     )
 
 

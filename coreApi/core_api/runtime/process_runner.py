@@ -89,8 +89,12 @@ class ProcessRunner:
         stdout = _BoundedCollector(self.output_limit_bytes)
         stderr = _BoundedCollector(self.output_limit_bytes)
         readers = [
-            threading.Thread(target=stdout.consume, args=(process.stdout,), daemon=True),
-            threading.Thread(target=stderr.consume, args=(process.stderr,), daemon=True),
+            threading.Thread(
+                target=stdout.consume, args=(process.stdout,), daemon=True
+            ),
+            threading.Thread(
+                target=stderr.consume, args=(process.stderr,), daemon=True
+            ),
         ]
         for reader in readers:
             reader.start()

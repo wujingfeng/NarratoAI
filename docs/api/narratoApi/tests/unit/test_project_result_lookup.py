@@ -12,7 +12,9 @@ from narrato_api.database import Base
 from narrato_api.projects.models import Project
 
 
-def _add_project(session: Session, *, project_id: str, user_id: str, status: str) -> None:
+def _add_project(
+    session: Session, *, project_id: str, user_id: str, status: str
+) -> None:
     session.add(User(id=user_id, email=f"{user_id}@example.com", password_hash="hash"))
     session.add(
         Project(
@@ -38,7 +40,9 @@ def _add_artifact(
     )
 
 
-def test_lookup_completed_project_result_returns_its_registered_artifacts_in_order() -> None:
+def test_lookup_completed_project_result_returns_its_registered_artifacts_in_order() -> (
+    None
+):
     from narrato_api.projects.service import lookup_completed_project_result
 
     engine = create_engine("sqlite://")
@@ -52,8 +56,18 @@ def test_lookup_completed_project_result_returns_its_registered_artifacts_in_ord
             user_id="usr_owner",
             status="completed",
         )
-        _add_artifact(session, artifact_id="art_b", project_id="prj_completed", created_at=timestamp)
-        _add_artifact(session, artifact_id="art_a", project_id="prj_completed", created_at=timestamp)
+        _add_artifact(
+            session,
+            artifact_id="art_b",
+            project_id="prj_completed",
+            created_at=timestamp,
+        )
+        _add_artifact(
+            session,
+            artifact_id="art_a",
+            project_id="prj_completed",
+            created_at=timestamp,
+        )
         _add_artifact(
             session,
             artifact_id="art_later",

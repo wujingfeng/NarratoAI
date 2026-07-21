@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Annotated
+from typing import Annotated, cast
 
 from fastapi import APIRouter, Depends, Request, status
 from sqlalchemy.orm import Session
@@ -76,8 +76,18 @@ def _lifecycle_error(error: Exception) -> ApiError:
     raise error
 
 
-@router.post("/projects", status_code=status.HTTP_201_CREATED, response_model=ApiResponse[ProjectData])
-def create_owned_project(body: ProjectCreateRequest, request: Request, token: Annotated[str, Depends(bearer_token)], auth: Annotated[AuthService, Depends(get_auth_service)], request_id: Annotated[str, Depends(get_request_id)]) -> ApiResponse[ProjectData]:
+@router.post(
+    "/projects",
+    status_code=status.HTTP_201_CREATED,
+    response_model=ApiResponse[ProjectData],
+)
+def create_owned_project(
+    body: ProjectCreateRequest,
+    request: Request,
+    token: Annotated[str, Depends(bearer_token)],
+    auth: Annotated[AuthService, Depends(get_auth_service)],
+    request_id: Annotated[str, Depends(get_request_id)],
+) -> ApiResponse[ProjectData]:
     user = auth.resolve_user(token)
     with Session(request.app.state.database_engine) as session:
         with session.begin():
@@ -86,30 +96,71 @@ def create_owned_project(body: ProjectCreateRequest, request: Request, token: An
                 data = ProjectData(id=project.id, status=project.status)
             except ProjectLifecycleConflict as error:
                 raise _lifecycle_error(error) from error
-    return ApiResponse(code="PROJECT_CREATED", message="Project created", data=data, request_id=request_id)
+    return ApiResponse(
+        code="PROJECT_CREATED",
+        message="Project created",
+        data=data,
+        request_id=request_id,
+    )
 
 
-@router.post("/projects/{project_id}/cost-estimate", response_model=ApiResponse[ProjectCostData])
-def estimate_owned_project(project_id: str, request: Request, token: Annotated[str, Depends(bearer_token)], auth: Annotated[AuthService, Depends(get_auth_service)], request_id: Annotated[str, Depends(get_request_id)]) -> ApiResponse[ProjectCostData]:
+@router.post(
+    "/projects/{project_id}/cost-estimate", response_model=ApiResponse[ProjectCostData]
+)
+def estimate_owned_project(
+    project_id: str,
+    request: Request,
+    token: Annotated[str, Depends(bearer_token)],
+    auth: Annotated[AuthService, Depends(get_auth_service)],
+    request_id: Annotated[str, Depends(get_request_id)],
+) -> ApiResponse[ProjectCostData]:
     user = auth.resolve_user(token)
     with Session(request.app.state.database_engine) as session:
         try:
-            credits, total_seconds, credits_per_minute = estimate_project_cost(session, user_id=user.id, project_id=project_id)
+            credits, total_seconds, credits_per_minute = estimate_project_cost(
+                session, user_id=user.id, project_id=project_id
+            )
         except (ProjectNotFoundError, ProjectLifecycleConflict) as error:
             raise _lifecycle_error(error) from error
-    return ApiResponse(code="PROJECT_COST_ESTIMATED", message="Project cost estimated", data=ProjectCostData(credits=credits, total_seconds=total_seconds, credits_per_minute=credits_per_minute), request_id=request_id)
+    return ApiResponse(
+        code="PROJECT_COST_ESTIMATED",
+        message="Project cost estimated",
+        data=ProjectCostData(
+            credits=credits,
+            total_seconds=total_seconds,
+            credits_per_minute=credits_per_minute,
+        ),
+        request_id=request_id,
+    )
 
 
-@router.post("/projects/{project_id}/start", status_code=status.HTTP_202_ACCEPTED, response_model=ApiResponse[ProjectStartData])
-def start_owned_project(project_id: str, request: Request, token: Annotated[str, Depends(bearer_token)], auth: Annotated[AuthService, Depends(get_auth_service)], request_id: Annotated[str, Depends(get_request_id)]) -> ApiResponse[ProjectStartData]:
+@router.post(
+    "/projects/{project_id}/start",
+    status_code=status.HTTP_202_ACCEPTED,
+    response_model=ApiResponse[ProjectStartData],
+)
+def start_owned_project(
+    project_id: str,
+    request: Request,
+    token: Annotated[str, Depends(bearer_token)],
+    auth: Annotated[AuthService, Depends(get_auth_service)],
+    request_id: Annotated[str, Depends(get_request_id)],
+) -> ApiResponse[ProjectStartData]:
     user = auth.resolve_user(token)
     with Session(request.app.state.database_engine) as session:
         try:
             with session.begin():
-                workflow_id = start_project(session, user_id=user.id, project_id=project_id)
+                workflow_id = start_project(
+                    session, user_id=user.id, project_id=project_id
+                )
         except (ProjectNotFoundError, ProjectLifecycleConflict) as error:
             raise _lifecycle_error(error) from error
-    return ApiResponse(code="PROJECT_STARTED", message="Project started", data=ProjectStartData(workflow_id=workflow_id), request_id=request_id)
+    return ApiResponse(
+        code="PROJECT_STARTED",
+        message="Project started",
+        data=ProjectStartData(workflow_id=workflow_id),
+        request_id=request_id,
+    )
 
 
 class ProjectResultData(StrictModel):
@@ -271,7 +322,8 @@ def build_project_jianying_manifest(
             template_version=manifest.template_version,
             package_name=manifest.package_name,
             files=[
-                JianyingManifestFileData(**file) for file in manifest.to_dict()["files"]
+                JianyingManifestFileData.model_validate(file)
+                for file in cast(list[object], manifest.to_dict()["files"])
             ],
         ),
         request_id=request_id,

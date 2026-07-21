@@ -41,8 +41,8 @@ def test_ready_returns_ok_when_dependencies_are_ready(client):
 
 
 def test_ready_returns_safe_503_envelope(app, client):
-    app.dependency_overrides[get_readiness_checker] = (
-        lambda: FakeReadinessChecker(ready=False)
+    app.dependency_overrides[get_readiness_checker] = lambda: FakeReadinessChecker(
+        ready=False
     )
 
     response = client.get("/api/v1/health/ready")
@@ -78,30 +78,56 @@ def test_required_configuration_rejects_invalid_task7_security_semantics(setting
             "oss_access_key_secret": "test-secret",
         }
     )
-    assert required_configuration_is_present(
-        base.model_copy(update={"oss_endpoint": "http://oss.example.invalid"})
-    ) is False
-    assert required_configuration_is_present(
-        base.model_copy(update={"oss_public_base_url": "http://cdn.example.test"})
-    ) is False
-    assert required_configuration_is_present(
-        base.model_copy(update={"cdn_allowed_hosts": []})
-    ) is False
-    assert required_configuration_is_present(
-        base.model_copy(update={"work_root": "relative/work"})
-    ) is False
-    assert required_configuration_is_present(
-        base.model_copy(update={"callback_url": ""})
-    ) is False
-    assert required_configuration_is_present(
-        base.model_copy(update={"callback_url": "http://narrato.example.test/callback"})
-    ) is False
-    assert required_configuration_is_present(
-        base.model_copy(update={"callback_url": "https://example.test:bad/callback"})
-    ) is False
-    assert required_configuration_is_present(
-        base.model_copy(update={"callback_url": "https://127.0.0.1/callback"})
-    ) is False
+    assert (
+        required_configuration_is_present(
+            base.model_copy(update={"oss_endpoint": "http://oss.example.invalid"})
+        )
+        is False
+    )
+    assert (
+        required_configuration_is_present(
+            base.model_copy(update={"oss_public_base_url": "http://cdn.example.test"})
+        )
+        is False
+    )
+    assert (
+        required_configuration_is_present(
+            base.model_copy(update={"cdn_allowed_hosts": []})
+        )
+        is False
+    )
+    assert (
+        required_configuration_is_present(
+            base.model_copy(update={"work_root": "relative/work"})
+        )
+        is False
+    )
+    assert (
+        required_configuration_is_present(base.model_copy(update={"callback_url": ""}))
+        is False
+    )
+    assert (
+        required_configuration_is_present(
+            base.model_copy(
+                update={"callback_url": "http://narrato.example.test/callback"}
+            )
+        )
+        is False
+    )
+    assert (
+        required_configuration_is_present(
+            base.model_copy(
+                update={"callback_url": "https://example.test:bad/callback"}
+            )
+        )
+        is False
+    )
+    assert (
+        required_configuration_is_present(
+            base.model_copy(update={"callback_url": "https://127.0.0.1/callback"})
+        )
+        is False
+    )
 
 
 def test_ready_probes_oss_with_timeout_and_safe_error(settings, monkeypatch):
@@ -140,7 +166,9 @@ def test_ready_probes_oss_with_timeout_and_safe_error(settings, monkeypatch):
             "readiness_timeout_seconds": 0.05,
         }
     )
-    monkeypatch.setattr("core_api.api.dependencies.get_engine", lambda current: FakeEngine())
+    monkeypatch.setattr(
+        "core_api.api.dependencies.get_engine", lambda current: FakeEngine()
+    )
     monkeypatch.setattr(
         "core_api.api.dependencies.Redis.from_url", lambda *args, **kwargs: FakeRedis()
     )
@@ -187,7 +215,9 @@ def test_default_readiness_accepts_successful_fake_oss_probe(settings, monkeypat
             "oss_access_key_secret": "test-secret",
         }
     )
-    monkeypatch.setattr("core_api.api.dependencies.get_engine", lambda current: FakeEngine())
+    monkeypatch.setattr(
+        "core_api.api.dependencies.get_engine", lambda current: FakeEngine()
+    )
     monkeypatch.setattr(
         "core_api.api.dependencies.Redis.from_url", lambda *args, **kwargs: FakeRedis()
     )
@@ -296,9 +326,7 @@ def test_app_state_settings_do_not_eagerly_reload_config(
     assert response.json() == {"ok": True}
 
 
-def test_slow_readiness_probe_does_not_block_event_loop(
-    settings, monkeypatch
-):
+def test_slow_readiness_probe_does_not_block_event_loop(settings, monkeypatch):
     class SlowConnection:
         def __enter__(self):
             time.sleep(0.2)
@@ -339,12 +367,8 @@ def test_slow_readiness_probe_does_not_block_event_loop(
 
     async def probe() -> float:
         application = create_app(settings=configured)
-        transport = httpx.ASGITransport(
-            app=application, raise_app_exceptions=False
-        )
-        client = httpx.AsyncClient(
-            transport=transport, base_url="http://testserver"
-        )
+        transport = httpx.ASGITransport(app=application, raise_app_exceptions=False)
+        client = httpx.AsyncClient(transport=transport, base_url="http://testserver")
         task = asyncio.create_task(client.get("/api/v1/health/ready"))
         await asyncio.sleep(0.01)
         live_started = time.monotonic()

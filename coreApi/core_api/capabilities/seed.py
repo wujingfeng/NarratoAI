@@ -158,9 +158,7 @@ def seed_capabilities(
                     "styles": list(voice_item.styles),
                     "sample_url": voice_item.sample_url,
                     "supported_formats": list(voice_item.supported_formats),
-                    "supported_sample_rates": list(
-                        voice_item.supported_sample_rates
-                    ),
+                    "supported_sample_rates": list(voice_item.supported_sample_rates),
                     "enabled": voice_item.enabled,
                 },
                 [CoreVoice.provider_id, CoreVoice.provider_voice_code],

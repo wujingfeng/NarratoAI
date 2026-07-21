@@ -28,7 +28,14 @@ def workflow_fixture(*, node_names: tuple[str, ...] | None = None):
         definitions = tuple(node for node in definitions if node.name in node_names)
     with sessions.begin() as session:
         session.add(User(id="usr_e2e", email="e2e@example.com", password_hash="hash"))
-        session.add(Project(id="prj_e2e", user_id="usr_e2e", product="short_drama_narration", status="queued"))
+        session.add(
+            Project(
+                id="prj_e2e",
+                user_id="usr_e2e",
+                product="short_drama_narration",
+                status="queued",
+            )
+        )
         session.add(
             WorkflowTemplateSnapshot(
                 id="tpl_e2e",
