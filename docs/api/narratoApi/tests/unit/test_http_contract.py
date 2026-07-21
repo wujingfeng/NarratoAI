@@ -108,6 +108,9 @@ def test_openapi_only_exposes_get_post_and_typed_responses(tmp_path) -> None:
         "/api/v1/auth/password-code/send",
         "/api/v1/auth/password/reset",
         "/api/v1/users/me",
+        "/api/v1/projects",
+        "/api/v1/projects/{project_id}/cost-estimate",
+        "/api/v1/projects/{project_id}/start",
         "/api/v1/projects/{project_id}/uploads/policy",
         "/api/v1/projects/{project_id}/uploads/complete",
         "/api/v1/projects/{project_id}/editor",
@@ -117,6 +120,7 @@ def test_openapi_only_exposes_get_post_and_typed_responses(tmp_path) -> None:
         "/api/v1/projects/{project_id}/result",
         "/api/v1/projects/{project_id}/exports/jianying-manifest",
         "/api/v1/assets/{asset_id}",
+        "/api/v1/internal/core/callbacks",
     }
     assert {
         method for path in paths.values() for method in path if method != "parameters"
