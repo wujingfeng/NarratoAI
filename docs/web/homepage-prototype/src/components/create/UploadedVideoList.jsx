@@ -28,7 +28,7 @@ export function UploadedVideoList({ videos, onRemove, onSubtitleSelect }) {
                 }}
               />
               <StatusIcon weight="bold" aria-hidden="true" />
-              <span>{video.subtitleName || t(video.subtitleStatusKey || "create.subtitle.clickOrAi")}</span>
+              <span>{video.subtitleName || (video.subtitleStatusKey ? t(video.subtitleStatusKey) : video.subtitleStatus || t("create.subtitle.clickOrAi"))}</span>
             </label>
             <button type="button" aria-label={t("create.upload.removeVideo", { name: video.name })} onClick={() => onRemove(video.id)}>
               <Trash aria-hidden="true" />
