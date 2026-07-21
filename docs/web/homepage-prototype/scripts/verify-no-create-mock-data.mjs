@@ -5,11 +5,17 @@ const source = (file) => readFile(new URL(`../src/${file}`, import.meta.url), "u
 
 const page = await source("pages/CreatePage.jsx");
 const createData = await source("data/createData.js");
+const uploadPanel = await source("components/create/VideoUploadPanel.jsx");
 
 assert.doesNotMatch(page, /initialCreateVideos/, "CreatePage must not initialize uploaded assets from mock data");
 assert.match(page, /useState\(\[\]\)/, "CreatePage must start with no uploaded assets");
 assert.match(page, /await uploadAsset/, "uploaded rows must come from the upload-complete API response");
 assert.match(page, /assetId: asset\.id/, "uploaded rows must retain the real API asset ID");
 assert.match(createData, /export const initialCreateVideos = \[\];/, "create data must not define placeholder upload assets");
+assert.match(page, /const \[isUploading, setIsUploading\] = useState\(false\)/, "CreatePage must track upload state");
+assert.match(page, /uploadInFlight\.current/, "CreatePage must reject overlapping upload requests");
+assert.match(page, /finally \{[\s\S]*?setIsUploading\(false\);\s*\}/, "CreatePage must release the upload lock after completion");
+assert.match(uploadPanel, /create-upload-loading/, "upload panel must render a loading indicator");
+assert.match(uploadPanel, /disabled=\{isUploading\}/, "upload controls must be disabled while uploading");
 
 console.log("PASS create page has no placeholder upload assets");

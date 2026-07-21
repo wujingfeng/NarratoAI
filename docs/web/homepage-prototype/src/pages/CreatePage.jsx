@@ -1,5 +1,5 @@
 import { ShieldCheck } from "@phosphor-icons/react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CreationSummary } from "../components/create/CreationSummary.jsx";
 import { CreationTypeSelector } from "../components/create/CreationTypeSelector.jsx";
 import { VideoUploadPanel } from "../components/create/VideoUploadPanel.jsx";
@@ -56,6 +56,8 @@ export function CreatePage() {
   const [selectedType, setSelectedType] = useState("narration");
   const [videos, setVideos] = useState([]);
   const [isDragging, setIsDragging] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const uploadInFlight = useRef(false);
   const [projectId, setProjectId] = useState(null);
   const [apiCredits, setApiCredits] = useState(null);
   const showUnavailable = useCallback((message) => {
@@ -93,6 +95,7 @@ export function CreatePage() {
   };
 
   const handleVideoFiles = async (files) => {
+    if (isUploading || uploadInFlight.current) return;
     const validFiles = files.filter((file) => {
       const extension = file.name.split(".").pop()?.toLowerCase();
       return VIDEO_EXTENSIONS.has(extension) && file.size <= VIDEO_SIZE_LIMIT;
@@ -108,6 +111,9 @@ export function CreatePage() {
     if (acceptedFiles.length < validFiles.length) {
       showUnavailable(`${selectedCreationType.title}最多上传 ${selectedCreationType.maxVideos} 个视频`);
     }
+    uploadInFlight.current = true;
+    setIsUploading(true);
+    setApiCredits(null);
     try {
       const activeProjectId = projectId || (await createProject()).id;
       setProjectId(activeProjectId);
@@ -154,6 +160,9 @@ export function CreatePage() {
       });
     } catch (error) {
       showUnavailable(error.message || "上传失败，请稍后重试");
+    } finally {
+      uploadInFlight.current = false;
+      setIsUploading(false);
     }
   };
 
@@ -201,6 +210,7 @@ export function CreatePage() {
                 videos={videos}
                 maxVideos={selectedCreationType.maxVideos}
                 isDragging={isDragging}
+                isUploading={isUploading}
                 onFiles={handleVideoFiles}
                 onDragStateChange={setIsDragging}
                 onRemove={(id) => setVideos((current) => current.filter((video) => video.id !== id))}
