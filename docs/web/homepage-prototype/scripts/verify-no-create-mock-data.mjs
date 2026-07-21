@@ -17,5 +17,8 @@ assert.match(page, /uploadInFlight\.current/, "CreatePage must reject overlappin
 assert.match(page, /finally \{[\s\S]*?setIsUploading\(false\);\s*\}/, "CreatePage must release the upload lock after completion");
 assert.match(uploadPanel, /create-upload-loading/, "upload panel must render a loading indicator");
 assert.match(uploadPanel, /disabled=\{isUploading\}/, "upload controls must be disabled while uploading");
+assert.doesNotMatch(page, /素材已校验/, "video validation state must not replace the SRT upload prompt");
+assert.match(page, /subtitleStatus: "上传 SRT 字幕文件"/, "every uploaded video must continue to offer SRT upload");
+assert.match(page, /uploadAsset\(projectId, file, "subtitle"\)/, "SRT selection must use the real upload API");
 
 console.log("PASS create page has no placeholder upload assets");

@@ -78,7 +78,10 @@ export function CreatePage() {
   }, [videos]);
 
   const selectedCreationType = creationTypes.find((type) => type.id === selectedType);
-  const assets = videos.map((video) => ({ status: video.assetStatus }));
+  const assets = videos.flatMap((video) => [
+    { status: video.assetStatus },
+    ...(video.subtitleAssetStatus ? [{ status: video.subtitleAssetStatus }] : []),
+  ]);
   const canStart = Boolean(projectId) && canStartProject(assets);
 
   useEffect(() => {
@@ -128,8 +131,8 @@ export function CreatePage() {
         name: file.name,
         durationSeconds: 0,
         durationLabel: "--:--",
-        subtitleStatus: asset.status === "ready" ? "素材已校验" : "素材校验中",
-        statusTone: asset.status === "ready" ? "success" : "warning",
+        subtitleStatus: "上传 SRT 字幕文件",
+        statusTone: "warning",
         subtitleName: null,
         thumbnail: null,
       }));
@@ -150,8 +153,6 @@ export function CreatePage() {
             ? {
               ...video,
               assetStatus: latest.status,
-              subtitleStatus: latest.status === "ready" ? "素材已校验" : latest.status === "invalid" ? "素材校验失败" : "素材校验中",
-              statusTone: latest.status === "ready" ? "success" : "warning",
             }
             : video));
           if (latest.status === "validating") window.setTimeout(poll, 2000);
@@ -183,14 +184,48 @@ export function CreatePage() {
     }
   };
 
-  const handleVideoSubtitle = (videoId, file) => {
+  const handleVideoSubtitle = async (videoId, file) => {
     if (!file.name.toLowerCase().endsWith(".srt") || file.size > SUBTITLE_SIZE_LIMIT) {
       showUnavailable("仅支持 50MB 以内的 SRT 字幕文件");
       return;
     }
-    setVideos((current) => current.map((video) => video.id === videoId
-      ? { ...video, subtitleName: file.name, subtitleStatus: file.name, statusTone: "success" }
-      : video));
+    if (!projectId || isUploading || uploadInFlight.current) return;
+    uploadInFlight.current = true;
+    setIsUploading(true);
+    setApiCredits(null);
+    try {
+      const asset = await uploadAsset(projectId, file, "subtitle");
+      setVideos((current) => current.map((video) => video.id === videoId
+        ? {
+          ...video,
+          subtitleName: file.name,
+          subtitleAssetId: asset.id,
+          subtitleAssetStatus: asset.status,
+          subtitleStatus: asset.status === "ready" ? "字幕已校验" : "字幕校验中",
+          statusTone: asset.status === "ready" ? "success" : "warning",
+        }
+        : video));
+      if (asset.status !== "ready" && asset.status !== "invalid") {
+        const poll = async () => {
+          const latest = await getAsset(asset.id);
+          setVideos((current) => current.map((video) => video.subtitleAssetId === asset.id
+            ? {
+              ...video,
+              subtitleAssetStatus: latest.status,
+              subtitleStatus: latest.status === "ready" ? "字幕已校验" : latest.status === "invalid" ? "字幕校验失败" : "字幕校验中",
+              statusTone: latest.status === "ready" ? "success" : "warning",
+            }
+            : video));
+          if (latest.status === "validating") window.setTimeout(poll, 2000);
+        };
+        window.setTimeout(poll, 2000);
+      }
+    } catch (error) {
+      showUnavailable(error.message || "字幕上传失败，请稍后重试");
+    } finally {
+      uploadInFlight.current = false;
+      setIsUploading(false);
+    }
   };
 
   return (
