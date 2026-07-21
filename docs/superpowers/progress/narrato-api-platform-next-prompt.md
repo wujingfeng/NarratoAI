@@ -10,12 +10,12 @@
 
 ## 当前真实基线
 
-- Gate C 已通过（用户接受原生 picker 证据例外）；Task 19 全部完成，Task 20A、20B 已完成，Gate D 待剩余 Task 20 验收。
+- PROJECT_COMPLETE：Gate C 与 Gate D 已通过；Task 19 和 Task 20 所有必需验收均完成。
 - Task 19 提交：`e776d9e`、`462ab86`、`3a6bc20`、`2a27f9c`。静态部署、README、编译和 lint 证据已通过；macOS sandbox 无法运行 nginx -t。
 
-## 本窗口唯一原子任务：Task 20E
+## 当前状态：PROJECT_COMPLETE
 
-仅修复 Core 开发环境并运行剩余 Core 静态与测试验收；不得运行真实 Provider smoke。
+无后续开发任务。可选真实 Provider smoke 需要单独提供测试凭据后执行。
 
 ## 不可删除的永久规则
 

@@ -4,7 +4,7 @@
 
 - 分支：`codex/narrato-api-platform`
 - worktree：`/private/tmp/NarratoAI-narrato-api-platform`
-- Gate：**Gate C 已通过（用户接受原生保存选择器证据例外）**；Gate D 待完成 Task 20 剩余验收。
+- Gate：**Gate C 已通过（用户接受原生保存选择器证据例外）；Gate D 已通过。**
 
 ## Task 17A 基线
 
@@ -62,7 +62,7 @@
 
 ## 下一原子任务
 
-**Task 20E**：修复 Core 开发环境后运行剩余静态与测试验收；不运行真实 Provider smoke。
+**PROJECT_COMPLETE**：Task 20E 建立隔离 Core 验证 venv 后，Core lint/format/mypy 与 388 项测试通过；Business lint/format/mypy 与 221 项测试通过。可选真实 Provider smoke 因无凭据未运行。
 
 Task 20C：`0381536 test: add workflow end to end acceptance`。fresh SQLite 双服务迁移通过；Business E2E 4 项通过，覆盖终态、轮询补偿、失败状态和一次退款。原项目回归 52 项、前端 build/API 验证通过。
 
