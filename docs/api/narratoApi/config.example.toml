@@ -6,6 +6,8 @@ redis_key_prefix = "narrato:business:"
 celery_broker_url = "redis://127.0.0.1:6379/5"
 celery_queue_prefix = "narrato.business"
 core_base_url = "https://core.example.com"
+# 仅本机开发允许 http://127.0.0.1 或 http://localhost 的 Core 服务。
+allow_insecure_core_loopback = false
 core_request_token = "replace-with-core-request-token"
 core_callback_token = "replace-with-callback-token"
 readiness_timeout_seconds = 3.0

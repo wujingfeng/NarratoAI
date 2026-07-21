@@ -159,7 +159,19 @@ def test_settings_reject_unknown_toml_and_hide_secrets(tmp_path) -> None:
     assert str(tmp_path / "business.db") not in rendered
 
     with pytest.raises(ValidationError):
-        Settings(core_base_url="http://core.example.test")
+        Settings(core_base_url="http://127.0.0.1:8002")
+
+    local_core = Settings(
+        core_base_url="http://127.0.0.1:8002",
+        allow_insecure_core_loopback=True,
+    )
+    assert str(local_core.core_base_url) == "http://127.0.0.1:8002/"
+
+    with pytest.raises(ValidationError):
+        Settings(
+            core_base_url="http://core.example.test",
+            allow_insecure_core_loopback=True,
+        )
 
     assert Settings(oss_endpoint="oss-cn-shanghai.aliyuncs.com").oss_endpoint == (
         "oss-cn-shanghai.aliyuncs.com"

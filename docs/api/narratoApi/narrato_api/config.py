@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import tomllib
+from ipaddress import ip_address
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
@@ -31,6 +32,7 @@ class Settings(BaseSettings):
     celery_broker_url: str = Field(default="redis://127.0.0.1:6379/5", repr=False)
     celery_queue_prefix: str = "narrato.business"
     core_base_url: HttpUrl = HttpUrl("https://core.example.com")
+    allow_insecure_core_loopback: bool = False
     core_request_token: str = Field(default="", repr=False)
     core_callback_token: str = Field(default="", repr=False)
     readiness_timeout_seconds: float = Field(default=3.0, ge=1, le=30)
@@ -60,11 +62,11 @@ class Settings(BaseSettings):
 
     @field_validator("core_base_url")
     @classmethod
-    def require_https_core_url(cls, value: HttpUrl) -> HttpUrl:
-        """Core 服务地址必须使用无用户凭据的 HTTPS URL。"""
+    def require_supported_core_url(cls, value: HttpUrl) -> HttpUrl:
+        """Core 服务地址仅接受无用户凭据的 HTTP(S) URL。"""
 
-        if value.scheme != "https" or value.username or value.password:
-            raise ValueError("core_base_url must be a credential-free HTTPS URL")
+        if value.scheme not in {"http", "https"} or value.username or value.password:
+            raise ValueError("core_base_url must be a credential-free HTTP(S) URL")
         return value
 
     @field_validator("redis_key_prefix")
@@ -115,7 +117,18 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def validate_verification_delivery_timeouts(self) -> Settings:
-        """校验验证码发送超时与 SMTP TLS 模式。"""
+        """校验 Core 传输边界、验证码发送超时与 SMTP TLS 模式。"""
+
+        if self.core_base_url.scheme == "http":
+            host = self.core_base_url.host
+            try:
+                is_loopback = host == "localhost" or ip_address(host).is_loopback
+            except ValueError:
+                is_loopback = False
+            if not self.allow_insecure_core_loopback or not is_loopback:
+                raise ValueError(
+                    "HTTP core_base_url requires allow_insecure_core_loopback on a loopback host"
+                )
 
         if self.smtp_use_ssl and self.smtp_use_starttls:
             raise ValueError("smtp_use_ssl and smtp_use_starttls cannot both be true")
