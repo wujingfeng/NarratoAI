@@ -13,7 +13,7 @@ from narrato_api.integrations.oss_client import OssPostPolicyService
 
 def test_video_policy_uses_fixed_api_prefix_type_and_300_mib_limit() -> None:
     service = OssPostPolicyService(
-        endpoint="https://oss.example.test",
+        upload_url="https://uploads.example.test",
         bucket="narrato",
         access_key_id="access-key",
         access_key_secret="access-secret",
@@ -51,7 +51,7 @@ def test_policy_rejects_disallowed_extension_or_file_boundary(
     asset_type: str, filename: str, size_bytes: int
 ) -> None:
     service = OssPostPolicyService(
-        endpoint="https://oss.example.test",
+        upload_url="https://uploads.example.test",
         bucket="narrato",
         access_key_id="access-key",
         access_key_secret="access-secret",
@@ -68,7 +68,7 @@ def test_policy_rejects_disallowed_extension_or_file_boundary(
 
 def test_policy_rejects_content_type_that_does_not_match_extension() -> None:
     service = OssPostPolicyService(
-        endpoint="https://oss.example.test",
+        upload_url="https://uploads.example.test",
         bucket="narrato",
         access_key_id="access-key",
         access_key_secret="access-secret",

@@ -25,6 +25,8 @@ password_argon2_time_cost = 3
 password_argon2_memory_cost_kib = 65536
 password_argon2_parallelism = 2
 oss_endpoint = ""
+# 浏览器 H5 表单直传地址，必须是完整 HTTPS URL，例如 Bucket 的 OSS 外网域名。
+oss_url = ""
 oss_bucket = ""
 oss_access_key_id = ""
 oss_access_key_secret = ""

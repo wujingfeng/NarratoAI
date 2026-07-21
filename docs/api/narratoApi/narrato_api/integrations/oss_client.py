@@ -53,14 +53,14 @@ class OssPostPolicyService:
     def __init__(
         self,
         *,
-        endpoint: str,
+        upload_url: str,
         bucket: str,
         access_key_id: str,
         access_key_secret: str,
         today: Callable[[], date] = date.today,
         token_factory: Callable[[], str] = lambda: secrets.token_hex(16),
     ) -> None:
-        self.endpoint = endpoint.rstrip("/")
+        self.upload_url = upload_url.rstrip("/")
         self.bucket = bucket
         self.access_key_id = access_key_id
         self.access_key_secret = access_key_secret
@@ -79,7 +79,7 @@ class OssPostPolicyService:
         """校验声明并签发仅可写入单个对象的十分钟表单。"""
 
         if (
-            not self.endpoint
+            not self.upload_url
             or not self.bucket
             or not self.access_key_id
             or not self.access_key_secret
@@ -114,7 +114,7 @@ class OssPostPolicyService:
             ).digest()
         ).decode("ascii")
         return OssPostPolicy(
-            url=self.endpoint,
+            url=self.upload_url,
             key=key,
             max_size_bytes=declaration.max_size_bytes,
             fields={

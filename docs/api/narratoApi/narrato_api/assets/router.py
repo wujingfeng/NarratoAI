@@ -78,7 +78,7 @@ def create_upload_policy(
 
     user = auth.resolve_user(token)
     policy_service = OssPostPolicyService(
-        endpoint=settings.oss_endpoint,
+        upload_url=settings.oss_url,
         bucket=settings.oss_bucket,
         access_key_id=settings.oss_access_key_id,
         access_key_secret=settings.oss_access_key_secret,

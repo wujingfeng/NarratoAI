@@ -51,6 +51,7 @@ class Settings(BaseSettings):
     password_argon2_memory_cost_kib: int = Field(default=65_536, ge=8_192, le=262_144)
     password_argon2_parallelism: int = Field(default=2, ge=1, le=8)
     oss_endpoint: str = ""
+    oss_url: str = ""
     oss_bucket: str = ""
     oss_access_key_id: str = Field(default="", repr=False)
     oss_access_key_secret: str = Field(default="", repr=False)

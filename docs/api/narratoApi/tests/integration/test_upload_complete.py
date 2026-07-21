@@ -77,6 +77,7 @@ def upload_fixture(
         Settings(
             database_url=f"sqlite:///{database_path}",
             oss_endpoint="https://cdn.example.test",
+            oss_url="https://narrato.oss-cn-shanghai.aliyuncs.com",
             oss_bucket="narrato",
             oss_access_key_id="key",
             oss_access_key_secret="secret",
@@ -115,6 +116,9 @@ def _issued_payload(client: TestClient) -> dict[str, object]:
         },
     )
     assert response.status_code == 200
+    assert (
+        response.json()["data"]["url"] == "https://narrato.oss-cn-shanghai.aliyuncs.com"
+    )
     payload["object_key"] = response.json()["data"]["key"]
     return payload
 
