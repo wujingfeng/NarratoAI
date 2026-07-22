@@ -78,6 +78,42 @@ def test_task_events_unknown_task_returns_safe_404(app, client, settings):
     assert response.json()["code"] == "CORE_TASK_NOT_FOUND"
 
 
+def test_task_query_exposes_completed_media_probe_result(app, client, settings):
+    """Business API 轮询任务时必须能读取媒体探测的时长结果。"""
+
+    from sqlalchemy.orm import Session
+
+    from core_api.api.dependencies import get_database_session
+    from core_api.database import Base, get_engine
+    from core_api.tasks.service import TaskService
+
+    engine = get_engine(settings)
+    Base.metadata.create_all(engine)
+    database_session = Session(engine, expire_on_commit=False)
+    service = TaskService(database_session)
+    task = service.create_core_task(
+        caller="narrato-api",
+        route="/media-probe",
+        task_type="media_probe",
+        idempotency_key="media-probe-result",
+        input_snapshot={"media_type": "video"},
+    )
+    attempt = service.start_attempt(task.id)
+    result = {"media_type": "video", "duration_seconds": 20.053333}
+    service.complete_attempt(
+        attempt.id, attempt.lease_token, result, lease_version=attempt.lease_version
+    )
+
+    app.dependency_overrides[get_database_session] = lambda: database_session
+    response = client.get(
+        f"/api/v1/tasks/{task.id}",
+        headers={"Authorization": "Bearer test-service-token"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["data"]["result"] == result
+
+
 def test_task_query_openapi_publishes_versionable_dto_schema(client):
     """Task 与 Event 200 响应必须发布固定 Envelope/DTO，而非任意对象。"""
 

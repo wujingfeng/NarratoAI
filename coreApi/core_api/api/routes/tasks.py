@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Annotated, Literal
+from typing import Annotated, Any, Literal
 from datetime import datetime
 
 from fastapi import APIRouter, Depends
@@ -76,6 +76,7 @@ class CoreTaskDTO(BaseModel):
     status: str
     phase: str | None
     progress: int
+    result: list[dict[str, Any]] | dict[str, Any] | None
     error: CoreTaskErrorDTO | None
     artifacts: list[CoreTaskArtifactDTO]
 
@@ -128,6 +129,7 @@ def get_core_task(
         "status": task.status.value,
         "phase": task.phase,
         "progress": task.progress,
+        "result": task.result,
         "error": _safe_event_error(task.error),
         "artifacts": [
             {
