@@ -280,7 +280,7 @@ class UploadService:
             ".mp4": "video/mp4",
             ".mov": "video/quicktime",
             ".avi": "video/x-msvideo",
-            ".srt": "application/x-subrip",
+            ".srt": "application/octet-stream",
         }[extension]
 
     @staticmethod

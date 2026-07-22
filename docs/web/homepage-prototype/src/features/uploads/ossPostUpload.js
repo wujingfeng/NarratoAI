@@ -11,7 +11,8 @@ const CONTENT_TYPE_BY_EXTENSION = {
     ".avi": "video/x-msvideo",
   },
   subtitle: {
-    ".srt": "application/x-subrip",
+    // OSS POST Policy 对 SRT 统一使用二进制 MIME，避免浏览器推断差异。
+    ".srt": "application/octet-stream",
   },
 };
 
@@ -33,7 +34,7 @@ function declaration(file, assetType) {
     asset_type: assetType,
     filename: file.name,
     size_bytes: file.size,
-    // 浏览器对 .srt 的 File.type 并不稳定；必须使用 API 约定的 MIME 类型。
+    // 浏览器对 .srt 的 File.type 并不稳定；必须使用 API/OSS 约定的 MIME 类型。
     content_type: contentType,
   };
 }

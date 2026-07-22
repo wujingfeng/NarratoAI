@@ -46,6 +46,31 @@ def test_video_policy_uses_fixed_api_prefix_type_and_300_mib_limit() -> None:
     assert ["content-length-range", 0, 314_572_800] in decoded["conditions"]
 
 
+def test_subtitle_policy_uses_octet_stream_for_oss_form_compatibility() -> None:
+    """SRT 直传统一使用 OSS 可稳定识别的二进制 MIME 类型。"""
+
+    service = OssPostPolicyService(
+        upload_url="https://uploads.example.test",
+        bucket="narrato",
+        access_key_id="key",
+        access_key_secret="secret",
+        today=lambda: date(2026, 7, 17),
+        token_factory=lambda: "token",
+    )
+
+    policy = service.create_policy(
+        asset_type="subtitle",
+        filename="episode.srt",
+        size_bytes=1,
+        existing_video_count=0,
+        content_type="application/octet-stream",
+    )
+
+    decoded = json.loads(base64.b64decode(policy.fields["policy"]))
+    assert policy.fields["Content-Type"] == "application/octet-stream"
+    assert ["eq", "$Content-Type", "application/octet-stream"] in decoded["conditions"]
+
+
 @pytest.mark.parametrize(
     ("asset_type", "filename", "size_bytes"),
     [
