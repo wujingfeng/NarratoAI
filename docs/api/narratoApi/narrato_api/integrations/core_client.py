@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import math
 from dataclasses import asdict, dataclass
 from typing import Any, cast
 from urllib.error import HTTPError, URLError
@@ -11,12 +12,29 @@ class CoreClientError(RuntimeError):
     """Core 媒体探测请求未能安全完成。"""
 
 
+def _duration_seconds(payload: object) -> float | None:
+    """仅接受 Core 已验证媒体探测返回的正有限时长。"""
+
+    if not isinstance(payload, dict):
+        return None
+    duration = payload.get("duration_seconds")
+    if (
+        isinstance(duration, bool)
+        or not isinstance(duration, (int, float))
+        or not math.isfinite(duration)
+        or duration <= 0
+    ):
+        return None
+    return float(duration)
+
+
 @dataclass(frozen=True, slots=True)
 class MediaProbeResult:
     """Core 返回的媒体校验结论；None 表示异步结果尚未返回。"""
 
     valid: bool | None
     core_task_id: str | None = None
+    duration_seconds: float | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -145,7 +163,7 @@ class HttpCoreClient:
         valid = data.get("valid") if isinstance(data, dict) else None
         if not isinstance(valid, bool):
             raise CoreClientError("Core media probe response is invalid")
-        return MediaProbeResult(valid=valid)
+        return MediaProbeResult(valid=valid, duration_seconds=_duration_seconds(data))
 
     def get_probe_result(self, core_task_id: str) -> MediaProbeResult:
         """查询已提交 Core 原子任务的终态，不创建工作流。"""
@@ -161,7 +179,12 @@ class HttpCoreClient:
         data = payload.get("data", payload)
         state = data.get("status") if isinstance(data, dict) else None
         if state == "succeeded":
-            return MediaProbeResult(valid=True, core_task_id=core_task_id)
+            result = data.get("result") if isinstance(data, dict) else None
+            return MediaProbeResult(
+                valid=True,
+                core_task_id=core_task_id,
+                duration_seconds=_duration_seconds(result),
+            )
         if state == "failed":
             return MediaProbeResult(valid=False, core_task_id=core_task_id)
         return MediaProbeResult(valid=None, core_task_id=core_task_id)

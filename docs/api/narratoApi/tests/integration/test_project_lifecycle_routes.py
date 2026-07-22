@@ -8,6 +8,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 
 from narrato_api.assets.models import Asset
+from narrato_api.assets.router import get_upload_service
 from narrato_api.auth.models import User
 from narrato_api.auth.router import get_auth_service
 from narrato_api.billing.models import CreditAccount, ProductPrice
@@ -78,7 +79,7 @@ def _create_project(client: TestClient) -> str:
 
 
 def _ready_video(
-    client: TestClient, project_id: str, duration_seconds: int = 61
+    client: TestClient, project_id: str, duration_seconds: float | None = 61
 ) -> None:
     with Session(client.app.state.database_engine) as session:
         session.add(
@@ -131,6 +132,38 @@ def test_authenticated_owner_can_create_estimate_and_start_ready_project(
     assert project is not None and project.status == "queued"
     assert workflow.state == "queued"
     assert account is not None and account.balance == 60
+
+
+def test_estimate_reconciles_legacy_ready_video_missing_duration(
+    lifecycle_client: TestClient,
+) -> None:
+    """历史 ready 视频在报价前补回 Core 已探测到的时长。"""
+
+    project_id = _create_project(lifecycle_client)
+    _ready_video(lifecycle_client, project_id, duration_seconds=None)
+
+    class UploadService:
+        def reconcile_owned_project_assets(
+            self, *, user_id: str, project_id: str
+        ) -> None:
+            assert user_id == "usr_owner"
+            with Session(lifecycle_client.app.state.database_engine) as session:
+                asset = session.get(Asset, "ast_ready")
+                assert asset is not None and asset.project_id == project_id
+                asset.duration_seconds = 60
+                session.commit()
+
+    lifecycle_client.app.dependency_overrides[get_upload_service] = UploadService
+    try:
+        estimate = lifecycle_client.post(
+            f"/api/v1/projects/{project_id}/cost-estimate",
+            headers={"Authorization": "Bearer owner-token"},
+        )
+    finally:
+        lifecycle_client.app.dependency_overrides.pop(get_upload_service, None)
+
+    assert estimate.status_code == 200
+    assert estimate.json()["data"]["total_seconds"] == 60
 
 
 def test_start_rejects_non_ready_or_foreign_project(

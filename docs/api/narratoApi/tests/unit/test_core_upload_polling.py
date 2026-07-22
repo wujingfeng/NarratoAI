@@ -35,7 +35,13 @@ def test_core_client_polls_real_task_endpoint_after_202(monkeypatch) -> None:
         else:
             yield FakeResponse(
                 status=200,
-                payload={"data": {"core_task_id": "core_1", "status": "succeeded"}},
+                payload={
+                    "data": {
+                        "core_task_id": "core_1",
+                        "status": "succeeded",
+                        "result": {"media_type": "video", "duration_seconds": 90.5},
+                    }
+                },
             )
 
     monkeypatch.setattr("narrato_api.integrations.core_client.urlopen", fake_urlopen)
@@ -50,6 +56,8 @@ def test_core_client_polls_real_task_endpoint_after_202(monkeypatch) -> None:
     result = client.get_probe_result("core_1")
 
     assert dispatched == MediaProbeResult(valid=None, core_task_id="core_1")
-    assert result == MediaProbeResult(valid=True, core_task_id="core_1")
+    assert result == MediaProbeResult(
+        valid=True, core_task_id="core_1", duration_seconds=90.5
+    )
     assert [item.get_method() for item in requests] == ["POST", "GET"]
     assert requests[1].full_url.endswith("/api/v1/tasks/core_1")

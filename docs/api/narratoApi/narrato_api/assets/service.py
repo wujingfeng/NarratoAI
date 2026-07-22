@@ -145,6 +145,8 @@ class UploadService:
                 if persisted is None:
                     raise ApiError("ASSET_NOT_FOUND", "Asset not found", 404)
                 persisted.status = "ready" if probe.valid else "invalid"
+                if persisted.asset_type == "video" and probe.valid:
+                    persisted.duration_seconds = probe.duration_seconds
                 session.commit()
                 session.refresh(persisted)
                 return persisted
@@ -239,7 +241,16 @@ class UploadService:
             )
             if asset is None:
                 raise ApiError("ASSET_NOT_FOUND", "Asset not found", 404)
-            core_task_id = asset.core_task_id if asset.status == "validating" else None
+            core_task_id = (
+                asset.core_task_id
+                if asset.status == "validating"
+                or (
+                    asset.asset_type == "video"
+                    and asset.duration_seconds is None
+                    and asset.core_task_id is not None
+                )
+                else None
+            )
         if not core_task_id:
             return asset
         try:
@@ -256,14 +267,34 @@ class UploadService:
             )
             if persisted is None:
                 raise ApiError("ASSET_NOT_FOUND", "Asset not found", 404)
-            if (
+            if persisted.core_task_id == core_task_id and (
                 persisted.status == "validating"
-                and persisted.core_task_id == core_task_id
+                or (
+                    persisted.asset_type == "video"
+                    and persisted.duration_seconds is None
+                )
             ):
                 persisted.status = "ready" if probe.valid else "invalid"
+                if persisted.asset_type == "video" and probe.valid:
+                    persisted.duration_seconds = probe.duration_seconds
                 session.commit()
                 session.refresh(persisted)
             return persisted
+
+    def reconcile_owned_project_assets(self, *, user_id: str, project_id: str) -> None:
+        """报价前轮询项目素材，补回历史媒体探测遗漏的时长。"""
+
+        with self.session_factory() as session:
+            self._owned_project(session, user_id=user_id, project_id=project_id)
+            asset_ids = list(
+                session.scalars(
+                    select(Asset.id).where(
+                        Asset.user_id == user_id, Asset.project_id == project_id
+                    )
+                )
+            )
+        for asset_id in asset_ids:
+            self.get_owned_asset(user_id=user_id, asset_id=asset_id)
 
     @staticmethod
     def _owned_project(session: Session, *, user_id: str, project_id: str) -> Project:

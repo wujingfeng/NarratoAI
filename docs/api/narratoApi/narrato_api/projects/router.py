@@ -8,6 +8,8 @@ from sqlalchemy.orm import Session
 from narrato_api.api.dependencies import get_request_id, get_settings
 from narrato_api.api.errors import ApiError
 from narrato_api.api.responses import ApiResponse, StrictModel
+from narrato_api.assets.router import get_upload_service
+from narrato_api.assets.service import UploadService
 from narrato_api.auth.router import bearer_token, get_auth_service
 from narrato_api.auth.service import AuthService
 from narrato_api.config import Settings
@@ -112,9 +114,13 @@ def estimate_owned_project(
     request: Request,
     token: Annotated[str, Depends(bearer_token)],
     auth: Annotated[AuthService, Depends(get_auth_service)],
+    upload_service: Annotated[UploadService, Depends(get_upload_service)],
     request_id: Annotated[str, Depends(get_request_id)],
 ) -> ApiResponse[ProjectCostData]:
     user = auth.resolve_user(token)
+    upload_service.reconcile_owned_project_assets(
+        user_id=user.id, project_id=project_id
+    )
     with Session(request.app.state.database_engine) as session:
         try:
             credits, total_seconds, credits_per_minute = estimate_project_cost(

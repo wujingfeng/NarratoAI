@@ -72,7 +72,7 @@ def upload_fixture(
         session.add(Project(id="prj_1", user_id="usr_1", product="short_drama"))
 
     oss = FakeOssClient(OssObject(size_bytes=100, content_type="video/mp4"))
-    core = FakeCoreClient(MediaProbeResult(valid=True))
+    core = FakeCoreClient(MediaProbeResult(valid=True, duration_seconds=120.5))
     app = create_app(
         Settings(
             database_url=f"sqlite:///{database_path}",
@@ -142,6 +142,7 @@ def test_upload_complete_heads_object_dispatches_probe_and_marks_asset_ready(
     with sessions() as session:
         asset = session.get(Asset, response.json()["data"]["id"])
         assert asset is not None and asset.status == "ready"
+        assert asset.duration_seconds == 120.5
 
 
 def test_upload_complete_marks_asset_invalid_when_core_rejects_media(
@@ -213,7 +214,9 @@ def test_asset_read_reconciles_later_succeeded_core_probe_for_owner(
         asset = session.get(Asset, asset_id)
         assert asset is not None and asset.core_task_id == "core_1"
 
-    core.poll_result = MediaProbeResult(valid=True, core_task_id="core_1")
+    core.poll_result = MediaProbeResult(
+        valid=True, core_task_id="core_1", duration_seconds=90.0
+    )
     fetched = client.get(
         f"/api/v1/assets/{asset_id}", headers={"Authorization": "Bearer valid-token"}
     )
@@ -224,6 +227,7 @@ def test_asset_read_reconciles_later_succeeded_core_probe_for_owner(
     with sessions() as session:
         asset = session.get(Asset, asset_id)
         assert asset is not None and asset.status == "ready"
+        assert asset.duration_seconds == 90.0
 
 
 def test_upload_complete_maps_oss_head_failure_to_service_unavailable(
