@@ -7,6 +7,7 @@ import os
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
+from urllib.parse import urlsplit
 
 
 class MediaProbeError(RuntimeError):
@@ -60,7 +61,8 @@ def _normalize_container(format_name: object, path: str) -> str:
         for part in str(format_name or "").split(",")
         if part.strip()
     ]
-    suffix = Path(path).suffix.lower().lstrip(".")
+    parsed = urlsplit(path)
+    suffix = Path(parsed.path if parsed.scheme else path).suffix.lower().lstrip(".")
     aliases = {"m4v": "mp4", "m4a": "mp4", "qt": "mov", "matroska": "mkv"}
 
     # MP4 的 FFprobe format_name 通常是复合列表，优先使用可识别的文件后缀。
@@ -83,23 +85,36 @@ def _positive_float(value: object) -> float:
 
 
 def probe_media(path: str) -> MediaInfo:
-    """使用 FFprobe 返回统一媒体元数据，探测失败时抛出 MediaProbeError。"""
+    """使用 FFprobe 探测本地文件或 HTTP(S) 远程媒体，不下载远程完整文件。"""
 
-    normalized_path = os.path.abspath(str(path or "").strip())
-    if not path or not os.path.isfile(normalized_path):
-        raise MediaProbeError(f"媒体文件不存在: {path}")
+    source = str(path or "").strip()
+    parsed = urlsplit(source)
+    is_remote = parsed.scheme in {"http", "https"} and bool(parsed.netloc)
+    if is_remote:
+        ffprobe_source = source
+    else:
+        normalized_path = os.path.abspath(source)
+        if not source or not os.path.isfile(normalized_path):
+            raise MediaProbeError(f"媒体文件不存在: {path}")
+        ffprobe_source = normalized_path
 
     try:
+        probe_limits = (
+            ["-probesize", "1048576", "-analyzeduration", "5000000"]
+            if is_remote
+            else []
+        )
         result = subprocess.run(
             [
                 _ffprobe_binary(),
                 "-v",
                 "error",
+                *probe_limits,
                 "-print_format",
                 "json",
                 "-show_streams",
                 "-show_format",
-                normalized_path,
+                ffprobe_source,
             ],
             capture_output=True,
             text=True,
@@ -160,7 +175,7 @@ def probe_media(path: str) -> MediaInfo:
 
     return MediaInfo(
         duration_seconds=duration,
-        container=_normalize_container(format_data.get("format_name"), normalized_path),
+        container=_normalize_container(format_data.get("format_name"), ffprobe_source),
         video_codec=video_stream.get("codec_name") if video_stream else None,
         audio_codec=audio_stream.get("codec_name") if audio_stream else None,
         width=width,
