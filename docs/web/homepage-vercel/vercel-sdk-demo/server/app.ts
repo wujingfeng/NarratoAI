@@ -6,6 +6,7 @@ import { scriptRoute } from "./routes/script";
 import { voicesRoute } from "./routes/voices";
 import { renderRoute } from "./routes/render";
 import { exportRoute } from "./routes/export";
+import { chatRoute } from "./routes/chat";
 
 export const app = new Hono()
   .route("/api/projects", projectsRoute)
@@ -14,4 +15,5 @@ export const app = new Hono()
   .route("/api/script", scriptRoute)
   .route("/api/voices", voicesRoute)
   .route("/api/render", renderRoute)
-  .route("/api/export", exportRoute);
+  .route("/api/export", exportRoute)
+  .route("/api/chat", chatRoute);
