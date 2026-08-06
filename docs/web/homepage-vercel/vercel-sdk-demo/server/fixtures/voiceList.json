@@ -1,0 +1,10 @@
+[
+  { "id": "morgan", "name": "Morgan", "gender": "male", "age": "30-50", "tone": "中年低沉" },
+  { "id": "liuchang", "name": "刘畅", "gender": "male", "age": "25-35", "tone": "青年沉稳" },
+  { "id": "qingcang", "name": "青苍", "gender": "male", "age": "20-30", "tone": "青年磁性" },
+  { "id": "zhiyu", "name": "知予", "gender": "male", "age": "40-60", "tone": "长者浑厚" },
+  { "id": "xinyu", "name": "心语", "gender": "female", "age": "25-35", "tone": "知性温柔" },
+  { "id": "linyao", "name": "琳瑶", "gender": "female", "age": "18-25", "tone": "少女清亮" },
+  { "id": "aiyue", "name": "艾悦", "gender": "female", "age": "30-45", "tone": "优雅知性" },
+  { "id": "ronin", "name": "Ronin", "gender": "male", "age": "25-35", "tone": "英文磁性" }
+]

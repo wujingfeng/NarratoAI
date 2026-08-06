@@ -1,0 +1,9 @@
+{
+  "scenes": [
+    { "start": 0, "end": 18, "summary": "考古小队进入古墓第一道石门，遭遇机关箭雨。", "keyCharacters": ["林夏", "教授"] },
+    { "start": 18, "end": 42, "summary": "主角发现墙上的神秘符号，预示着墓主身份不凡。", "keyCharacters": ["林夏"] },
+    { "start": 42, "end": 68, "summary": "队伍进入主墓室，金银财宝映入眼帘，但林夏察觉异常。", "keyCharacters": ["林夏", "教授", "助手"] },
+    { "start": 68, "end": 95, "summary": "墓室机关触发，队友陷入危机，林夏用绳索救下教授。", "keyCharacters": ["林夏", "教授"] },
+    { "start": 95, "end": 120, "summary": "墓主苏醒，主角逃出古墓，但发现这一切只是更大谜团的开始。", "keyCharacters": ["林夏", "墓主"] }
+  ]
+}
