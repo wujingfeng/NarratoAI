@@ -1,5 +1,5 @@
 from core_api.celery_app import create_celery_app
-from core_api.tasks.celery_tasks import wake_core_task
+from core_api.tasks.celery_tasks import publish_callback_outbox, wake_core_task
 
 
 def test_worker_lost_delivery_and_recovery_scanner_are_configured(settings):
@@ -24,3 +24,23 @@ def test_worker_lost_delivery_and_recovery_scanner_are_configured(settings):
         "task": "core.tasks.publish_callback_outbox",
         "schedule": 5.0,
     }
+
+
+def test_invalid_callback_configuration_does_not_touch_outbox(
+    settings, monkeypatch
+):
+    import core_api.tasks.celery_tasks as tasks_module
+
+    invalid = settings.model_copy(
+        update={"callback_url": "https://api.example.com/callback"}
+    )
+    monkeypatch.setattr(tasks_module, "get_cached_settings", lambda: invalid)
+    monkeypatch.setattr(
+        tasks_module,
+        "get_engine",
+        lambda _settings: (_ for _ in ()).throw(
+            AssertionError("invalid callback configuration touched the database")
+        ),
+    )
+
+    publish_callback_outbox.run()

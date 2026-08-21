@@ -210,7 +210,7 @@ def required_configuration_is_present(settings: Settings) -> bool:
         and "\n" not in settings.smtp_host
         and settings.smtp_username
         and settings.smtp_password
-        and settings.smtp_use_starttls
+        and (settings.smtp_use_starttls or settings.smtp_use_ssl)
         and settings.smtp_timeout_seconds
         < settings.verification_code_send_lease_seconds
         and settings.smtp_timeout_seconds < settings.smtp_total_deadline_seconds

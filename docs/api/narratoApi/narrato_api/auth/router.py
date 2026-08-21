@@ -6,7 +6,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, Header, Request, status
 from redis import Redis
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import Session, sessionmaker
 
 from narrato_api.api.dependencies import get_request_id, get_settings
 from narrato_api.api.errors import ApiError
@@ -14,6 +14,7 @@ from narrato_api.api.responses import ApiResponse
 from narrato_api.auth.redis_store import RedisEmailCodeStore, RedisSessionStore
 from narrato_api.auth.schemas import (
     AcceptedData,
+    CurrentUserData,
     EmailRequest,
     EmptyData,
     LoginData,
@@ -22,6 +23,7 @@ from narrato_api.auth.schemas import (
     RegisterRequest,
     UserData,
 )
+from narrato_api.billing.models import CreditAccount
 from narrato_api.auth.service import (
     AuthService,
     EmailCodeManager,
@@ -54,6 +56,17 @@ def _user_data(user: object) -> UserData:
         id=str(getattr(user, "id")),
         email=str(getattr(user, "email")),
         status=str(getattr(user, "status")),
+    )
+
+
+def _current_user_data(user: object, *, credit_balance: int) -> CurrentUserData:
+    """仅为当前登录用户补充账本驱动的实时余额。"""
+
+    return CurrentUserData(
+        id=str(getattr(user, "id")),
+        email=str(getattr(user, "email")),
+        status=str(getattr(user, "status")),
+        credit_balance=credit_balance,
     )
 
 
@@ -229,18 +242,25 @@ def reset_password(
     )
 
 
-@router.get("/users/me", response_model=ApiResponse[UserData])
+@router.get("/users/me", response_model=ApiResponse[CurrentUserData])
 def current_user(
+    request: Request,
     token: Annotated[str, Depends(bearer_token)],
     service: Annotated[AuthService, Depends(get_auth_service)],
     request_id: Annotated[str, Depends(get_request_id)],
-) -> ApiResponse[UserData]:
+) -> ApiResponse[CurrentUserData]:
     """返回当前有效且启用的个人账户。"""
 
     user = service.resolve_user(token)
+    with Session(request.app.state.database_engine) as session:
+        credit_account = session.get(CreditAccount, user.id)
+    if credit_account is None:
+        raise ApiError(
+            "CREDIT_ACCOUNT_UNAVAILABLE", "Credit account unavailable", 503
+        )
     return ApiResponse(
         code="CURRENT_USER",
         message="Current user",
-        data=_user_data(user),
+        data=_current_user_data(user, credit_balance=credit_account.balance),
         request_id=request_id,
     )

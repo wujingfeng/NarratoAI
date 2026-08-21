@@ -3,20 +3,27 @@ import { useRef } from "react";
 import { UploadedVideoList } from "./UploadedVideoList.jsx";
 import { useI18n } from "../../i18n/useI18n.js";
 
-export function VideoUploadPanel({ videos, maxVideos, isDragging, isUploading, onFiles, onDragStateChange, onRemove, onSubtitleSelect }) {
+export function VideoUploadPanel({ videos, maxVideos, isDragging, isUploading, isSubtitleDetecting, isReordering, removingSubtitleAssetId, onFiles, onDragStateChange, onRemove, onSubtitleSelect, onSubtitleRemove, onReorder }) {
   const { formatNumber, t } = useI18n();
   const inputRef = useRef(null);
+  // 视频翻译必须等字幕区域检测结束后才能进入下一步；检测期间沿用上传遮罩，
+  // 避免 OSS 上传完成后给出“操作已结束”的错误反馈。
+  const isLoading = isUploading || isSubtitleDetecting;
+  const interactionDisabled = isLoading || isReordering;
   const handleFiles = (files) => {
-    if (!isUploading && files?.length) onFiles([...files]);
+    if (!interactionDisabled && files?.length) onFiles([...files]);
+  };
+  const openFilePicker = () => {
+    if (!interactionDisabled) inputRef.current?.click();
   };
 
   return (
     <section className="create-upload-section" aria-labelledby="create-upload-heading">
       <h2 id="create-upload-heading">{t("create.upload.title")}</h2>
       <div
-        className={`create-video-dropzone${isDragging ? " is-dragging" : ""}${isUploading ? " is-uploading" : ""}`}
-        aria-busy={isUploading}
-        onDragEnter={(event) => { event.preventDefault(); if (!isUploading) onDragStateChange(true); }}
+        className={`create-video-dropzone${isDragging ? " is-dragging" : ""}${isLoading ? " is-uploading" : ""}`}
+        aria-busy={interactionDisabled}
+        onDragEnter={(event) => { event.preventDefault(); if (!interactionDisabled) onDragStateChange(true); }}
         onDragOver={(event) => event.preventDefault()}
         onDragLeave={(event) => {
           if (!event.currentTarget.contains(event.relatedTarget)) onDragStateChange(false);
@@ -24,7 +31,7 @@ export function VideoUploadPanel({ videos, maxVideos, isDragging, isUploading, o
         onDrop={(event) => {
           event.preventDefault();
           onDragStateChange(false);
-          if (!isUploading) handleFiles(event.dataTransfer.files);
+          if (!interactionDisabled) handleFiles(event.dataTransfer.files);
         }}
       >
         <input
@@ -33,29 +40,50 @@ export function VideoUploadPanel({ videos, maxVideos, isDragging, isUploading, o
           type="file"
           accept="video/mp4,video/quicktime,video/x-msvideo,.mp4,.mov,.avi"
           multiple
-          disabled={isUploading}
+          disabled={interactionDisabled}
           aria-label={t("create.upload.chooseVideos")}
           onChange={(event) => {
             handleFiles(event.target.files);
             event.target.value = "";
           }}
         />
-        <button className="create-upload-add" type="button" disabled={isUploading} onClick={() => inputRef.current?.click()}>
+        <button className="create-upload-add" type="button" disabled={interactionDisabled} onClick={openFilePicker}>
           <PlusCircle aria-hidden="true" />
           {t("create.upload.addMore")}
         </button>
-        <div className="create-dropzone-copy">
+        <div
+          className="create-dropzone-copy"
+          role="button"
+          tabIndex={interactionDisabled ? -1 : 0}
+          aria-disabled={interactionDisabled}
+          onClick={openFilePicker}
+          onKeyDown={(event) => {
+            if (event.key === "Enter" || event.key === " ") {
+              event.preventDefault();
+              openFilePicker();
+            }
+          }}
+        >
           <CloudArrowUp weight="duotone" aria-hidden="true" />
-          <p>{t("create.upload.dragPrefix")} <button type="button" disabled={isUploading} onClick={() => inputRef.current?.click()}>{t("create.upload.chooseFile")}</button></p>
+          <p>{t("create.upload.dragPrefix")} <span>{t("create.upload.chooseFile")}</span></p>
           <small>{t("create.upload.limits", { count: formatNumber(maxVideos) })}</small>
         </div>
-        {isUploading && (
+        {isLoading && (
           <div className="create-upload-loading" role="status" aria-live="polite">
             <span className="create-upload-loading__spinner" aria-hidden="true" />
-            <span>正在上传素材，请勿继续添加文件</span>
+            <span>{isUploading ? t("create.upload.uploadingMaterials") : t("create.upload.detectingVideoSubtitles")}</span>
           </div>
         )}
-        <UploadedVideoList videos={videos} onRemove={onRemove} onSubtitleSelect={onSubtitleSelect} />
+        <UploadedVideoList
+          videos={videos}
+          disabled={interactionDisabled}
+          removeDisabled={isReordering}
+          removingSubtitleAssetId={removingSubtitleAssetId}
+          onRemove={onRemove}
+          onSubtitleSelect={onSubtitleSelect}
+          onSubtitleRemove={onSubtitleRemove}
+          onReorder={onReorder}
+        />
       </div>
     </section>
   );

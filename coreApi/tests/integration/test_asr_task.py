@@ -9,6 +9,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy import create_engine, event
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session
 
 from core_api.adapters.narrato.asr import AsrAdapter
 from core_api.api.routes.tasks import get_task_dispatcher
@@ -18,7 +19,7 @@ from core_api.runtime.artifact_store import ArtifactStore
 from core_api.runtime.artifact_store import ArtifactSecurityError
 from core_api.runtime.workspace import CoreTaskWorkspace, WorkspaceSecurityError
 from core_api.tasks.handlers import AtomicTaskHandler
-from core_api.tasks.models import CoreArtifact, CoreTaskStatus
+from core_api.tasks.models import CoreArtifact, CoreTask, CoreTaskStatus
 from core_api.tasks.models import utc_now
 from core_api.tasks.service import StaleLeaseError, TaskService
 
@@ -69,6 +70,44 @@ def test_asr_post_creates_async_task_once(app, settings):
             ).status_code
             == 422
         )
+
+
+def test_asr_post_accepts_ordered_batch_sources(app, settings):
+    Base.metadata.create_all(get_engine(settings))
+    dispatcher = RecordingDispatcher()
+    app.dependency_overrides[get_task_dispatcher] = lambda: dispatcher
+    body = {
+        "sources": [
+            {
+                "source_asset_id": "asset_a",
+                "source_url": "https://cdn.example.test/narrato/api/a.mp4",
+                "declared_extension": "mp4",
+            },
+            {
+                "source_asset_id": "asset_b",
+                "source_url": "https://cdn.example.test/narrato/api/b.mov",
+                "declared_extension": "mov",
+            },
+        ],
+        "caller_task_id": "node_asr_batch",
+    }
+    with TestClient(app) as client:
+        response = client.post(
+            "/api/v1/asr/tasks",
+            json=body,
+            headers={
+                "Authorization": "Bearer test-service-token",
+                "X-Idempotency-Key": "asr-batch",
+            },
+        )
+    assert response.status_code == 202
+    with Session(get_engine(settings)) as session:
+        task = session.get(CoreTask, response.json()["data"]["core_task_id"])
+    assert task is not None
+    assert [item["source_asset_id"] for item in task.input_snapshot["sources"]] == [
+        "asset_a",
+        "asset_b",
+    ]
 
 
 class FakeDownloader:
@@ -143,6 +182,47 @@ def test_asr_handler_uploads_and_registers_srt_artifact(session, tmp_path):
         select(CoreArtifact).where(CoreArtifact.core_task_id == task.id)
     )
     assert row is not None and row.object_key == artifact["object_key"]
+
+
+def test_asr_handler_returns_subtitle_artifact_for_each_source(session, tmp_path):
+    task_service = TaskService(session)
+    task = task_service.create_core_task(
+        caller="narrato-api",
+        route="/api/v1/asr/tasks",
+        task_type="asr",
+        idempotency_key="handler-asr-batch",
+        input_snapshot={
+            "sources": [
+                {
+                    "source_asset_id": "asset_a",
+                    "source_url": "https://cdn.example.test/narrato/api/a.mp4",
+                    "declared_extension": "mp4",
+                },
+                {
+                    "source_asset_id": "asset_b",
+                    "source_url": "https://cdn.example.test/narrato/api/b.mp4",
+                    "declared_extension": "mp4",
+                },
+            ]
+        },
+    )
+    handler = AtomicTaskHandler(
+        task_service=task_service,
+        work_root=tmp_path / "work-batch",
+        asr_adapter=AsrAdapter(
+            downloader=FakeDownloader(),
+            transcriber=fake_transcriber,
+            artifact_store=ArtifactStore(FakeOss()),
+        ),
+    )
+    handler.run(task.id)
+    result = task_service.get_task(task.id).result
+    assert [item["source_asset_id"] for item in result["subtitles"]] == [
+        "asset_a",
+        "asset_b",
+    ]
+    assert len(result["artifacts"]) == 2
+    assert all(item["artifact"]["kind"] == "subtitle" for item in result["subtitles"])
 
 
 @pytest.mark.parametrize(

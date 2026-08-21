@@ -67,11 +67,12 @@ await test("failed stream aborts the writable so the action can be retried", asy
   assert.deepEqual(calls, ["abort"]);
 });
 
-await test("result details hide failed downloads and expose exactly two completed actions", async () => {
-  const source = await readFile(new URL("../src/components/projects/ProjectResultDetails.jsx", import.meta.url), "utf8");
-  assert.match(source, /status !== "completed"/);
-  assert.match(source, /导出视频/);
-  assert.match(source, /导出到剪映草稿/);
+await test("result page requests a server manifest only after real Artifacts load", async () => {
+  const source = await readFile(new URL("../src/pages/NarrationStagePage.jsx", import.meta.url), "utf8");
+  assert.match(source, /if \(!result \|\| exportingDraft\) return/);
+  assert.match(source, /apiRequest\(`\/projects\/\$\{projectId\}\/exports\/jianying-manifest`/);
+  assert.match(source, /exportJianyingZip\(manifest\)/);
+  assert.match(source, /result && <button/);
   assert.doesNotMatch(source, /exports\/zip|jianying.*artifact/i);
 });
 

@@ -7,6 +7,7 @@ from sqlalchemy import select
 
 from core_api.adapters.narrato.short_drama import (
     FakeShortDramaProvider,
+    ProviderTemporaryError,
     ShortDramaAdapter,
 )
 from core_api.infrastructure.oss_client import DownloadReceipt, OssUploadResult
@@ -72,6 +73,35 @@ class CapturingFakeProvider(FakeShortDramaProvider):
         return super().generate_script(
             analysis, sources=sources, language=language, config=config
         )
+
+
+class FailingRepairProvider(CapturingFakeProvider):
+    """模型已返回可编辑脚本后，模拟自动修复供应商失败。"""
+
+    original_script: list[dict[str, object]]
+
+    def match_script(self, script, *, sources):
+        self.original_script = [
+            {
+                "source_asset_id": sources[0].source_asset_id,
+                "start": 0.0,
+                "end": 10.0,
+                "narration": "字" * 61,
+                "original_sound": False,
+            },
+            {
+                "source_asset_id": sources[1].source_asset_id,
+                "start": 0.0,
+                "end": 1.0,
+                "narration": "模型正常返回的第二个片段",
+                "original_sound": False,
+            },
+        ]
+        return self.original_script
+
+    def repair_script(self, invalid_script, *, validation_errors, sources):
+        self.repair_calls += 1
+        raise ProviderTemporaryError("PROVIDER_TEMPORARY_FAILURE")
 
 
 def source_snapshots(with_subtitles: bool = True) -> list[dict[str, object]]:
@@ -174,7 +204,10 @@ def test_fake_provider_analysis_then_script_artifacts_are_safe_and_registered(
     assert script_task.status == CoreTaskStatus.SUCCEEDED
     assert script_task.phase == "script_generation"
     assert provider.repair_calls == 1
-    assert provider.received_subtitles == ["B episode", "A episode"]
+    assert provider.received_subtitles == [
+        "1\n00:00:00,000 --> 00:00:01,000\nB episode",
+        "1\n00:00:00,000 --> 00:00:01,000\nA episode",
+    ]
     assert {item["kind"] for item in script_task.result["artifacts"]} == {
         "timeline",
         "editor_draft",
@@ -202,6 +235,11 @@ def test_fake_provider_analysis_then_script_artifacts_are_safe_and_registered(
     ]
     assert timeline["language"] == "zh-CN"
     assert timeline["config_snapshot"]["original_sound_ratio"] == 30
+    assert timeline["items"][0]["original_sound"] is False
+    assert sum(item["original_sound"] is True for item in timeline["items"]) == 1
+    assert next(item for item in timeline["items"] if item["original_sound"] is True)[
+        "narration"
+    ].startswith("播放原片")
     assert len(timeline["sources"]) == 2
     assert [item["subtitle_url"] for item in timeline["sources"]] == [
         "https://cdn.example.test/narrato/api/b.srt",
@@ -244,6 +282,65 @@ def test_fake_provider_retryable_error_enters_retry_wait(session, tmp_path):
     handler.run(task.id)
     assert service.get_task(task.id).status == CoreTaskStatus.RETRY_WAIT
     assert service.get_task(task.id).error["code"] == "PROVIDER_TEMPORARY_FAILURE"
+
+
+def test_script_task_succeeds_with_original_when_automatic_repair_fails(
+    session, tmp_path
+):
+    service = TaskService(session)
+    downloader = MemoryDownloader()
+    oss = MemoryOss(downloader)
+    provider = FailingRepairProvider()
+    handler = AtomicTaskHandler(
+        task_service=service,
+        work_root=tmp_path / "nonblocking-repair-work",
+        short_drama_adapter=ShortDramaAdapter(
+            provider=provider,
+            downloader=downloader,
+            artifact_store=ArtifactStore(oss),
+        ),
+    )
+    common = {
+        "model_id": "model_fake",
+        "model_snapshot": {
+            "model_id": "model_fake",
+            "catalog_version": "catalog_test",
+        },
+        "language": "zh-CN",
+        "config_snapshot": {"original_sound_ratio": 30},
+        "source_order": ["asset_b", "asset_a"],
+    }
+    analysis_task = service.create_core_task(
+        caller="narrato-api",
+        route="/api/v1/video-analysis/tasks",
+        task_type="video_analysis",
+        idempotency_key="nonblocking-repair-analysis",
+        input_snapshot={**common, "sources": source_snapshots()},
+    )
+    handler.run(analysis_task.id)
+    analysis_artifact = service.get_task(analysis_task.id).result["artifacts"][0]
+    script_task = service.create_core_task(
+        caller="narrato-api",
+        route="/api/v1/script-generation/tasks",
+        task_type="script_generation",
+        idempotency_key="nonblocking-repair-script",
+        input_snapshot={
+            **common,
+            "sources": source_snapshots(with_subtitles=False),
+            "analysis_artifact": {
+                "artifact_id": analysis_artifact["artifact_id"],
+                "url": analysis_artifact["url"],
+            },
+        },
+    )
+
+    handler.run(script_task.id)
+    completed = service.get_task(script_task.id)
+
+    assert completed.status == CoreTaskStatus.SUCCEEDED
+    assert completed.error is None
+    assert completed.result["timeline"]["items"] == provider.original_script
+    assert provider.repair_calls == 1
 
 
 def test_duplicate_wake_does_not_duplicate_analysis_artifact(session, tmp_path):

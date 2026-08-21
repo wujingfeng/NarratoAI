@@ -100,6 +100,12 @@ class UserData(StrictModel):
     status: str
 
 
+class CurrentUserData(UserData):
+    """当前账户页可读取的实时资产摘要。"""
+
+    credit_balance: int
+
+
 class LoginData(StrictModel):
     """仅登录响应返回一次的原始会话 Token。"""
 

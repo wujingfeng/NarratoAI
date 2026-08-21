@@ -112,6 +112,7 @@ def test_task_query_exposes_completed_media_probe_result(app, client, settings):
 
     assert response.status_code == 200
     assert response.json()["data"]["result"] == result
+    assert response.json()["data"]["state_version"] == task.state_version
 
 
 def test_task_query_openapi_publishes_versionable_dto_schema(client):
@@ -148,3 +149,4 @@ def test_task_query_openapi_publishes_versionable_dto_schema(client):
         "error",
         "artifacts",
     }
+    assert "state_version" in schemas["CoreTaskDTO"]["properties"]

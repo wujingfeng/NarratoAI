@@ -2,7 +2,15 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from sqlalchemy import BigInteger, DateTime, Float, ForeignKey, Index, String
+from sqlalchemy import (
+    BigInteger,
+    DateTime,
+    Float,
+    ForeignKey,
+    Index,
+    String,
+    UniqueConstraint,
+)
 from sqlalchemy.orm import Mapped, mapped_column
 
 from narrato_api.database import Base
@@ -20,6 +28,9 @@ class RegisteredArtifact(Base):
     __tablename__ = "artifacts"
     __table_args__ = (
         Index("ix_artifacts_project_created", "project_id", "created_at"),
+        UniqueConstraint(
+            "project_id", "kind", name="uq_artifacts_project_kind"
+        ),
     )
 
     id: Mapped[str] = mapped_column(String(64), primary_key=True)

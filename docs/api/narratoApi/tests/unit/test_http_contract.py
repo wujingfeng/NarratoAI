@@ -6,6 +6,7 @@ from concurrent.futures import ThreadPoolExecutor
 import io
 import json
 import logging
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -108,11 +109,18 @@ def test_openapi_only_exposes_get_post_and_typed_responses(tmp_path) -> None:
         "/api/v1/auth/password-code/send",
         "/api/v1/auth/password/reset",
         "/api/v1/users/me",
+        "/api/v1/products/short-drama-narration/config",
         "/api/v1/projects",
         "/api/v1/projects/{project_id}/cost-estimate",
         "/api/v1/projects/{project_id}/start",
+        "/api/v1/projects/{project_id}/narration/settings",
+        "/api/v1/projects/{project_id}/narration/settings/start-analysis",
+        "/api/v1/projects/{project_id}/stage",
+        "/api/v1/projects/{project_id}/stage/advance",
         "/api/v1/projects/{project_id}/uploads/policy",
         "/api/v1/projects/{project_id}/uploads/complete",
+        "/api/v1/projects/{project_id}/assets/{asset_id}/remove",
+        "/api/v1/projects/{project_id}/assets/order",
         "/api/v1/projects/{project_id}/editor",
         "/api/v1/projects/{project_id}/editor/save",
         "/api/v1/projects/{project_id}/render/submit",
@@ -124,7 +132,7 @@ def test_openapi_only_exposes_get_post_and_typed_responses(tmp_path) -> None:
     }
     assert {
         method for path in paths.values() for method in path if method != "parameters"
-    } <= {"get", "post"}
+    } <= {"get", "post", "patch"}
     for path in paths.values():
         for method, operation in path.items():
             if method == "parameters":
@@ -183,6 +191,18 @@ def test_settings_reject_unknown_toml_and_hide_secrets(tmp_path) -> None:
     with pytest.raises(ValidationError):
         Settings(oss_url="narrato.oss-cn-shanghai.aliyuncs.com")
 
+    with pytest.raises(ValidationError):
+        Settings(
+            oss_url="https://narrato.oss-cn-shanghai.aliyuncs.com",
+            cdn_public_base_url="http://cdn.example.test",
+        )
+
+    settings = Settings(
+        oss_url="https://narrato.oss-cn-shanghai.aliyuncs.com/",
+        cdn_public_base_url="https://cdn.example.test/",
+    )
+    assert settings.cdn_public_base_url == "https://cdn.example.test"
+
 
 def test_celery_has_independent_prefix_and_no_result_backend(tmp_path) -> None:
     settings = _settings(tmp_path)
@@ -193,9 +213,15 @@ def test_celery_has_independent_prefix_and_no_result_backend(tmp_path) -> None:
         celery.conf.broker_transport_options["global_keyprefix"]
         == "narrato:business:test:celery:"
     )
+    assert "narrato.deletion.sweep" in celery.tasks
+    assert celery.conf.beat_schedule["project-deletion-sweep"] == {
+        "task": "narrato.deletion.sweep",
+        "schedule": settings.project_deletion_sweep_interval_seconds,
+    }
 
 
 def test_clean_celery_worker_registers_auth_tasks(tmp_path) -> None:
+    config_path = Path(__file__).resolve().parents[2] / "config.example.toml"
     probe = subprocess.run(
         [
             sys.executable,
@@ -204,10 +230,12 @@ def test_clean_celery_worker_registers_auth_tasks(tmp_path) -> None:
                 "from narrato_api.celery_app import celery_app; "
                 "names=set(celery_app.tasks); "
                 "assert 'narrato.auth.send_verification_email' in names; "
+                "assert 'narrato.deletion.sweep' in names; "
                 "assert not any('cover' in name for name in names)"
             ),
         ],
         cwd=tmp_path,
+        env={**os.environ, "NARRATO_API_CONFIG": str(config_path)},
         check=False,
         capture_output=True,
         text=True,
@@ -215,42 +243,30 @@ def test_clean_celery_worker_registers_auth_tasks(tmp_path) -> None:
     assert probe.returncode == 0, probe.stderr
 
 
-def test_each_web_app_lifespan_owns_configured_celery_producer(
+def test_each_web_app_lifespan_owns_configured_synchronous_mail_client(
     tmp_path, monkeypatch
 ) -> None:
     import narrato_api.main as main_module
 
     created: list[object] = []
 
-    class Producer:
-        def __init__(self, broker: str) -> None:
-            self.broker = broker
-            self.closed = False
+    class Client:
+        def __init__(self, **kwargs) -> None:
+            self.kwargs = kwargs
+            created.append(self)
 
-        def send_task(self, *args, **kwargs):
-            return None
+        def send_verification_code(self, *args, **kwargs) -> None:
+            del args, kwargs
 
-        def close(self) -> None:
-            self.closed = True
-
-    def factory(settings):
-        producer = Producer(settings.celery_broker_url)
-        created.append(producer)
-        return producer
-
-    monkeypatch.setattr(main_module, "create_celery_app", factory)
-    first_settings = _settings(tmp_path).model_copy(
-        update={"celery_broker_url": "redis://127.0.0.1:6381/11"}
-    )
-    second_settings = _settings(tmp_path).model_copy(
-        update={"celery_broker_url": "redis://127.0.0.1:6382/12"}
-    )
-    with TestClient(create_app(first_settings)):
-        assert getattr(created[-1], "broker") == first_settings.celery_broker_url
-    assert getattr(created[-1], "closed") is True
-    with TestClient(create_app(second_settings)):
-        assert getattr(created[-1], "broker") == second_settings.celery_broker_url
-    assert getattr(created[-1], "closed") is True
+    monkeypatch.setattr(main_module, "SmtpMailClient", Client)
+    first_settings = _settings(tmp_path).model_copy(update={"smtp_host": "smtp.one"})
+    second_settings = _settings(tmp_path).model_copy(update={"smtp_host": "smtp.two"})
+    with TestClient(create_app(first_settings)) as client:
+        assert created[-1].kwargs["host"] == "smtp.one"
+        assert client.app.state.mail_dispatcher._client is created[-1]
+    with TestClient(create_app(second_settings)) as client:
+        assert created[-1].kwargs["host"] == "smtp.two"
+        assert client.app.state.mail_dispatcher._client is created[-1]
     assert len(created) == 2
 
 

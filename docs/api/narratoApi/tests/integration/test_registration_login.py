@@ -101,6 +101,27 @@ def _register(client: TestClient, mail: FakeMailDispatcher) -> dict[str, object]
     return response.json()["data"]
 
 
+def test_register_accepts_eight_character_password_with_letters_and_numbers(
+    auth_fixture,
+) -> None:
+    client, _service, mail = auth_fixture
+    sent = client.post(
+        "/api/v1/auth/register-code/send", json={"email": "minimum@example.com"}
+    )
+    assert sent.status_code == 202
+
+    response = client.post(
+        "/api/v1/auth/register",
+        json={
+            "email": "minimum@example.com",
+            "password": "Abcdef12",
+            "verification_code": mail.messages[-1].verification_code,
+        },
+    )
+
+    assert response.status_code == 201
+
+
 def test_register_login_single_session_logout_and_me(auth_fixture) -> None:
     client, _service, mail = auth_fixture
     registered = _register(client, mail)
@@ -129,6 +150,7 @@ def test_register_login_single_session_logout_and_me(auth_fixture) -> None:
     )
     assert current.status_code == 200
     assert current.json()["data"]["email"] == "user@example.com"
+    assert current.json()["data"]["credit_balance"] == 100
     assert (
         client.post(
             "/api/v1/auth/logout", headers={"Authorization": f"Bearer {second_token}"}
@@ -238,7 +260,12 @@ def test_auth_dtos_forbid_extra_and_openapi_has_no_refresh_route(auth_fixture) -
     assert response.status_code == 422
     schema = client.get("/openapi.json").json()
     assert all("refresh" not in path for path in schema["paths"])
-    assert {method for path in schema["paths"].values() for method in path} <= {
+    auth_paths = {
+        path: operations
+        for path, operations in schema["paths"].items()
+        if path.startswith("/api/v1/auth/") or path == "/api/v1/users/me"
+    }
+    assert {method for operations in auth_paths.values() for method in operations} <= {
         "get",
         "post",
     }
@@ -289,7 +316,9 @@ def test_disabled_user_cannot_login_and_existing_token_is_rejected(
     )
 
 
-def test_code_send_endpoints_do_not_enumerate_accounts(auth_fixture) -> None:
+def test_register_code_send_rejects_existing_account_and_password_reset_stays_private(
+    auth_fixture,
+) -> None:
     client, _service, mail = auth_fixture
     _register(client, mail)
     before = len(mail.messages)
@@ -299,13 +328,11 @@ def test_code_send_endpoints_do_not_enumerate_accounts(auth_fixture) -> None:
     missing = client.post(
         "/api/v1/auth/register-code/send", json={"email": "missing@example.com"}
     )
-    assert existing.status_code == missing.status_code == 202
-    assert {key: existing.json()[key] for key in ("code", "message", "data")} == {
-        key: missing.json()[key] for key in ("code", "message", "data")
-    }
+    assert existing.status_code == 409
+    assert existing.json()["code"] == "EMAIL_ALREADY_REGISTERED"
+    assert missing.status_code == 202
     assert len(mail.messages) == before + 1
     assert mail.messages[-1].email == "missing@example.com"
-    assert mail.cover_dispatches >= 1
 
     before = len(mail.messages)
     known_reset = client.post(
@@ -317,7 +344,7 @@ def test_code_send_endpoints_do_not_enumerate_accounts(auth_fixture) -> None:
     assert known_reset.status_code == unknown_reset.status_code == 202
     assert len(mail.messages) == before + 1
     assert mail.messages[-1].email == "user@example.com"
-    assert mail.cover_dispatches >= 2
+    assert mail.cover_dispatches >= 1
 
 
 def test_concurrent_code_sends_leave_only_latest_generation_consumable(

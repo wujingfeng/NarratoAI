@@ -11,8 +11,10 @@ import "./styles/create.css";
 import "./styles/projects.css";
 import "./styles/project-result.css";
 import "./styles/narration.css";
+import "./styles/video-translation.css";
 import "./styles/narration-analysis.css";
 import "./styles/narration-editor.css";
+import "./styles/narration-review.css";
 import "./styles/auth.css";
 import "./styles/project-editor.css";
 

@@ -61,6 +61,7 @@ def _apply_credit(
     idempotency_key: str,
     reference_id: str | None,
     reason: str,
+    allow_negative: bool = False,
 ) -> bool:
     """在已开启事务中锁定余额并以唯一幂等键追加一笔流水。"""
 
@@ -75,7 +76,7 @@ def _apply_credit(
     )
     if existing is not None:
         return False
-    if account.balance + amount < 0:
+    if account.balance + amount < 0 and not allow_negative:
         raise InsufficientCreditsError("insufficient credits")
     account.balance += amount
     account.version += 1

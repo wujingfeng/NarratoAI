@@ -5,13 +5,13 @@ class StateTransitionError(ValueError):
     """表示调用方请求了不允许的工作流状态操作。"""
 
 
-_TERMINAL_STATES = frozenset({"completed", "failed"})
+_TERMINAL_STATES = frozenset({"completed", "failed", "cancelled"})
 _ALLOWED_TRANSITIONS: dict[str, frozenset[str]] = {
     "draft": frozenset({"queued"}),
-    "queued": frozenset({"running", "failed"}),
-    "running": frozenset({"waiting_for_edit", "completed", "failed"}),
+    "queued": frozenset({"running", "failed", "cancelled"}),
+    "running": frozenset({"waiting_for_edit", "completed", "failed", "cancelled"}),
     "waiting_for_edit": frozenset({"waiting_for_edit", "render_queued"}),
-    "render_queued": frozenset({"running", "failed"}),
+    "render_queued": frozenset({"running", "failed", "cancelled"}),
     "completed": frozenset(),
     "failed": frozenset(),
 }

@@ -9,6 +9,7 @@ from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from starlette.responses import Response
@@ -21,6 +22,8 @@ from narrato_api.api.router import api_router
 from narrato_api.config import Settings, load_settings
 from narrato_api.database import acquire_database_engine, release_database_engine
 from narrato_api.auth.service import AccountLockRegistry
+from narrato_api.admin.service import ensure_bootstrap_admin
+from sqlalchemy.orm import Session
 from narrato_api.integrations.mail_client import (
     SmtpMailClient,
     SynchronousMailDispatcher,
@@ -85,6 +88,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         try:
             _app.state.database_engine = acquire_database_engine(current)
             database_owned = True
+            if current.admin_bootstrap_password:
+                with Session(_app.state.database_engine) as session:
+                    ensure_bootstrap_admin(session, current)
             _app.state.auth_account_locks = AccountLockRegistry()
             _app.state.mail_dispatcher = SynchronousMailDispatcher(
                 client=SmtpMailClient(
@@ -154,6 +160,20 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 raise RuntimeError("application cleanup failed") from None
 
     app = FastAPI(title="Narrato Business API", version="1.0.0", lifespan=lifespan)
+    admin_cors_origins = [
+        origin.strip()
+        for origin in current.admin_cors_origins.split(",")
+        if origin.strip()
+    ]
+    if admin_cors_origins:
+        app.add_middleware(
+            CORSMiddleware,
+            allow_origins=admin_cors_origins,
+            allow_credentials=False,
+            allow_methods=["GET", "POST", "PATCH", "OPTIONS"],
+            allow_headers=["Authorization", "Content-Type", "X-Request-ID"],
+            expose_headers=["X-Request-ID"],
+        )
     app.state.settings = current
     app.state.readiness_executor = executor
 

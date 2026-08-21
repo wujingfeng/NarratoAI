@@ -51,7 +51,7 @@ class Workflow(Base):
     __table_args__ = (
         CheckConstraint(
             "state IN ('draft', 'queued', 'running', 'waiting_for_edit', "
-            "'render_queued', 'completed', 'failed')",
+            "'render_queued', 'completed', 'failed', 'cancelled')",
             name="ck_workflows_state",
         ),
         CheckConstraint("state_version >= 0", name="ck_workflows_state_version"),
@@ -87,7 +87,7 @@ class WorkflowNode(Base):
     __tablename__ = "workflow_nodes"
     __table_args__ = (
         CheckConstraint(
-            "state IN ('queued', 'running', 'waiting_for_edit', 'completed', 'failed')",
+            "state IN ('queued', 'running', 'waiting_for_edit', 'completed', 'failed', 'cancelled')",
             name="ck_workflow_nodes_state",
         ),
         CheckConstraint("max_attempts >= 1", name="ck_workflow_nodes_max_attempts"),
@@ -119,7 +119,7 @@ class WorkflowNodeAttempt(Base):
     __tablename__ = "workflow_node_attempts"
     __table_args__ = (
         CheckConstraint(
-            "state IN ('queued', 'running', 'completed', 'failed')",
+            "state IN ('queued', 'running', 'completed', 'failed', 'cancelled')",
             name="ck_workflow_node_attempts_state",
         ),
         CheckConstraint("attempt_number >= 1", name="ck_workflow_node_attempts_number"),
@@ -219,5 +219,9 @@ class WorkflowOutbox(Base):
         DateTime(timezone=True), nullable=False, default=utc_now
     )
     sent_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    dispatch_lease_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    dispatch_started_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )

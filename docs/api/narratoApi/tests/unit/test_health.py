@@ -92,7 +92,7 @@ def test_ready_returns_503_when_redis_fails(tmp_path) -> None:
         {"verification_code_hmac_secret": "short"},
         {"smtp_host": ""},
         {"smtp_sender": ""},
-        {"smtp_use_starttls": False},
+        {"smtp_use_starttls": False, "smtp_use_ssl": False},
         {"smtp_username": ""},
         {"smtp_password": ""},
         {"verification_code_send_lease_seconds": 10, "smtp_timeout_seconds": 10},
@@ -121,6 +121,16 @@ def test_ready_endpoint_fails_closed_for_missing_auth_secret(tmp_path) -> None:
         response = client.get("/api/v1/health/ready")
     assert response.status_code == 503
     assert response.json()["code"] == "SERVICE_UNAVAILABLE"
+
+
+def test_readiness_accepts_implicit_tls_smtp(tmp_path) -> None:
+    from narrato_api.api.dependencies import required_configuration_is_present
+
+    settings = _settings(tmp_path).model_copy(
+        update={"smtp_use_starttls": False, "smtp_use_ssl": True}
+    )
+
+    assert required_configuration_is_present(settings) is True
 
 
 def test_readiness_fails_when_independent_celery_broker_is_down(

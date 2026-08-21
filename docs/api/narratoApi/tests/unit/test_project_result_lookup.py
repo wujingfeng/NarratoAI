@@ -27,14 +27,19 @@ def _add_project(
 
 
 def _add_artifact(
-    session: Session, *, artifact_id: str, project_id: str, created_at: datetime
+    session: Session,
+    *,
+    artifact_id: str,
+    project_id: str,
+    kind: str,
+    created_at: datetime,
 ) -> None:
     session.add(
         RegisteredArtifact(
             id=artifact_id,
             project_id=project_id,
-            kind="video",
-            cdn_url=f"https://cdn.example.test/exports/{artifact_id}.mp4",
+            kind=kind,
+            cdn_url=f"https://cdn.example.test/exports/{artifact_id}",
             created_at=created_at,
         )
     )
@@ -58,21 +63,31 @@ def test_lookup_completed_project_result_returns_its_registered_artifacts_in_ord
         )
         _add_artifact(
             session,
-            artifact_id="art_b",
+            artifact_id="art_video",
             project_id="prj_completed",
+            kind="video",
             created_at=timestamp,
         )
         _add_artifact(
             session,
-            artifact_id="art_a",
+            artifact_id="art_subtitle",
             project_id="prj_completed",
+            kind="subtitle",
             created_at=timestamp,
         )
         _add_artifact(
             session,
-            artifact_id="art_later",
+            artifact_id="art_voice",
             project_id="prj_completed",
+            kind="voice",
             created_at=datetime(2026, 7, 18, tzinfo=timezone.utc),
+        )
+        _add_artifact(
+            session,
+            artifact_id="art_timeline",
+            project_id="prj_completed",
+            kind="timeline",
+            created_at=timestamp,
         )
         session.commit()
 
@@ -82,10 +97,44 @@ def test_lookup_completed_project_result_returns_its_registered_artifacts_in_ord
 
     assert result.project_id == "prj_completed"
     assert [artifact.id for artifact in result.artifacts] == [
-        "art_a",
-        "art_b",
-        "art_later",
+        "art_subtitle",
+        "art_timeline",
+        "art_video",
+        "art_voice",
     ]
+
+
+def test_lookup_completed_project_result_rejects_incomplete_artifact_set() -> None:
+    from narrato_api.projects.service import (
+        ProjectResultLookupError,
+        lookup_completed_project_result,
+    )
+
+    engine = create_engine("sqlite://")
+    Base.metadata.create_all(engine)
+
+    with Session(engine) as session:
+        _add_project(
+            session,
+            project_id="prj_incomplete",
+            user_id="usr_owner",
+            status="completed",
+        )
+        _add_artifact(
+            session,
+            artifact_id="art_video_only",
+            project_id="prj_incomplete",
+            kind="video",
+            created_at=datetime(2026, 7, 17, tzinfo=timezone.utc),
+        )
+        session.commit()
+
+        with pytest.raises(ProjectResultLookupError) as error:
+            lookup_completed_project_result(
+                session, user_id="usr_owner", project_id="prj_incomplete"
+            )
+
+    assert error.value.code == "PROJECT_RESULT_ARTIFACTS_INCOMPLETE"
 
 
 def test_lookup_completed_project_result_rejects_other_users() -> None:

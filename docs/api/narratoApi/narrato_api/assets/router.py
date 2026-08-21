@@ -9,6 +9,9 @@ from narrato_api.api.dependencies import get_request_id, get_settings
 from narrato_api.api.responses import ApiResponse
 from narrato_api.assets.schemas import (
     AssetData,
+    AssetOrderData,
+    AssetOrderRequest,
+    AssetRemovalData,
     UploadCompleteRequest,
     UploadPolicyData,
     UploadPolicyRequest,
@@ -28,9 +31,13 @@ router = APIRouter()
 def get_oss_client(
     request: Request, settings: Annotated[Settings, Depends(get_settings)]
 ) -> HttpOssClient:
-    """创建仅供当前请求 HEAD 和 URL 构造的 OSS 客户端。"""
+    """创建供当前请求校验、URL 构造和鉴权删除使用的 OSS 客户端。"""
 
-    return HttpOssClient(endpoint=settings.oss_endpoint)
+    return HttpOssClient(
+        endpoint=settings.oss_endpoint,
+        access_key_id=settings.oss_access_key_id,
+        access_key_secret=settings.oss_access_key_secret,
+    )
 
 
 def get_core_client(
@@ -102,7 +109,7 @@ def create_upload_policy(
         filename=body.filename,
         size_bytes=body.size_bytes,
         object_key=policy.key,
-        cdn_url=f"{settings.oss_url.rstrip('/')}/{policy.key}",
+        cdn_url=f"{settings.cdn_public_base_url}/{policy.key}",
     )
     return ApiResponse(
         code="UPLOAD_POLICY_CREATED",
@@ -149,6 +156,7 @@ def complete_upload(
         data=AssetData(
             id=asset.id,
             status=cast(Literal["validating", "ready", "invalid"], asset.status),
+            cdn_url=asset.cdn_url,
         ),
     )
 
@@ -172,5 +180,60 @@ def get_asset(
         data=AssetData(
             id=asset.id,
             status=cast(Literal["validating", "ready", "invalid"], asset.status),
+            cdn_url=asset.cdn_url,
         ),
+    )
+
+
+@router.post(
+    "/projects/{project_id}/assets/{asset_id}/remove",
+    response_model=ApiResponse[AssetRemovalData],
+)
+def remove_asset(
+    project_id: str,
+    asset_id: str,
+    token: Annotated[str, Depends(bearer_token)],
+    auth: Annotated[AuthService, Depends(get_auth_service)],
+    service: Annotated[UploadService, Depends(get_upload_service)],
+    request_id: Annotated[str, Depends(get_request_id)],
+) -> ApiResponse[AssetRemovalData]:
+    """删除当前用户尚未开始项目的单个上传素材。"""
+
+    user = auth.resolve_user(token)
+    service.remove_owned_asset(
+        user_id=user.id, project_id=project_id, asset_id=asset_id
+    )
+    return ApiResponse(
+        code="ASSET_REMOVED",
+        message="Asset removed",
+        request_id=request_id,
+        data=AssetRemovalData(removed=True),
+    )
+
+
+@router.post(
+    "/projects/{project_id}/assets/order",
+    response_model=ApiResponse[AssetOrderData],
+)
+def reorder_video_assets(
+    project_id: str,
+    body: AssetOrderRequest,
+    token: Annotated[str, Depends(bearer_token)],
+    auth: Annotated[AuthService, Depends(get_auth_service)],
+    service: Annotated[UploadService, Depends(get_upload_service)],
+    request_id: Annotated[str, Depends(get_request_id)],
+) -> ApiResponse[AssetOrderData]:
+    """保存当前项目完整的视频源顺序，供分析、编辑和渲染统一消费。"""
+
+    user = auth.resolve_user(token)
+    asset_ids = service.reorder_owned_video_assets(
+        user_id=user.id,
+        project_id=project_id,
+        asset_ids=body.asset_ids,
+    )
+    return ApiResponse(
+        code="PROJECT_ASSET_ORDER_UPDATED",
+        message="Project video asset order updated",
+        request_id=request_id,
+        data=AssetOrderData(asset_ids=asset_ids),
     )

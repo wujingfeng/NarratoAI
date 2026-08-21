@@ -78,19 +78,27 @@ def jianying_manifest_fixture(tmp_path) -> Iterator[TestClient]:
                     product="short_drama",
                     status="draft",
                 ),
-                RegisteredArtifact(
-                    id="art_render",
-                    project_id="prj_completed",
-                    kind="video",
-                    cdn_url="https://cdn.example.test/exports/render.mp4",
-                    size=1024,
-                    checksum="sha256:" + "a" * 64,
-                    content_type="video/mp4",
-                    width=1920,
-                    height=1080,
-                    duration=1.0,
-                    created_at=datetime(2026, 7, 17, tzinfo=timezone.utc),
-                ),
+                *[
+                    RegisteredArtifact(
+                        id=f"art_{kind}",
+                        project_id="prj_completed",
+                        kind=kind,
+                        cdn_url=f"https://cdn.example.test/exports/{kind}.{extension}",
+                        size=1024,
+                        checksum="sha256:" + "a" * 64,
+                        content_type=content_type,
+                        width=1920 if kind == "video" else None,
+                        height=1080 if kind == "video" else None,
+                        duration=1.0 if kind in {"video", "voice"} else None,
+                        created_at=datetime(2026, 7, 17, tzinfo=timezone.utc),
+                    )
+                    for kind, extension, content_type in (
+                        ("video", "mp4", "video/mp4"),
+                        ("subtitle", "srt", "application/x-subrip"),
+                        ("voice", "wav", "audio/wav"),
+                        ("timeline", "json", "application/json"),
+                    )
+                ],
                 EditorRevision(
                     id="erv_1",
                     project_id="prj_completed",

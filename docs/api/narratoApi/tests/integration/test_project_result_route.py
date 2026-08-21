@@ -46,26 +46,72 @@ def project_result_fixture(tmp_path) -> Iterator[TestClient]:
                     user_id="usr_owner",
                     product="short_drama",
                     status="completed",
+                    current_stage="export",
                 ),
                 Project(
-                    id="prj_draft",
+                    id="prj_created",
                     user_id="usr_owner",
                     product="short_drama",
                     status="draft",
+                    current_stage="created",
                 ),
                 Project(
                     id="prj_failed",
                     user_id="usr_owner",
                     product="short_drama",
                     status="failed",
+                    current_stage="analysis",
                 ),
-                RegisteredArtifact(
-                    id="art_render",
-                    project_id="prj_completed",
-                    kind="video",
-                    cdn_url="https://cdn.example.test/exports/render.mp4",
-                    created_at=datetime(2026, 7, 17, tzinfo=timezone.utc),
+                Project(
+                    id="prj_settings",
+                    user_id="usr_owner",
+                    product="short_drama",
+                    status="ready",
+                    current_stage="settings",
                 ),
+                Project(
+                    id="prj_analyzing",
+                    user_id="usr_owner",
+                    product="short_drama",
+                    status="analyzing",
+                    current_stage="analysis",
+                ),
+                Project(
+                    id="prj_rendering",
+                    user_id="usr_owner",
+                    product="short_drama",
+                    status="rendering",
+                    current_stage="generate",
+                ),
+                Project(
+                    id="prj_deleting",
+                    user_id="usr_owner",
+                    product="short_drama",
+                    status="deleting",
+                    current_stage="created",
+                ),
+                Project(
+                    id="prj_deleted",
+                    user_id="usr_owner",
+                    product="short_drama",
+                    status="deleted",
+                    current_stage="settings",
+                ),
+                *[
+                    RegisteredArtifact(
+                        id=f"art_{kind}",
+                        project_id="prj_completed",
+                        kind=kind,
+                        cdn_url=f"https://cdn.example.test/exports/{kind}.{extension}",
+                        created_at=datetime(2026, 7, 17, tzinfo=timezone.utc),
+                    )
+                    for kind, extension in (
+                        ("video", "mp4"),
+                        ("subtitle", "srt"),
+                        ("voice", "wav"),
+                        ("timeline", "json"),
+                    )
+                ],
             ]
         )
 
@@ -96,10 +142,16 @@ def test_get_project_result_returns_completed_owner_artifacts(
         "project_id": "prj_completed",
         "artifacts": [
             {
-                "id": "art_render",
-                "kind": "video",
-                "cdn_url": "https://cdn.example.test/exports/render.mp4",
+                "id": f"art_{kind}",
+                "kind": kind,
+                "cdn_url": f"https://cdn.example.test/exports/{kind}.{extension}",
             }
+            for kind, extension in (
+                ("subtitle", "srt"),
+                ("timeline", "json"),
+                ("video", "mp4"),
+                ("voice", "wav"),
+            )
         ],
     }
 
@@ -109,7 +161,7 @@ def test_get_project_result_returns_completed_owner_artifacts(
     [
         ("other-token", "prj_completed"),
         ("owner-token", "prj_missing"),
-        ("owner-token", "prj_draft"),
+        ("owner-token", "prj_created"),
     ],
 )
 def test_get_project_result_never_returns_unavailable_project_result(
@@ -133,11 +185,13 @@ def test_get_project_result_requires_authentication(
     assert response.json()["code"] == "AUTHENTICATION_REQUIRED"
 
 
-@pytest.mark.parametrize("project_id", ["prj_completed", "prj_failed"])
-def test_terminal_owner_can_request_project_deletion_once(
+@pytest.mark.parametrize(
+    "project_id", ["prj_completed", "prj_failed", "prj_created", "prj_settings"]
+)
+def test_eligible_owner_can_request_project_deletion_idempotently(
     project_result_fixture: TestClient, project_id: str
 ) -> None:
-    """终态项目创建审计 Job 并将项目原子切换为 deleting。"""
+    """终态或分析前项目创建一个审计 Job，并原子切换为 deleting。"""
 
     first = project_result_fixture.post(
         f"/api/v1/projects/{project_id}/deletion-requests",
@@ -163,10 +217,29 @@ def test_terminal_owner_can_request_project_deletion_once(
     assert jobs[0].status == "pending"
     assert jobs[0].created_at is not None and jobs[0].updated_at is not None
     assert project is not None and project.status == "deleting"
+    listed = project_result_fixture.get(
+        f"/api/v1/projects?query={project_id}",
+        headers={"Authorization": "Bearer owner-token"},
+    )
+    assert listed.json()["data"] == {
+        "items": [],
+        "page": 1,
+        "page_size": 10,
+        "total": 0,
+    }
 
 
-@pytest.mark.parametrize("project_id", ["prj_draft", "prj_missing"])
-def test_non_terminal_or_missing_project_cannot_request_deletion(
+@pytest.mark.parametrize(
+    "project_id",
+    [
+        "prj_analyzing",
+        "prj_rendering",
+        "prj_deleting",
+        "prj_deleted",
+        "prj_missing",
+    ],
+)
+def test_processing_deletion_state_or_missing_project_cannot_request_deletion(
     project_result_fixture: TestClient, project_id: str
 ) -> None:
     response = project_result_fixture.post(
@@ -174,14 +247,18 @@ def test_non_terminal_or_missing_project_cannot_request_deletion(
         headers={"Authorization": "Bearer owner-token"},
     )
 
-    expected_status = 409 if project_id == "prj_draft" else 404
+    expected_status = 404 if project_id == "prj_missing" else 409
     expected_code = (
-        "PROJECT_NOT_TERMINAL" if project_id == "prj_draft" else "PROJECT_NOT_FOUND"
+        "PROJECT_NOT_FOUND" if project_id == "prj_missing" else "PROJECT_NOT_TERMINAL"
     )
     assert (response.status_code, response.json()["code"]) == (
         expected_status,
         expected_code,
     )
+    if expected_status == 409:
+        assert response.json()["message"] == (
+            "Project cannot be deleted in its current state"
+        )
 
 
 def test_foreign_project_cannot_request_deletion(

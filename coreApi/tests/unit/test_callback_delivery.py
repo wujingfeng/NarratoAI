@@ -59,6 +59,7 @@ def test_http_callback_client_rejects_unsafe_or_invalid_url():
         "https://10.0.0.1/callback",
         "https://localhost/callback",
         "https://bad_host.test/callback",
+        "https://api.example.com/callback",
     ):
         try:
             HttpCallbackClient(url, "token")

@@ -6,6 +6,7 @@ import { useI18n } from "../../i18n/useI18n.js";
 
 export function DashboardHeader({ credits, onUnavailable }) {
   const { formatNumber, t } = useI18n();
+  const balance = Number.isFinite(credits?.balance) ? formatNumber(credits.balance) : "—";
   return (
     <header className="dashboard-header">
       <Link className="dashboard-header--mobile" to="/" aria-label={t("dashboard.header.home")}>
@@ -17,11 +18,11 @@ export function DashboardHeader({ credits, onUnavailable }) {
           <button
             className="dashboard-account__balance"
             type="button"
-            aria-label={t("dashboard.header.viewBalance", { balance: formatNumber(credits.balance) })}
+            aria-label={t("dashboard.header.viewBalance", { balance })}
             onClick={() => onUnavailable(t("dashboard.unavailable.creditDetails"))}
           >
             <span>{t("dashboard.credits.title")}</span>
-            <strong>{formatNumber(credits.balance)}</strong>
+            <strong>{balance}</strong>
           </button>
           <button className="dashboard-account__recharge" type="button" onClick={() => onUnavailable(t("dashboard.unavailable.recharge"))}>
             {t("dashboard.header.recharge")}

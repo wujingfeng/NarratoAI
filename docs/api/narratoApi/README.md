@@ -48,6 +48,43 @@ and `server` directives into the host configuration, or operate it as the
 host's main config after replacing example origins and applying TLS policy.
 Nginx proxies Business API `127.0.0.1:8001` and Core `127.0.0.1:8002`.
 
+## Database migrations and runtime seed data
+
+Stop the Business Worker and Scheduler before a release, then run Alembic with the real PostgreSQL SQLAlchemy DSN. The current head includes the automatic workflow, Artifact truth gate, and persisted multi-video source ordering; do not deploy the application code without its migrations.
+
+```bash
+cd "$REPO_ROOT/docs/api/narratoApi"
+export NARRATO_API_DATABASE_URL='postgresql+psycopg://USER:PASSWORD@HOST:5432/narrato'
+.venv/bin/alembic upgrade head
+```
+
+Then run the idempotent runtime-data script with the matching native `psql` DSN so the product price and `short_drama_narration_v2` workflow template exist:
+
+```bash
+psql 'postgresql://USER:PASSWORD@HOST:5432/narrato' \
+  -v ON_ERROR_STOP=1 \
+  -f "$REPO_ROOT/docs/api/narratoApi/sql/bootstrap-runtime-data.postgresql.sql"
+```
+
+Confirm that `alembic_version` is `0036_admin_rbac` before starting the Web, Worker, and Scheduler processes. Earlier revision `0031_normalize_model_generation` normalizes the generic model, play-mode, provider, rule, price, task, asset and output tables; it also evolves the former `ai_video_tasks` into `model_tasks`; revision `0036_admin_rbac` adds the independent management RBAC schema. Model provider URLs/API keys and pricing are configured in PostgreSQL, while provider field/state adaptation remains code-owned. The migration intentionally has no downgrade after it removes legacy JSON configuration; roll back from a database backup matching the target application version.
+
+## AI video provider polling
+
+LLM、图片和视频模型任务状态均由 Business API 收敛，而不是由浏览器调用
+供应商刷新接口。必须同时运行 `narrato-api-worker` 与
+`narrato-api-scheduler`：Beat 触发 `narrato.ai_video.poll_tasks`，Worker 以
+PostgreSQL 行锁和短租约领取到期的 `submitting`/`queued`/`processing`/`finalizing`
+任务后直接查询已配置 Provider。图片和视频结果会转存自有 OSS；视频随后调用
+Core 媒体探测获取实际时长，再按实际用量结算。
+
+The polling options in the private TOML have safe defaults. Tune the interval
+and batch size for provider quota, keep the lease longer than the provider HTTP
+timeout, and use the max-error/backoff values to bound transient outages. A
+stale `submitting` task is recovered after
+`ai_video_submission_recovery_delay_seconds` using its local task id as the
+provider idempotency key. Terminal provider failures refund through the existing
+idempotent credit ledger exactly once.
+
 ## Run, logs, stopping, and rollback
 
 Create `/var/log/narrato-api` and `/var/log/narrato-core-api` with ownership
@@ -83,3 +120,10 @@ with credentialed browser calls.
 
 See [the Core deployment guide](../../../coreApi/README.md) for Core programs
 and its current queue-isolation limitation.
+
+## Management console API
+
+The independent management API is mounted below `/api/v1/admin`. Run migration
+`0036_admin_rbac`, set the private admin bootstrap settings, and then start the
+Web process once to provision the initial `Admin` superuser. See
+[`docs/admin-api.md`](docs/admin-api.md) for the RBAC, audit and endpoint contract.

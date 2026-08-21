@@ -33,23 +33,21 @@ const translations = new Map([
   ["常见问题", "Frequently asked questions"], ["没有字幕文件也能用吗？", "Can I use it without a subtitle file?"], ["可以。影创工坊会自动识别视频中的对白并生成时间轴字幕，你仍可在合成前校对。", "Yes. 影创工坊 recognizes dialogue and builds timed captions automatically, and you can review them before rendering."], ["生成前可以修改片段和文案吗？", "Can I edit clips and scripts before generation?"], ["可以。AI 先给出推荐片段、文案和节奏，你可以逐项替换、改写或调整顺序。", "Yes. AI recommends clips, narration, and pacing, and you can replace, rewrite, or reorder each item."], ["创作点如何计费？", "How are credits charged?"], ["原型中暂不接入真实计费；正式版本会在生成前透明展示预计创作点消耗。", "This prototype does not charge real credits. The production version will show the estimated cost before generation."], ["生成失败会扣费吗？", "Will failed generations use credits?"], ["失败任务不会按成功成片计费，正式规则会在任务记录中清晰展示。", "Failed tasks will not be billed as completed videos. The final policy will appear clearly in task history."],
   ["准备好完成你的第一条", "Ready to create your first"], ["AI 成片", "AI video"], ["了吗？", "?"], ["真实生成前会透明展示预计消耗", "Estimated usage is shown clearly before generation"], ["页脚导航", "Footer navigation"], ["用户协议", "Terms of service"], ["用户协议待接入", "Terms of service coming soon"], ["隐私政策", "Privacy policy"], ["隐私政策待接入", "Privacy policy coming soon"], ["关闭案例播放", "Close demo playback"], ["关闭案例", "Close demo"], ["播放", "Play"], ["暂停", "Pause"], ["{title}视频案例", "Video demo: {title}"], ["关闭提示", "Close notification"], ["常见问题与开始创作", "FAQ and start creating"],
   ["页面未找到", "Page not found"], ["你访问的页面不存在。", "The page you requested does not exist."], ["错误页面导航", "Error page navigation"], ["返回官网", "Back to website"], ["前往工作台", "Go to workspace"],
-  ["影创工坊｜AI 出片工作台", "影创工坊 | AI Video Workspace"], ["工作台概览｜影创工坊", "Workspace overview | 影创工坊"], ["新建创作｜影创工坊", "New creation | 影创工坊"], ["我的项目｜影创工坊", "My projects | 影创工坊"], ["霸总短剧解说 01｜影创工坊", "CEO short-drama narration 01 | 影创工坊"], ["短剧解说设置｜影创工坊", "Narration settings | 影创工坊"], ["AI 分析｜影创工坊", "AI analysis | 影创工坊"], ["解说编辑器｜影创工坊", "Narration editor | 影创工坊"], ["页面未找到｜影创工坊", "Page not found | 影创工坊"],
+  ["影创工坊｜AI 出片工作台", "影创工坊 | AI Video Workspace"], ["登录｜影创工坊", "Log in | 影创工坊"], ["注册｜影创工坊", "Register | 影创工坊"], ["重置密码｜影创工坊", "Reset password | 影创工坊"], ["工作台概览｜影创工坊", "Workspace overview | 影创工坊"], ["新建创作｜影创工坊", "New creation | 影创工坊"], ["我的项目｜影创工坊", "My projects | 影创工坊"], ["项目结果｜影创工坊", "Project result | 影创工坊"], ["编辑项目｜影创工坊", "Edit project | 影创工坊"], ["短剧解说设置｜影创工坊", "Narration settings | 影创工坊"], ["AI 分析｜影创工坊", "AI analysis | 影创工坊"], ["解说编辑器｜影创工坊", "Narration editor | 影创工坊"], ["生成视频｜影创工坊", "Generate video | 影创工坊"], ["导出完成｜影创工坊", "Export complete | 影创工坊"], ["页面未找到｜影创工坊", "Page not found | 影创工坊"],
 ]);
 
 translations.set('{title} · 项目结果', '{title} · Project result');
 translations.set('生成完成', 'Generated');
 translations.set('识别视频内容', 'Recognize video content');
 translations.set('开始识别视频内容', 'Started recognizing video content');
-translations.set('AI 已提取 8 个高光片段', 'AI extracted 8 highlights');
 translations.set('解说文案生成完成', 'Narration script generated');
 translations.set('配音与字幕合成完成', 'Voice and captions synthesized');
 translations.set('视频导出完成', 'Video export completed');
 translations.set('AI 分析', 'AI analysis');
+translations.set('AI 视频生成｜影创工坊', 'AI video generation | Studio');
 translations.set('文案生成', 'Script generation');
 translations.set('配音合成', 'Voice synthesis');
 translations.set('视频渲染', 'Video rendering');
-translations.set('源视频 3 集 · 08:42', '3 source episodes · 08:42');
-translations.set('成片 01:25', 'Final video 01:25');
 translations.set('面包屑', 'Breadcrumb');
 translations.set('导出视频', 'Export video');
 translations.set('下载字幕', 'Download subtitles');
@@ -60,6 +58,18 @@ translations.set('全部完成', 'All complete');
 translations.set('操作日志', 'Operation log');
 translations.set('创作点消耗', 'Credits used');
 translations.set('总计 {count} 创作点', '{count} credits total');
+translations.set('导出完成内容', 'Export content');
+translations.set('功能操作区', 'Actions');
+translations.set('视频下载', 'Download video');
+translations.set('字幕下载', 'Download subtitles');
+translations.set('音频下载', 'Download voice-over');
+translations.set('时间线下载', 'Download timeline');
+translations.set('预览', 'Preview');
+translations.set('下载', 'Download');
+translations.set('下载中…', 'Downloading…');
+translations.set('导出剪映', 'Export to Jianying');
+translations.set('正在导出剪映草稿…', 'Exporting Jianying draft…');
+translations.set('正在核验并读取已登记产物…', 'Verifying and loading registered artifacts…');
 translations.set('项目摘要', 'Project summary');
 translations.set('项目类型', 'Project type');
 translations.set('{title} 成片', 'Final video for {title}');
@@ -94,9 +104,10 @@ translations.set('经典白字', 'Classic white');
 translations.set('黑底描边', 'Dark outline');
 translations.set('解说设置', 'Narration settings');
 translations.set('选择解说风格', 'Choose narration style');
+translations.set('原片占比', 'Original-footage ratio');
+translations.set('按片段数量控制原声片段占比，默认 30%。', 'Controls original-audio clips by item count. Default: 30%.');
 translations.set('视频比例', 'Video ratio');
 translations.set('配音角色', 'Voice character');
-translations.set('沉稳男声 · 顾言', 'Calm male voice · Gu Yan');
 translations.set('试听', 'Preview');
 translations.set('更换', 'Change');
 translations.set('字幕样式', 'Caption style');
@@ -108,8 +119,6 @@ translations.set('旁白配音中', 'Voice-over active');
 translations.set('字幕已开启', 'Captions on');
 translations.set('安全区', 'Safe area');
 translations.set('短剧画面预览', 'Short-drama scene preview');
-translations.set('他一步步', 'Step by step, he rose');
-translations.set('走向权力的巅峰', 'to the pinnacle of power');
 translations.set('预览轮播', 'Preview carousel');
 translations.set('源视频', 'Source video');
 translations.set('预计成片约', 'Estimated final video');
@@ -117,8 +126,9 @@ translations.set('预计消耗', 'Estimated usage');
 translations.set('{count} 创作点', '{count} credits');
 translations.set('上一步', 'Previous');
 translations.set('使用当前设置，开始 AI 分析', 'Start AI analysis with current settings');
+translations.set('正在保存并启动…', 'Saving and starting…');
+translations.set('正在加载解说配置…', 'Loading narration settings…');
 translations.set('重命名功能建设中', 'Renaming is coming soon');
-translations.set('正在试听沉稳男声', 'Previewing the calm male voice');
 translations.set('配音角色选择功能建设中', 'Voice selection is coming soon');
 translations.set('短剧解说 AI 分析', 'Short-drama narration AI analysis');
 translations.set('返回短剧解说设置', 'Back to narration settings');
@@ -147,7 +157,6 @@ translations.set('候选高光', 'Highlight candidates');
 translations.set('任务日志', 'Task log');
 translations.set('开始读取视频素材', 'Started reading video footage');
 translations.set('字幕识别完成', 'Caption recognition completed');
-translations.set('已合并 3 集剧情时间线', 'Merged the timeline for 3 episodes');
 translations.set('已识别主要人物关系', 'Identified main character relationships');
 translations.set('正在定位剧情冲突与爽点', 'Locating story conflicts and payoffs');
 translations.set('返回项目列表', 'Back to projects');
@@ -159,12 +168,31 @@ translations.set('播放下一个视频', 'Play next video');
 translations.set('播放或暂停', 'Play or pause');
 translations.set('{current} / {total} · 使用左右按钮切换视频', '{current} / {total} · Use the left and right buttons to switch videos');
 
-translations.set('霸总短剧解说 01｜影创工坊', '霸总短剧解说 01 | 影创工坊');
-
 translations.set('我的项目', 'My projects');
 translations.set('创建时间', 'Created');
 translations.set('导出', 'Export');
 translations.set('已完成', 'Complete');
+translations.set('制作模式', 'Production mode');
+translations.set('选择分析完成后是否进入人工编辑。', 'Choose whether to review the edit after analysis.');
+translations.set('手动模式', 'Manual mode');
+translations.set('分析后进入编辑器，确认片段和文案再生成。', 'Review clips and the script in the editor before rendering.');
+translations.set('自动模式', 'Automatic mode');
+translations.set('分析完成后自动冻结脚本、配音、字幕和音乐设置并生成成片。', 'After analysis, freeze the script, voice, captions, and music settings and render automatically.');
+translations.set('使用当前设置，全自动生成', 'Generate automatically with these settings');
+translations.set('正在保存并启动自动生成…', 'Saving and starting automatic generation…');
+translations.set('正在理解剧情并生成解说脚本', 'Understanding the story and generating the narration script');
+translations.set('处理时间取决于素材总时长，可稍后返回查看。', 'Processing time depends on the source duration. You can return later to check.');
+translations.set('生成解说文案', 'Generate narration script');
+translations.set('暂未读取到可播放的视频素材', 'No playable source video is available yet');
+translations.set('素材与消耗', 'Source and usage');
+translations.set('源视频预览', 'Source video preview');
+translations.set('尚未读取到可预览的源视频', 'No previewable source video is available yet');
+translations.set('项目结果｜影创工坊', 'Project result｜影创工坊');
+translations.set('可用配音音色', 'Available voices');
+translations.set('音色试听', 'Voice sample');
+translations.set('该音色未提供试听', 'No sample is available for this voice');
+translations.set('当前浏览器不支持音频试听', 'This browser cannot play the audio sample');
+translations.set('解说核对｜影创工坊', 'Narration review | 影创工坊');
 
 function localize(value) {
   if (typeof value === "string") return translations.get(value) ?? value;
@@ -202,10 +230,10 @@ export const en = {
     routeHeading: "Create a new AI video", description: "Choose a creation type and upload footage", autosave: "Upload progress is saved automatically",
     types: { narration: { title: "Short-drama narration", description: "Tell the story with voice-over" }, translation: { title: "Video translation", description: "Translate and dub in multiple languages" }, remix: { title: "Short-drama remix", description: "Extract highlights without editing skills" } },
     typeSelector: { title: "Choose creation type", ariaLabel: "Creation type" },
-    upload: { title: "Upload footage", chooseVideos: "Choose video files", addMore: "Add more", dragPrefix: "Drag videos here, or", chooseFile: "choose files", limits: "MP4 / MOV / AVI, up to 5 GB each, {count} files maximum", selectedVideos: "Selected videos", uploadSubtitle: "Upload subtitles for {name}", removeVideo: "Remove {name}" },
-    subtitle: { matched: "SRT matched", aiRecognition: "Not uploaded; AI recognition will be used", pending: "Pending; AI recognition will be used", clickOrAi: "Upload subtitles or use AI recognition" },
-    summary: { title: "Creation summary", duration: "Total source duration", estimated: "Estimated usage", balance: "Current balance", next: "Next: Set parameters" },
-    messages: { invalidVideo: "Only MP4, MOV, or AVI files up to 5 GB are supported", maxVideos: "{type} supports up to {count} videos", tooMany: "{type} currently has {current} videos; the limit is {count}", settingsUnavailable: "Parameter settings are coming soon", invalidSubtitle: "Only SRT subtitle files up to 50 MB are supported" },
+    upload: { title: "Upload footage", chooseVideos: "Choose video files", addMore: "Add more", dragPrefix: "Drag videos here, or", chooseFile: "choose files", limits: "MP4 / MOV / AVI, up to 5 GB each, {count} files maximum", selectedVideos: "Selected videos", uploadingMaterials: "Uploading footage. Please do not add more files.", detectingVideoSubtitles: "Detecting video subtitles. Please wait.", uploadSubtitle: "Upload subtitles for {name}", removeSubtitle: "Remove {name}", reorderVideo: "Reorder {name}", removeVideo: "Remove {name}" },
+    subtitle: { matched: "SRT matched", aiRecognition: "Not uploaded; AI recognition will be used", pending: "Pending; AI recognition will be used", clickOrAi: "Upload subtitles or use AI recognition", detecting: "Locating subtitle area ({progress})" },
+    summary: { title: "Creation summary", duration: "Total source duration", estimated: "Estimated usage", balance: "Current balance", next: "Next: Set parameters", nextWaiting: "Locating subtitles…", detectingSubtitles: "Locating subtitle areas for {count} video(s). The next step unlocks automatically when finished." },
+    messages: { invalidVideo: "Only MP4, MOV, or AVI files up to 5 GB are supported", maxVideos: "{type} supports up to {count} videos", tooMany: "{type} currently has {current} videos; the limit is {count}", settingsUnavailable: "Parameter settings are coming soon", invalidSubtitle: "Only SRT subtitle files up to 50 MB are supported", orderSaveAfterUploadFailed: "The footage was uploaded, but its order could not be saved. Drag it to retry.", orderSaveFailed: "The footage order could not be saved. Please retry.", orderSaveBeforeNextFailed: "The footage order is not saved, so parameter settings cannot be opened. Please retry.", waitSubtitleDetection: "Locating subtitle areas for {count} video(s). Please wait before continuing." },
   },
   projects: {
     routeHeading: "My projects", heading: "My projects", description: "Manage every creation task and result", search: "Search project names", create: "New creation", notice: "You can leave while tasks process; progress is saved automatically",
@@ -213,25 +241,123 @@ export const en = {
     status: { all: "All statuses", complete: "Complete", processing: "Processing", processingPercent: "Processing {progress}%", draft: "Draft", failed: "Generation failed" },
     filters: { ariaLabel: "Project filters", types: "Project types", status: "Filter by status" },
     table: { project: "Project", type: "Type", status: "Status", created: "Created", credits: "Credits", actions: "Actions", progress: "{name} progress: {progress}%" },
-    actions: { result: "View result", export: "Export", progress: "View progress", continue: "Continue editing", reason: "View reason", retry: "Generate again" },
+    actions: { result: "View result", export: "Export", exporting: "Downloading…", progress: "View progress", continue: "Continue editing", reason: "View reason", retry: "Generate again" },
+    bulkDelete: { selected: "{count} selected", hint: "Only tasks not yet analyzed, completed, or failed can be deleted", button: "Delete selected ({count})", selectAll: "Select all deletable projects on this page", selectAllShort: "Select deletable", clearAll: "Clear selection", selectProject: "Select project {name}", unavailable: "Project {name} is being processed and cannot be deleted", dialogTitle: "Delete the selected projects?", dialogDescription: "This will delete the {count} selected projects and their related content. This action cannot be undone.", cancel: "Cancel", confirm: "Delete {count} projects", deleting: "Deleting…" },
     empty: { title: "No matching projects", description: "Change the filters or start a new creation" },
     pagination: { ariaLabel: "Project pagination", previous: "Previous page", next: "Next page", page: "Page {page}", perPage: "{count} per page" },
-    messages: { unavailable: "{name}: {action} is coming soon", pageChanged: "Switched to page {page}" },
+    messages: { unavailable: "{name}: {action} is coming soon", retryUnavailable: "{name}: Regeneration is coming soon", retryFailed: "{name}: Unable to create a regeneration draft. Please try again.", retryUnsupported: "{name}: Regeneration is not supported for this project type", exportStarted: "{name}: Video download started", exportVideoUnavailable: "{name}: No downloadable video was found", exportFailed: "{name}: Video download failed. Please try again.", pageChanged: "Switched to page {page}", failureReason: "{name}: Generation failed: {reason}", failureReasonUnavailable: "{name}: No failure reason is available", failureReasonReadFailed: "{name}: Unable to read the failure reason. Please try again.", loading: "Loading projects…", loadFailed: "Unable to load projects. Please try again.", deleteSuccess: "Deletion requested for {count} projects", deletePartial: "Deletion requested for {success} projects; {failed} failed", deleteFailed: "Unable to delete {count} projects. Please try again." },
   },
   editor: {
     routeHeading: "Multitrack narration editor", mobileNotice: "Use a desktop to fine-tune the multitrack edit",
-    topbar: { back: "Back", backAria: "Back to analysis", editing: "Editing", autosaved: "Autosaved", undo: "Undo", redo: "Redo", credits: "Credits", saveDraft: "Save draft", generate: "Generate video" },
-    clips: { highlights: "{count} highlight clips", recommend: "Recommend again", highEnergy: "Energy", add: "Add clip" },
+    topbar: { back: "Back", backAria: "Back to analysis", editing: "Editing", autosaved: "Autosaved", credits: "Credits", saveDraft: "Save draft", generate: "Generate video", readOnly: "Read only", locked: "Locked", saving: "Saving…", saveFailed: "Save failed", generating: "Generating…", reviewMode: "Spreadsheet mode", switchingMode: "Switching…" },
+    clips: { highlights: "{count} highlight clips" },
     tabs: { script: "Narration script", subtitle: "Voice captions", bgm: "Background music" },
-    script: { current: "Current clip script", input: "Edit the current clip script", characters: "{count} characters", rewrite: "AI rewrite", style: "Script style", styles: { reversal: "High-impact twist", suspense: "Build suspense" } },
-    settings: { summary: "Quick settings summary", voiceRole: "Voice role", volume: "Volume {value}%", volumeControl: "Adjust voice-over volume", speed: "Speed {value}×", speedControl: "Adjust voice-over speed", subtitleStyle: "Caption style", backgroundMusic: "Background music", edit: "Edit", editVoiceRole: "Edit voice role", editSubtitleStyle: "Edit caption style", editBackgroundMusic: "Edit background music" },
-    presets: { voiceRole: "Steady male voice · Gu Yan", subtitleStyle: "Neon outline", bgmStyle: "Epic ambience" },
+    script: { current: "Current clip script", input: "Edit the current clip script", characters: "{count} characters" },
+    settings: { summary: "Quick settings summary", voiceRole: "Voice role", volume: "Volume {value}%", volumeControl: "Adjust voice-over volume", speed: "Speed {value}×", speedControl: "Adjust voice-over speed", subtitleStyle: "Caption style", backgroundMusic: "Background music" },
     subtitle: { title: "Subtitle file content", locked: "Timeline locked; text editing only", cue: "Edit the caption at {time}" },
-    bgm: { title: "Background music", currentFile: "Current file: {file}", reselect: "Choose and upload music again", hint: "The prototype saves this selection; the backend reads the uploaded file on export." },
-    preview: { ariaLabel: "Video preview", safeArea: "Safe area", progress: "Preview playback progress", start: "Jump to start", backOne: "Back one second", play: "Play", pause: "Pause", forwardOne: "Forward one second", end: "Jump to end", volume: "Volume", speed: "Playback speed", fullscreen: "Fullscreen preview" },
+    bgm: { title: "Background music", currentFile: "Current file: {file}", none: "Not configured" },
+    preview: { ariaLabel: "Video preview", safeArea: "Safe area", progress: "Preview playback progress", start: "Jump to start", backOne: "Back one second", play: "Play", pause: "Pause", forwardOne: "Forward one second", end: "Jump to end", fullscreen: "Fullscreen preview" },
     timeline: { ariaLabel: "Multitrack timeline", noOverlap: "Clips cannot overlap", zoomOut: "Zoom timeline out", zoom: "Timeline zoom", zoomIn: "Zoom timeline in", trimStart: "Trim start", trimEnd: "Trim end", tracks: { video: "Video clips", script: "Narration script", voice: "Voice-over audio", bgm: "Background music" } },
     waveform: { voicePreview: "Voice preview", bgmWaveform: "Background music waveform" },
-    messages: { draftSaved: "Draft saved", clipsRecommended: "Clips recommended again", rewriteReady: "AI rewrite generated" },
-    content: { projectName: "霸总短剧解说 01", defaultCaption: "精绝古城的谜团，正在镜头中一点点揭开。" },
+    messages: { draftSaved: "Draft saved", loading: "Loading editor draft…", readFailed: "Unable to load the editor draft.", invalidDraft: "The editor API returned incomplete data.", draftUnavailable: "No editable draft is available for this project. Wait for analysis to finish and retry.", saveFailed: "Unable to save the draft. Please retry.", saveBeforeGenerateFailed: "Unable to save the draft; video generation was not started.", switchModeFailed: "The draft could not be saved, so spreadsheet mode was not opened." },
   },
+  review: {
+    routeHeading: "Manual narration review",
+    eyebrow: "MANUAL REVIEW",
+    heading: "Review narration clips",
+    description: "Review the source range, scene description, narration, and original-audio strategy for each clip. Changes stay in sync with the multitrack draft.",
+    contentLabel: "Narration clip review list",
+    rowLabel: "Narration clip {number}",
+    sourcePreview: "Source video preview for row {number}",
+    assetSelect: "Choose the source video for row {number}",
+    timeInput: "{field} for row {number}",
+    pictureInput: "Edit the scene description for row {number}",
+    scriptInput: "Edit the narration for row {number}",
+    originalSoundInput: "Set whether row {number} plays the original clip audio",
+    columns: { sequence: "No.", source: "Source video", timecode: "Timecode", picture: "Scene description", script: "Narration", originalSound: "Play original clip", actions: "Actions" },
+    fields: { start: "Start time", end: "End time" },
+    placeholders: { picture: "Describe what appears in this clip", script: "Enter narration for this clip" },
+    values: { yes: "Yes", no: "No" },
+    actions: {
+      editorMode: "Editor mode", switching: "Switching…", save: "Save draft", generate: "Generate video", generating: "Generating…",
+      delete: "Delete", deleteRow: "Delete row {number}", moveUp: "Move up", moveUpRow: "Move row {number} up", moveDown: "Move down", moveDownRow: "Move row {number} down", insertAfter: "Insert row", insertAfterRow: "Insert a row after row {number}",
+    },
+    status: { locked: "Locked", saving: "Saving…", failed: "Save failed", saved: "Autosaved" },
+    validation: {
+      ready: "{count} clips are ready", pending: "{count} items still need review", missingAsset: "Choose a playable source video", invalidStart: "Start time cannot be negative", invalidEnd: "End time must be after start time", outOfRange: "End time exceeds the source duration", emptyScript: "Narration cannot be empty", duplicateRegion: "Duplicate clip identifier. Refresh and try again.", emptyRows: "Keep at least one clip", timecode: "Enter a timecode in HH:MM:SS.mmm format",
+    },
+    messages: {
+      missingProject: "No project was specified. Open manual review from the project workflow.", invalidDraft: "The editor API returned incomplete data.", draftUnavailable: "No draft is available for review. Wait for AI analysis to finish and retry.", readFailed: "Unable to load the review draft.", saveFailed: "Unable to save the draft. Please retry.", loading: "Loading review content…", fixBeforeSave: "Fix the time or source errors before saving.", switchFailed: "The draft could not be saved, so editor mode was not opened.", fixBeforeGenerate: "Complete all required fields and time checks first.", generateFailed: "Unable to start video generation. Please retry.", readOnly: "This video is already being generated. The content is read-only.", previewUnavailable: "No playable URL is available for this source", noAssets: "No video sources available",
+    },
+  },
+  videoTranslation: {
+  "back": "Back",
+  "name": "Video translation",
+  "flow": "Video translation flow",
+  "mode": "Mode",
+  "modeHint": "Configure how the translation is produced.",
+  "manual": "Manual",
+  "manualHint": "Review before rendering",
+  "auto": "Automatic",
+  "autoHint": "Run the whole workflow automatically",
+  "language": "Target language",
+  "ratio": "Output ratio",
+  "voice": "Global voice",
+  "originalSound": "Original audio",
+  "mute": "Mute",
+  "muteHint": "Translated audio only",
+  "keep": "Keep",
+  "keepHint": "Mix original and translated audio",
+  "voice_replacement": "Replace speech",
+  "voice_replacementHint": "Keep ambience, effects and music while replacing spoken vocals",
+  "voiceReplacementSurcharge": "Keeping ambience uses voice separation and adds {credits} credits/minute (rounded up once across all source videos).",
+  "noVoiceReplacementSurcharge": "Translated voice only does not use voice separation, so no ambience-preservation surcharge applies.",
+  "estimatedCost": "The source is billed as {minutes} minute(s): estimated {credits} credits, including {surcharge} credits for ambience preservation.",
+  "translated_voice_only": "Translated voice only",
+  "translated_voice_onlyHint": "Remove all source audio and keep the translated voice",
+  "music": "Background music",
+  "musicHint": "Optional background music",
+  "chooseMusic": "Choose music",
+  "previous": "Previous",
+  "saving": "Saving…",
+  "start": "Start translation",
+  "subtitleLayout": "Caption layout",
+  "subtitleHint": "Caption areas are detected automatically.",
+  "sourceSubtitle": "Source caption",
+  "targetSubtitle": "Translated caption",
+  "keepSource": "Keep source captions",
+  "recognizing": "Recognizing captions…",
+  "processing": "Translation in progress",
+  "edit": "Edit lines",
+  "time": "Time",
+  "source": "Source",
+  "target": "Translation",
+  "preview": "Preview",
+  "render": "Render video",
+  "rendering": "Rendering video",
+  "complete": "Export complete",
+  "completeHint": "Your translated video is ready.",
+  "download": "Download",
+  "steps": {
+    "upload": "Create task",
+    "settings": "Settings",
+    "translation": "AI translation",
+    "edit": "Edit lines",
+    "render": "Generate video"
+  },
+  "languages": {'en': 'English', 'ja': 'Japanese', 'ko': 'Korean', 'de': 'German', 'fr': 'French', 'es': 'Spanish', 'pt': 'Portuguese', 'ru': 'Russian', 'vi': 'Vietnamese', 'th': 'Thai', 'id': 'Indonesian', 'ar': 'Arabic'},
+  "ratios": {"original": "Original ratio", "9:16": "9:16", "16:9": "16:9", "1:1": "1:1", "4:3": "4:3", "3:4": "3:4"},
+  "errors": {
+    "config": "Unable to load settings",
+    "project": "Missing project ID",
+    "save": "Unable to save settings",
+    "music": "Unable to upload music",
+    "progress": "Unable to load progress",
+    "segments": "Unable to load lines",
+    "limit": "Preview is limited to 100 characters or words",
+    "preview": "Preview failed",
+    "render": "Render failed",
+    "result": "Unable to load the export result"
+  }
+}
 };

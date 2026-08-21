@@ -41,3 +41,26 @@ SHORT_DRAMA_NARRATION_TEMPLATE_V1 = WorkflowTemplate(
         WorkflowNodeTemplate(name="publish_artifacts", depends_on=("video_render",)),
     ),
 )
+
+
+# V1 是已发布快照，保留只读兼容；新项目使用 V2。V2 的命名与当前 Core
+# 能力一一对应，避免在业务侧把 media_probe/tts/subtitle 伪装成可执行节点。
+SHORT_DRAMA_NARRATION_TEMPLATE_V2 = WorkflowTemplate(
+    version="short_drama_narration_v2",
+    nodes=(
+        WorkflowNodeTemplate(name="subtitle_recognition"),
+        WorkflowNodeTemplate(name="plot_structure", depends_on=("subtitle_recognition",)),
+        WorkflowNodeTemplate(name="conflict_highlights", depends_on=("plot_structure",)),
+        WorkflowNodeTemplate(name="highlight_scoring", depends_on=("conflict_highlights",)),
+        WorkflowNodeTemplate(name="script_generation", depends_on=("highlight_scoring",)),
+        WorkflowNodeTemplate(
+            name="waiting_for_edit", depends_on=("script_generation",),
+            retryable=False, manual_gate=True,
+        ),
+        WorkflowNodeTemplate(name="video_render", depends_on=("waiting_for_edit",)),
+        WorkflowNodeTemplate(
+            name="publish_artifacts", depends_on=("video_render",),
+            retryable=False, manual_gate=True,
+        ),
+    ),
+)

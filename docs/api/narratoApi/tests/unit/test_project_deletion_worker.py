@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from datetime import datetime, timedelta, timezone
+
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -103,7 +105,7 @@ def test_pending_deletion_worker_records_retryable_failure_without_deleting_busi
         assert session.query(Asset).filter_by(project_id="prj_1").count() == 2
 
 
-def test_worker_ignores_non_pending_jobs() -> None:
+def test_worker_retries_retryable_failed_jobs_idempotently() -> None:
     from narrato_api.deletion.tasks import ProjectDeletionWorker
 
     engine = create_engine("sqlite://")
@@ -114,8 +116,37 @@ def test_worker_ignores_non_pending_jobs() -> None:
         session.commit()
     oss = FakeOssClient()
 
-    assert (
-        ProjectDeletionWorker(sessionmaker(bind=engine), oss).run_pending_job("dlj_1")
-        is False
+    assert ProjectDeletionWorker(sessionmaker(bind=engine), oss).run_pending_job(
+        "dlj_1"
     )
+    assert oss.deleted == [("media", "owner/video.mp4"), ("media", "owner/video.srt")]
+    with Session(engine) as session:
+        assert session.get(DeletionJob, "dlj_1").status == "completed"
+        assert session.get(Project, "prj_1").status == "deleted"
+
+
+def test_worker_waits_for_issued_upload_policy_to_expire_before_cleanup() -> None:
+    from narrato_api.deletion.tasks import ProjectDeletionWorker
+
+    now = datetime(2026, 8, 5, 8, 0, tzinfo=timezone.utc)
+    engine = create_engine("sqlite://")
+    Base.metadata.create_all(engine)
+    with Session(engine) as session:
+        _seed(session)
+        session.get(Asset, "ast_1").reservation_expires_at = now + timedelta(minutes=10)
+        session.commit()
+    oss = FakeOssClient()
+    worker = ProjectDeletionWorker(sessionmaker(bind=engine), oss, now=lambda: now)
+
+    assert worker.run_pending_job("dlj_1") is False
     assert oss.deleted == []
+    with Session(engine) as session:
+        job = session.get(DeletionJob, "dlj_1")
+        project = session.get(Project, "prj_1")
+        assert job is not None and (job.status, job.attempt_count) == ("pending", 0)
+        assert project is not None and project.status == "deleting"
+        session.get(Asset, "ast_1").reservation_expires_at = now - timedelta(seconds=1)
+        session.commit()
+
+    assert worker.run_pending_job("dlj_1") is True
+    assert oss.deleted == [("media", "owner/video.mp4"), ("media", "owner/video.srt")]

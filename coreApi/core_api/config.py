@@ -16,7 +16,9 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_prefix="CORE_API_",
         case_sensitive=False,
-        extra="forbid",
+        # 运行配置可由新版能力模块扩展；旧版 Core 在未加载对应适配器时
+        # 忽略这些字段，避免整个 API/Worker 因无关配置无法启动。
+        extra="ignore",
     )
 
     database_url: str = "postgresql+psycopg://narrato_core@127.0.0.1/narrato_core"
@@ -56,6 +58,9 @@ def load_settings(config_path: str | Path | None = None) -> Settings:
     path = Path(selected).expanduser()
     with path.open("rb") as handle:
         values: dict[str, Any] = tomllib.load(handle)
+    # 兼容新版配置名称，旧版 ArtifactStore 仍读取 oss_public_base_url。
+    if "oss_public_base_url" not in values and "cdn_public_base_url" in values:
+        values["oss_public_base_url"] = values["cdn_public_base_url"]
     return Settings(**values)
 
 

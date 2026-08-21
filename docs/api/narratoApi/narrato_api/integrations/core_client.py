@@ -12,6 +12,10 @@ class CoreClientError(RuntimeError):
     """Core 媒体探测请求未能安全完成。"""
 
 
+class CoreClientRejectedError(CoreClientError):
+    """Core 已收到请求，但拒绝了媒体声明或媒体校验。"""
+
+
 def _duration_seconds(payload: object) -> float | None:
     """仅接受 Core 已验证媒体探测返回的正有限时长。"""
 
@@ -35,6 +39,31 @@ class MediaProbeResult:
     valid: bool | None
     core_task_id: str | None = None
     duration_seconds: float | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class CoreTaskResult:
+    """Core 原子任务的最小状态投影，供 Business 工作流轮询。"""
+
+    core_task_id: str
+    status: str
+    state_version: int
+    progress: int = 0
+    result: object | None = None
+    artifacts: tuple[dict[str, object], ...] = ()
+
+
+@dataclass(frozen=True, slots=True)
+class CoreVoiceCapability:
+    """Core 能力目录中可直接用于创建渲染任务的稳定音色。"""
+
+    voice_id: str
+    name: str
+    provider_code: str
+    languages: tuple[str, ...]
+    gender: str | None
+    styles: tuple[str, ...]
+    sample_url: str | None
 
 
 @dataclass(frozen=True, slots=True)
@@ -151,7 +180,15 @@ class HttpCoreClient:
             with urlopen(request, timeout=10) as response:
                 payload = json.loads(response.read() or b"{}")
                 status = response.status
-        except (HTTPError, URLError, TimeoutError, json.JSONDecodeError) as error:
+        except HTTPError as error:
+            # 422 是 Core 对请求声明的明确拒绝，不应伪装成服务不可用；认证、路由
+            # 和服务端错误仍按不可用处理，避免将部署问题错误归因于用户文件。
+            if error.code == 422:
+                raise CoreClientRejectedError(
+                    "Core media probe rejected the request"
+                ) from error
+            raise CoreClientError("Core media probe request failed") from error
+        except (URLError, TimeoutError, json.JSONDecodeError) as error:
             raise CoreClientError("Core media probe request failed") from error
         if status == 202:
             data = payload.get("data", payload)
@@ -188,6 +225,328 @@ class HttpCoreClient:
         if state == "failed":
             return MediaProbeResult(valid=False, core_task_id=core_task_id)
         return MediaProbeResult(valid=None, core_task_id=core_task_id)
+
+    def submit_asr(
+        self, *, source_url: str, declared_extension: str, caller_task_id: str
+    ) -> str:
+        return self._submit_task(
+            "/api/v1/asr/tasks",
+            {
+                "source_url": source_url,
+                "declared_extension": declared_extension,
+                "caller_task_id": caller_task_id,
+            },
+            caller_task_id,
+        )
+
+    def submit_asr_batch(
+        self, *, sources: list[dict[str, object]], caller_task_id: str
+    ) -> str:
+        """按素材顺序提交一次最多五条来源的 ASR 任务。"""
+
+        return self._submit_task(
+            "/api/v1/asr/tasks",
+            {"sources": sources, "caller_task_id": caller_task_id},
+            caller_task_id,
+        )
+
+    def submit_video_analysis(
+        self,
+        *,
+        model_id: str,
+        sources: list[dict[str, object]],
+        caller_task_id: str,
+        config_snapshot: dict[str, object],
+    ) -> str:
+        return self._submit_task(
+            "/api/v1/video-analysis/tasks",
+            {
+                "model_id": model_id,
+                "sources": sources,
+                "language": "zh-CN",
+                "config_snapshot": config_snapshot,
+                "caller_task_id": caller_task_id,
+            },
+            caller_task_id,
+        )
+
+    def submit_video_translation(
+        self,
+        *,
+        model_id: str,
+        subtitle_input: dict[str, object],
+        target_language: str,
+        caller_task_id: str,
+    ) -> str:
+        """提交一条 SRT 时间轴翻译任务，绝不回退为视频剧情分析。"""
+
+        return self._submit_task(
+            "/api/v1/video-translation/tasks",
+            {
+                "model_id": model_id,
+                "source": subtitle_input,
+                "target_language": target_language,
+                "caller_task_id": caller_task_id,
+            },
+            caller_task_id,
+        )
+
+    def submit_translation_rewrite(
+        self,
+        *,
+        model_id: str,
+        target_language: str,
+        segments: list[dict[str, object]],
+        caller_task_id: str,
+    ) -> str:
+        """只压缩 TTS 超限译文，不重新执行 ASR 或整批字幕翻译。"""
+
+        return self._submit_task(
+            "/api/v1/video-translation/rewrite-tasks",
+            {
+                "model_id": model_id,
+                "target_language": target_language,
+                "segments": segments,
+                "caller_task_id": caller_task_id,
+            },
+            caller_task_id,
+        )
+
+    def submit_script_generation(
+        self,
+        *,
+        model_id: str,
+        analysis_artifact: dict[str, object],
+        sources: list[dict[str, object]],
+        caller_task_id: str,
+        config_snapshot: dict[str, object],
+    ) -> str:
+        return self._submit_task(
+            "/api/v1/script-generation/tasks",
+            {
+                "model_id": model_id,
+                "analysis_artifact": analysis_artifact,
+                "sources": sources,
+                "language": "zh-CN",
+                "config_snapshot": config_snapshot,
+                "caller_task_id": caller_task_id,
+            },
+            caller_task_id,
+        )
+
+    def submit_video_render(
+        self,
+        *,
+        snapshot_id: str,
+        voice_id: str,
+        sources: list[dict[str, object]],
+        timeline: list[dict[str, object]],
+        render_config: dict[str, object],
+        caller_task_id: str,
+    ) -> str:
+        return self._submit_task(
+            "/api/v1/video-render/tasks",
+            {
+                "snapshot_id": snapshot_id,
+                "voice_id": voice_id,
+                "sources": sources,
+                "timeline": timeline,
+                "render_config": render_config,
+                "caller_task_id": caller_task_id,
+            },
+            caller_task_id,
+        )
+
+    def submit_tts_preview(
+        self,
+        *,
+        voice_id: str,
+        language: str,
+        text: str,
+        speed: float,
+        volume: int,
+        caller_task_id: str,
+    ) -> str:
+        """创建单段翻译试听任务。
+
+        speed/volume 是 Core TTS 的明确字段，Core 会将其冻结为供应商请求参数。
+        不得发送未声明的 ``translation_preview`` 包装字段。
+        """
+        return self._submit_task(
+            "/api/v1/tts/tasks",
+            {
+                "voice_id": voice_id,
+                "language": language,
+                "output_format": "wav",
+                "sample_rate": 16000,
+                "speed": speed,
+                "volume": volume,
+                "segments": [{"text": text, "start": 0, "end": 60}],
+                "caller_task_id": caller_task_id,
+            },
+            caller_task_id,
+        )
+
+    def submit_translation_tts(
+        self,
+        *,
+        voice_id: str,
+        language: str,
+        segments: list[dict[str, object]],
+        caller_task_id: str,
+    ) -> str:
+        """提交确认台词后的整段配音任务，不能误走视频分析接口。"""
+
+        return self._submit_task(
+            "/api/v1/tts/tasks",
+            {
+                "voice_id": voice_id,
+                "language": language,
+                "output_format": "wav",
+                "sample_rate": 16000,
+                "segments": segments,
+                "caller_task_id": caller_task_id,
+            },
+            caller_task_id,
+        )
+
+    def get_task_result(self, core_task_id: str) -> CoreTaskResult:
+        request = Request(
+            f"{self.base_url}/api/v1/tasks/{core_task_id}",
+            headers={"Authorization": f"Bearer {self.request_token}"},
+        )
+        try:
+            with urlopen(request, timeout=10) as response:
+                payload = json.loads(response.read() or b"{}")
+        except (HTTPError, URLError, TimeoutError, json.JSONDecodeError) as error:
+            raise CoreClientError("Core task query failed") from error
+        data = payload.get("data", payload)
+        if (
+            not isinstance(data, dict)
+            or not isinstance(data.get("core_task_id"), str)
+            or not isinstance(data.get("status"), str)
+        ):
+            raise CoreClientError("Core task response is invalid")
+        state_version = data.get("state_version")
+        progress = data.get("progress", 0)
+        if (
+            isinstance(state_version, bool)
+            or not isinstance(state_version, int)
+            or state_version < 0
+        ):
+            raise CoreClientError("Core task response is invalid")
+        if (
+            isinstance(progress, bool)
+            or not isinstance(progress, int)
+            or not 0 <= progress <= 100
+        ):
+            raise CoreClientError("Core task response is invalid")
+        artifacts = data.get("artifacts", [])
+        return CoreTaskResult(
+            data["core_task_id"],
+            data["status"],
+            state_version,
+            progress,
+            data.get("result"),
+            tuple(item for item in artifacts if isinstance(item, dict)),
+        )
+
+    def get_voice_capabilities(self) -> tuple[CoreVoiceCapability, ...]:
+        """读取 Core 已启用、已配置密钥且真实可调用的音色目录。"""
+
+        if not self.request_token:
+            raise CoreClientError("Core request token is not configured")
+        request = Request(
+            f"{self.base_url}/api/v1/capabilities",
+            headers={"Authorization": f"Bearer {self.request_token}"},
+        )
+        try:
+            with urlopen(request, timeout=10) as response:
+                payload = json.loads(response.read() or b"{}")
+        except (HTTPError, URLError, TimeoutError, json.JSONDecodeError) as error:
+            raise CoreClientError("Core capability catalog request failed") from error
+        data = payload.get("data", payload) if isinstance(payload, dict) else None
+        voices = data.get("voices") if isinstance(data, dict) else None
+        if (
+            not isinstance(data, dict)
+            or not isinstance(data.get("version"), str)
+            or not isinstance(voices, list)
+        ):
+            raise CoreClientError("Core capability catalog response is invalid")
+        result: list[CoreVoiceCapability] = []
+        seen: set[str] = set()
+        for item in voices:
+            if not isinstance(item, dict):
+                raise CoreClientError("Core capability catalog response is invalid")
+            voice_id, name = item.get("voice_id"), item.get("name")
+            provider_code = item.get("provider_code")
+            languages = item.get("languages")
+            gender = item.get("gender")
+            styles = item.get("styles")
+            sample_url = item.get("sample_url")
+            if (
+                not isinstance(voice_id, str)
+                or not voice_id
+                or voice_id in seen
+                or not isinstance(name, str)
+                or not name
+                or not isinstance(provider_code, str)
+                or not provider_code
+                or not isinstance(languages, list)
+                or any(not isinstance(value, str) or not value for value in languages)
+                or (gender is not None and (not isinstance(gender, str) or not gender))
+                or not isinstance(styles, list)
+                or any(not isinstance(value, str) or not value for value in styles)
+                or (sample_url is not None and not isinstance(sample_url, str))
+            ):
+                raise CoreClientError("Core capability catalog response is invalid")
+            seen.add(voice_id)
+            result.append(
+                CoreVoiceCapability(
+                    voice_id=voice_id,
+                    name=name,
+                    provider_code=provider_code,
+                    languages=tuple(languages),
+                    gender=gender,
+                    styles=tuple(styles),
+                    sample_url=sample_url or None,
+                )
+            )
+        return tuple(result)
+
+    def _submit_task(
+        self, path: str, body_data: dict[str, object], idempotency_key: str
+    ) -> str:
+        if not self.request_token:
+            raise CoreClientError("Core request token is not configured")
+        request = Request(
+            f"{self.base_url}{path}",
+            data=json.dumps(body_data).encode(),
+            method="POST",
+            headers={
+                "Authorization": f"Bearer {self.request_token}",
+                "Content-Type": "application/json",
+                "X-Idempotency-Key": idempotency_key,
+            },
+        )
+        try:
+            with urlopen(request, timeout=15) as response:
+                payload = json.loads(response.read() or b"{}")
+        except HTTPError as error:
+            # 422 代表 Core 已经可用，但拒绝了当前任务契约或参数；调用方不能把它
+            # 伪装成 503 服务不可用，否则前端会引导用户错误地排查服务状态。
+            if error.code == 422:
+                raise CoreClientRejectedError(
+                    "Core task request was rejected"
+                ) from error
+            raise CoreClientError("Core task submission failed") from error
+        except (URLError, TimeoutError, json.JSONDecodeError) as error:
+            raise CoreClientError("Core task submission failed") from error
+        data = payload.get("data", payload)
+        task_id = data.get("core_task_id") if isinstance(data, dict) else None
+        if not isinstance(task_id, str) or not task_id:
+            raise CoreClientError("Core task submission response is invalid")
+        return task_id
 
     def build_jianying_manifest(
         self,

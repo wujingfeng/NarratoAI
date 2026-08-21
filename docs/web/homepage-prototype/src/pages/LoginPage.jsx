@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Navigate, useLocation, useNavigate } from "react-router-dom";
+import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
 import { ApiError } from "../services/httpClient.js";
 import { useAuth } from "../features/auth/AuthProvider.jsx";
 
@@ -40,9 +40,11 @@ export function LoginPage() {
           <input id="login-email" type="email" autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} required />
           <label htmlFor="login-password">密码</label>
           <input id="login-password" type="password" autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} required />
+          <p className="auth-card__forgot-password"><Link to="/forgot-password">忘记密码？</Link></p>
           {error && <p className="auth-card__error" role="alert">{error}</p>}
           <button type="submit" disabled={submitting}>{submitting ? "登录中…" : "登录"}</button>
         </form>
+        <p className="auth-card__secondary">还没有账号？ <Link to="/register">立即注册</Link></p>
       </section>
     </main>
   );

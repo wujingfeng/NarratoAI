@@ -8,6 +8,7 @@ from core_api.adapters.narrato.media_probe import (
     MediaProbeAdapter,
     SrtConstraintError,
     parse_srt,
+    validate_audio,
     validate_video,
 )
 from core_api.runtime.workspace import CoreTaskWorkspace
@@ -88,6 +89,57 @@ def test_video_probe_uses_remote_url_without_downloading(tmp_path):
 
     assert received == ["https://cdn.example.test/narrato/api/video.mp4"]
     assert result["duration_seconds"] == 600.0
+
+
+def test_audio_probe_validates_container_and_audio_stream(tmp_path):
+    received: list[str] = []
+
+    class AudioProbe(FakeProbe):
+        container = "mov"
+        video_codec = None
+        width = None
+        height = None
+        has_video = False
+
+    def probe(source: str) -> AudioProbe:
+        received.append(source)
+        return AudioProbe()
+
+    adapter = MediaProbeAdapter(downloader=object(), probe=probe)
+    workspace = CoreTaskWorkspace.create(tmp_path, "ctask_01AUDIO", 1)
+
+    result = adapter.run(
+        source_url="https://cdn.example.test/narrato/api/theme.m4a",
+        media_type="audio",
+        declared_extension="m4a",
+        workspace=workspace,
+    )
+
+    assert received == ["https://cdn.example.test/narrato/api/theme.m4a"]
+    assert result == {
+        "media_type": "audio",
+        "duration_seconds": 600.0,
+        "container": "mov",
+        "audio_codec": "aac",
+    }
+
+
+@pytest.mark.parametrize(
+    "changes",
+    [
+        {"duration_seconds": 0},
+        {"has_audio": False},
+        {"audio_codec": None},
+        {"container": "matroska"},
+    ],
+)
+def test_audio_probe_rejects_invalid_metadata(changes):
+    probe = FakeProbe()
+    probe.container = "mp3"
+    for name, value in changes.items():
+        setattr(probe, name, value)
+    with pytest.raises(MediaConstraintError):
+        validate_audio(probe, declared_extension="mp3")
 
 
 def test_srt_parser_returns_normalized_metadata():

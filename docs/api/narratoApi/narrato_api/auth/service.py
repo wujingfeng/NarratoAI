@@ -47,11 +47,11 @@ def normalize_email(value: str) -> str:
 
 
 def validate_password(value: str) -> None:
-    """限制密码长度并要求字母与数字同时存在。"""
+    """限制密码为 8 至 128 字节，并要求字母与数字同时存在。"""
 
     encoded = value.encode("utf-8")
     if (
-        len(encoded) < 12
+        len(encoded) < 8
         or len(encoded) > 128
         or not any(char.isalpha() for char in value)
         or not any(char.isdigit() for char in value)
@@ -552,20 +552,21 @@ class AuthService:
         return self.account_locks.for_email(normalized_email)
 
     def send_register_code(self, email: str) -> str | None:
-        """以统一公开工作量创建唯一未过期注册码 generation。"""
+        """为未注册邮箱创建并同步发送注册验证码。"""
 
         normalized = normalize_email(email)
         with self.session_factory() as session:
             exists = session.scalar(select(User.id).where(User.email == normalized))
+        if exists is not None:
+            raise ApiError("EMAIL_ALREADY_REGISTERED", "Email already registered", 409)
         issue = self.codes.issue(normalized, purpose="register")
-        deliver = exists is None
         try:
             self.mail_dispatcher.enqueue(
                 normalized,
                 issue.code,
                 purpose="register",
                 generation=issue.generation,
-                deliver=deliver,
+                deliver=True,
                 ttl_seconds=self.codes.ttl_seconds,
             )
         except BaseException:

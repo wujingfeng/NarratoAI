@@ -85,36 +85,32 @@ def _positive_float(value: object) -> float:
 
 
 def probe_media(path: str) -> MediaInfo:
-    """使用 FFprobe 探测本地文件或 HTTP(S) 远程媒体，不下载远程完整文件。"""
+    """使用 FFprobe 探测本地文件或 HTTPS CDN 的有限元数据。"""
 
     source = str(path or "").strip()
     parsed = urlsplit(source)
-    is_remote = parsed.scheme in {"http", "https"} and bool(parsed.netloc)
-    if is_remote:
-        ffprobe_source = source
+    if parsed.scheme in {"http", "https"} and parsed.hostname:
+        normalized_path = source
     else:
         normalized_path = os.path.abspath(source)
         if not source or not os.path.isfile(normalized_path):
             raise MediaProbeError(f"媒体文件不存在: {path}")
-        ffprobe_source = normalized_path
 
     try:
-        probe_limits = (
-            ["-probesize", "1048576", "-analyzeduration", "5000000"]
-            if is_remote
-            else []
-        )
         result = subprocess.run(
             [
                 _ffprobe_binary(),
                 "-v",
                 "error",
-                *probe_limits,
+                "-probesize",
+                "1048576",
+                "-analyzeduration",
+                "5000000",
                 "-print_format",
                 "json",
                 "-show_streams",
                 "-show_format",
-                ffprobe_source,
+                normalized_path,
             ],
             capture_output=True,
             text=True,
@@ -175,7 +171,7 @@ def probe_media(path: str) -> MediaInfo:
 
     return MediaInfo(
         duration_seconds=duration,
-        container=_normalize_container(format_data.get("format_name"), ffprobe_source),
+        container=_normalize_container(format_data.get("format_name"), normalized_path),
         video_codec=video_stream.get("codec_name") if video_stream else None,
         audio_codec=audio_stream.get("codec_name") if audio_stream else None,
         width=width,

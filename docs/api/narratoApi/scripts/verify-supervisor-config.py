@@ -74,6 +74,19 @@ PROGRAMS = (
         required_pythonpath="/srv/narrato/NarratoAI",
     ),
     ProgramSpec(
+        filename="core-api-scheduler.conf",
+        section="program:core-api-scheduler",
+        command_fragments=(
+            "coreApi/.venv/bin/celery",
+            "-A core_api.celery_app:celery_app",
+            "beat",
+        ),
+        forbidden_command_fragments=(" worker", "--queues="),
+        supervisor_dir=CORE_SUPERVISOR_DIR,
+        environment_key="CORE_API_CONFIG",
+        required_pythonpath="/srv/narrato/NarratoAI",
+    ),
+    ProgramSpec(
         filename="core-worker-analysis.conf",
         section="program:core-worker-analysis",
         command_fragments=(

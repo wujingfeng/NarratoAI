@@ -8,8 +8,13 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from narrato_api.editor.models import EditorDraft, EditorRevision
+from narrato_api.editor.models import EditorDraft
 from narrato_api.projects.models import Project
+from narrato_api.projects.service import (
+    ProjectLifecycleConflict,
+    materialize_editor_draft,
+    queue_project_render,
+)
 from narrato_api.workflows.models import Workflow, WorkflowOutbox
 
 
@@ -27,6 +32,10 @@ class EditorDraftNotFoundError(LookupError):
 
 class EditorProjectNotFoundError(LookupError):
     """编辑器读取时项目不存在或不属于当前用户。"""
+
+
+class EditorRenderSnapshotError(ValueError):
+    """当前编辑草稿无法生成合法的 Core Render 请求。"""
 
 
 def _new_id(prefix: str) -> str:
@@ -87,37 +96,26 @@ class EditorService:
                 )
                 if workflow is None:
                     raise EditorWorkflowNotFoundError("workflow not found")
-                draft = session.get(EditorDraft, project.id)
-                if draft is None:
-                    raise EditorDraftNotFoundError("editor draft not found")
-                project.is_locked = True
-                project.status = "render_queued"
-                workflow.state = "render_queued"
-                workflow.state_version += 1
-                session.add(
-                    EditorRevision(
-                        id=_new_id("erv"),
-                        project_id=project.id,
-                        content=draft.content,
-                    )
-                )
-                session.add(
-                    WorkflowOutbox(
-                        id=_new_id("obx"),
-                        workflow_id=workflow.id,
-                        workflow_node_id=None,
-                        event_type="workflow.render_requested",
+                try:
+                    queue_project_render(
+                        session,
+                        project=project,
+                        workflow=workflow,
                         idempotency_key=idempotency_key,
-                        payload={"state": "render_queued"},
-                        status="pending",
                     )
-                )
+                except ProjectLifecycleConflict as error:
+                    if error.code == "PROJECT_SCRIPT_UNAVAILABLE":
+                        raise EditorDraftNotFoundError(str(error)) from error
+                    if error.code == "PROJECT_RENDER_INVALID":
+                        raise EditorRenderSnapshotError(str(error)) from error
+                    raise EditorWorkflowNotFoundError(str(error)) from error
                 return True
 
     def get_draft(self, *, user_id: str, project_id: str) -> tuple[EditorDraft, bool]:
         """读取当前用户项目草稿；提交渲染后仍可只读访问。"""
 
         with self.session_factory() as session:
+            materialized = False
             project = session.scalar(
                 select(Project).where(
                     Project.id == project_id, Project.user_id == user_id
@@ -126,11 +124,24 @@ class EditorService:
             if project is None:
                 raise EditorProjectNotFoundError("project was not found")
             draft = session.get(EditorDraft, project.id)
-            if draft is None:
-                raise EditorDraftNotFoundError("editor draft not found")
+            legacy_demo_draft = draft is not None and _contains_legacy_demo_media(draft.content)
+            if draft is None or legacy_demo_draft:
+                # 兼容已进入 edit 阶段、但在初始化机制上线前遗漏草稿的旧项目。
+                # 使用同一事务内已验证的项目素材回填，绝不引入本地演示数据。
+                if project.current_stage != "edit" or project.is_locked:
+                    raise EditorDraftNotFoundError("editor draft not found")
+                materialize_editor_draft(session, project=project)
+                session.flush()
+                materialized = True
+                draft = session.get(EditorDraft, project.id)
+                if draft is None:
+                    raise EditorDraftNotFoundError("editor draft not found")
+            locked = project.is_locked
+            if materialized:
+                session.commit()
+                session.refresh(draft)
             session.expunge(draft)
-            return draft, project.is_locked
-
+            return draft, locked
     @staticmethod
     def _editable_project(
         session: Session, *, user_id: str, project_id: str
@@ -144,6 +155,19 @@ class EditorService:
         )
         if project is None:
             raise EditorProjectNotFoundError("project was not found")
-        if project.status != "waiting_for_edit" or project.is_locked:
+        if project.status != "waiting_for_edit" or project.current_stage != "edit" or project.is_locked:
             raise EditorLockedError("project editor is locked")
         return project
+
+
+def _contains_legacy_demo_media(content: object) -> bool:
+    """仅识别历史演示路径，避免覆盖已经由真实 API 写入的用户草稿。"""
+
+    if not isinstance(content, dict) or not isinstance(content.get("clips"), list):
+        return False
+    return any(
+        isinstance(clip, dict)
+        and isinstance(clip.get("asset_id"), str)
+        and clip["asset_id"].startswith("/media/narration-editor/")
+        for clip in content["clips"]
+    )

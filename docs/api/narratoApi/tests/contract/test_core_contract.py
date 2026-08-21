@@ -7,7 +7,11 @@ from pydantic import ValidationError
 from narrato_api.api.errors import ServiceUnavailableError
 from narrato_api.api.responses import ApiResponse, envelope
 from narrato_api.config import Settings
-from narrato_api.internal.router import get_workflow_reconciler
+from narrato_api.internal.router import (
+    get_analysis_core_client,
+    get_workflow_orchestrator,
+    get_workflow_reconciler,
+)
 from narrato_api.main import create_app
 
 
@@ -58,7 +62,24 @@ def test_core_callback_requires_its_dedicated_bearer_token_and_event_idempotency
             seen.update(event)
             return True
 
+        def workflow_id_for_core_task(self, core_task_id: str) -> str:
+            assert core_task_id == "ctask_7"
+            return "wfl_callback"
+
+    class FakeOrchestrator:
+        def __init__(self) -> None:
+            self.calls: list[tuple[str, object]] = []
+
+        def dispatch_ready(self, *, workflow_id: str, core_client: object) -> bool:
+            self.calls.append((workflow_id, core_client))
+            return True
+
+    core_client = object()
+    orchestrator = FakeOrchestrator()
+
     app.dependency_overrides[get_workflow_reconciler] = FakeReconciler
+    app.dependency_overrides[get_analysis_core_client] = lambda: core_client
+    app.dependency_overrides[get_workflow_orchestrator] = lambda: orchestrator
     payload = {
         "event_id": "evt_core_task_7",
         "core_task_id": "ctask_7",
@@ -109,5 +130,6 @@ def test_core_callback_requires_its_dedicated_bearer_token_and_event_idempotency
             "attempt_no": 2,
         },
     }
+    assert orchestrator.calls == [("wfl_callback", core_client)]
     for response in (rejected, mismatch):
         assert set(response.json()) == {"code", "message", "data", "request_id"}

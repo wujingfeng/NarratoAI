@@ -23,13 +23,9 @@ def utc_now() -> datetime:
 
 
 class CreditAccount(Base):
-    """用户当前创作点余额；每次变更必须由账本流水驱动。"""
+    """用户当前创作点余额；模型任务结算允许临时欠费。"""
 
     __tablename__ = "credit_accounts"
-    __table_args__ = (
-        CheckConstraint("balance >= 0", name="ck_credit_accounts_balance"),
-    )
-
     user_id: Mapped[str] = mapped_column(
         String(64), ForeignKey("users.id", ondelete="RESTRICT"), primary_key=True
     )

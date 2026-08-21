@@ -22,7 +22,7 @@ const translations = new Map([
   ["常见问题", "よくある質問"], ["没有字幕文件也能用吗？", "字幕ファイルがなくても使えますか？"], ["可以。影创工坊会自动识别视频中的对白并生成时间轴字幕，你仍可在合成前校对。", "はい。影创工坊が動画内のセリフを認識してタイムライン字幕を生成し、合成前に確認できます。"], ["生成前可以修改片段和文案吗？", "生成前にクリップや台本を修正できますか？"], ["可以。AI 先给出推荐片段、文案和节奏，你可以逐项替换、改写或调整顺序。", "はい。AIが提案したクリップ、台本、テンポを個別に差し替え、書き換え、並べ替えできます。"], ["创作点如何计费？", "制作クレジットはどのように消費されますか？"], ["原型中暂不接入真实计费；正式版本会在生成前透明展示预计创作点消耗。", "このプロトタイプでは実際の課金は行いません。正式版では生成前に予想消費量を明示します。"], ["生成失败会扣费吗？", "生成に失敗した場合も課金されますか？"], ["失败任务不会按成功成片计费，正式规则会在任务记录中清晰展示。", "失敗したタスクは完成動画として課金されません。正式なルールはタスク履歴に明示されます。"],
   ["准备好完成你的第一条", "最初の"], ["AI 成片", "AI動画"], ["了吗？", "を作る準備はできましたか？"], ["真实生成前会透明展示预计消耗", "生成前に予想消費量を明確に表示します"], ["页脚导航", "フッターナビゲーション"], ["用户协议", "利用規約"], ["用户协议待接入", "利用規約は準備中です"], ["隐私政策", "プライバシーポリシー"], ["隐私政策待接入", "プライバシーポリシーは準備中です"], ["关闭案例播放", "事例再生を閉じる"], ["关闭案例", "事例を閉じる"], ["播放", "再生"], ["暂停", "一時停止"], ["{title}视频案例", "{title}の動画事例"], ["关闭提示", "通知を閉じる"], ["常见问题与开始创作", "よくある質問と制作開始"],
   ["页面未找到", "ページが見つかりません"], ["你访问的页面不存在。", "指定されたページは存在しません。"], ["错误页面导航", "エラーページナビゲーション"], ["返回官网", "公式サイトに戻る"], ["前往工作台", "ワークスペースへ"],
-  ["影创工坊｜AI 出片工作台", "影创工坊｜AI 動画制作ワークスペース"], ["工作台概览｜影创工坊", "ワークスペース概要｜影创工坊"], ["新建创作｜影创工坊", "新規制作｜影创工坊"], ["我的项目｜影创工坊", "マイプロジェクト｜影创工坊"], ["霸总短剧解说 01｜影创工坊", "CEOショートドラマ解説 01｜影创工坊"], ["短剧解说设置｜影创工坊", "ショートドラマ解説設定｜影创工坊"], ["AI 分析｜影创工坊", "AI分析｜影创工坊"], ["解说编辑器｜影创工坊", "解説エディター｜影创工坊"], ["页面未找到｜影创工坊", "ページが見つかりません｜影创工坊"],
+  ["影创工坊｜AI 出片工作台", "影创工坊｜AI 動画制作ワークスペース"], ["登录｜影创工坊", "ログイン｜影创工坊"], ["注册｜影创工坊", "アカウント登録｜影创工坊"], ["重置密码｜影创工坊", "パスワード再設定｜影创工坊"], ["工作台概览｜影创工坊", "ワークスペース概要｜影创工坊"], ["新建创作｜影创工坊", "新規制作｜影创工坊"], ["我的项目｜影创工坊", "マイプロジェクト｜影创工坊"], ["项目结果｜影创工坊", "プロジェクト結果｜影创工坊"], ["编辑项目｜影创工坊", "プロジェクト編集｜影创工坊"], ["短剧解说设置｜影创工坊", "ショートドラマ解説設定｜影创工坊"], ["AI 分析｜影创工坊", "AI分析｜影创工坊"], ["解说编辑器｜影创工坊", "解説エディター｜影创工坊"], ["生成视频｜影创工坊", "動画生成｜影创工坊"], ["导出完成｜影创工坊", "書き出し完了｜影创工坊"], ["页面未找到｜影创工坊", "ページが見つかりません｜影创工坊"],
 ]);
 
 translations.set('{title} · 项目结果', '{title} · プロジェクト結果');
@@ -37,15 +37,12 @@ translations.set('节奏与 BGM 自动匹配', 'テンポと BGM を自動調整
 translations.set('生成完成', '生成完了');
 translations.set('识别视频内容', '動画内容を認識');
 translations.set('开始识别视频内容', '動画内容の認識を開始');
-translations.set('AI 已提取 8 个高光片段', 'AI が 8 件のハイライトを抽出');
 translations.set('解说文案生成完成', '解説台本の生成が完了');
 translations.set('配音与字幕合成完成', '音声と字幕の合成が完了');
 translations.set('视频导出完成', '動画の書き出しが完了');
 translations.set('文案生成', '台本生成');
 translations.set('配音合成', '音声合成');
 translations.set('视频渲染', '動画レンダリング');
-translations.set('源视频 3 集 · 08:42', '元動画 3 話 · 08:42');
-translations.set('成片 01:25', '完成動画 01:25');
 translations.set('面包屑', 'パンくずリスト');
 translations.set('导出视频', '動画を書き出す');
 translations.set('下载字幕', '字幕をダウンロード');
@@ -56,6 +53,18 @@ translations.set('全部完成', 'すべて完了');
 translations.set('操作日志', '操作ログ');
 translations.set('创作点消耗', 'クレジット使用量');
 translations.set('总计 {count} 创作点', '合計 {count} クレジット');
+translations.set('导出完成内容', 'エクスポート完了コンテンツ');
+translations.set('功能操作区', '操作エリア');
+translations.set('视频下载', '動画をダウンロード');
+translations.set('字幕下载', '字幕をダウンロード');
+translations.set('音频下载', '音声をダウンロード');
+translations.set('时间线下载', 'タイムラインをダウンロード');
+translations.set('预览', 'プレビュー');
+translations.set('下载', 'ダウンロード');
+translations.set('下载中…', 'ダウンロード中…');
+translations.set('导出剪映', 'Jianying にエクスポート');
+translations.set('正在导出剪映草稿…', 'Jianying 草稿をエクスポート中…');
+translations.set('正在核验并读取已登记产物…', '登録成果物を確認・読み込み中…');
 translations.set('项目摘要', 'プロジェクト概要');
 translations.set('项目类型', 'プロジェクト種類');
 translations.set('{title} 成片', '{title} の完成動画');
@@ -93,9 +102,10 @@ translations.set('经典白字', 'クラシック白文字');
 translations.set('黑底描边', '黒背景の縁取り');
 translations.set('解说设置', '解説設定');
 translations.set('选择解说风格', '解説スタイルを選択');
+translations.set('原片占比', '元映像の比率');
+translations.set('按片段数量控制原声片段占比，默认 30%。', '元音声クリップの件数比率を指定します。既定値は30%です。');
 translations.set('视频比例', '動画比率');
 translations.set('配音角色', 'ナレーター');
-translations.set('沉稳男声 · 顾言', '落ち着いた男性音声 · 顧言');
 translations.set('试听', '試聴');
 translations.set('更换', '変更');
 translations.set('字幕样式', '字幕スタイル');
@@ -107,8 +117,6 @@ translations.set('旁白配音中', 'ナレーション再生中');
 translations.set('字幕已开启', '字幕オン');
 translations.set('安全区', 'セーフエリア');
 translations.set('短剧画面预览', 'ショートドラマ画面プレビュー');
-translations.set('他一步步', '彼は一歩ずつ');
-translations.set('走向权力的巅峰', '権力の頂点へ向かった');
 translations.set('预览轮播', 'プレビューカルーセル');
 translations.set('源视频', '元動画');
 translations.set('预计成片约', '完成動画の目安');
@@ -116,8 +124,9 @@ translations.set('预计消耗', '推定消費量');
 translations.set('{count} 创作点', '{count} クレジット');
 translations.set('上一步', '前へ');
 translations.set('使用当前设置，开始 AI 分析', '現在の設定で AI 分析を開始');
+translations.set('正在保存并启动…', '保存して開始しています…');
+translations.set('正在加载解说配置…', '解説設定を読み込んでいます…');
 translations.set('重命名功能建设中', '名前変更機能は準備中です');
-translations.set('正在试听沉稳男声', '落ち着いた男性音声を試聴中');
 translations.set('配音角色选择功能建设中', 'ナレーター選択機能は準備中です');
 translations.set('短剧解说 AI 分析', 'ショートドラマ解説 AI 分析');
 translations.set('返回短剧解说设置', '解説設定に戻る');
@@ -147,7 +156,6 @@ translations.set('候选高光', 'ハイライト候補');
 translations.set('任务日志', 'タスクログ');
 translations.set('开始读取视频素材', '動画素材の読み込みを開始');
 translations.set('字幕识别完成', '字幕認識が完了');
-translations.set('已合并 3 集剧情时间线', '3 話のストーリータイムラインを統合');
 translations.set('已识别主要人物关系', '主な人物関係を特定');
 translations.set('正在定位剧情冲突与爽点', 'ストーリーの対立と見せ場を特定中');
 translations.set('返回项目列表', 'プロジェクト一覧に戻る');
@@ -159,11 +167,31 @@ translations.set('播放下一个视频', '次の動画を再生');
 translations.set('播放或暂停', '再生または一時停止');
 translations.set('{current} / {total} · 使用左右按钮切换视频', '{current} / {total} · 左右のボタンで動画を切り替え');
 
-translations.set('霸总短剧解说 01｜影创工坊', '霸总短剧解说 01｜影创工坊');
 translations.set('AI 分析｜影创工坊', 'AI 分析｜影创工坊');
 
 translations.set('我的项目', 'マイプロジェクト');
 translations.set('创建时间', '作成日時');
+translations.set('制作模式', '制作モード');
+translations.set('选择分析完成后是否进入人工编辑。', '分析後に手動編集へ進むか選択します。');
+translations.set('手动模式', '手動モード');
+translations.set('分析后进入编辑器，确认片段和文案再生成。', '分析後にエディターでクリップと台本を確認してから生成します。');
+translations.set('自动模式', '自動モード');
+translations.set('分析完成后自动冻结脚本、配音、字幕和音乐设置并生成成片。', '分析後に台本、音声、字幕、音楽設定を固定し、自動で動画を生成します。');
+translations.set('使用当前设置，全自动生成', '現在の設定で自動生成');
+translations.set('正在保存并启动自动生成…', '保存して自動生成を開始しています…');
+translations.set('正在理解剧情并生成解说脚本', '物語を理解し、解説台本を生成しています');
+translations.set('处理时间取决于素材总时长，可稍后返回查看。', '処理時間は素材の長さによって変わります。後で戻って確認できます。');
+translations.set('生成解说文案', '解説台本を生成');
+translations.set('暂未读取到可播放的视频素材', '再生できる動画素材はまだありません');
+translations.set('素材与消耗', '素材と使用量');
+translations.set('源视频预览', '元動画のプレビュー');
+translations.set('尚未读取到可预览的源视频', 'プレビューできる元動画はまだありません');
+translations.set('项目结果｜影创工坊', 'プロジェクト結果｜影创工坊');
+translations.set('可用配音音色', '利用可能な音声');
+translations.set('音色试听', '音声サンプル');
+translations.set('该音色未提供试听', 'この音声にはサンプルがありません');
+translations.set('当前浏览器不支持音频试听', 'このブラウザーでは音声サンプルを再生できません');
+translations.set('解说核对｜影创工坊', '解説確認｜影创工坊');
 
 function localize(value) {
   if (typeof value === "string") return translations.get(value) ?? value;
@@ -201,10 +229,10 @@ export const ja = {
     routeHeading: "新しい AI 動画を作成", description: "制作タイプを選択して素材をアップロード", autosave: "アップロード進捗は自動保存されます",
     types: { narration: { title: "ショートドラマ解説", description: "ナレーションで物語を伝える" }, translation: { title: "動画翻訳", description: "多言語翻訳と吹き替え" }, remix: { title: "ショートドラマリミックス", description: "編集スキル不要でハイライトを抽出" } },
     typeSelector: { title: "制作タイプを選択", ariaLabel: "制作タイプ" },
-    upload: { title: "素材をアップロード", chooseVideos: "動画ファイルを選択", addMore: "追加", dragPrefix: "動画をここにドラッグ、または", chooseFile: "ファイルを選択", limits: "MP4 / MOV / AVI、1ファイル最大5GB、最大{count}本", selectedVideos: "選択した動画", uploadSubtitle: "{name}の字幕をアップロード", removeVideo: "{name}を削除" },
-    subtitle: { matched: "SRT割り当て済み", aiRecognition: "未アップロード・AI認識を使用", pending: "認識待ち・AI認識を使用", clickOrAi: "字幕をアップロード、またはAI認識を使用" },
-    summary: { title: "制作サマリー", duration: "元動画の合計時間", estimated: "予想消費量", balance: "現在の残高", next: "次へ：パラメータ設定" },
-    messages: { invalidVideo: "5GB以内のMP4、MOV、AVIのみ対応しています", maxVideos: "{type}は最大{count}本までアップロードできます", tooMany: "{type}には現在{current}本あり、上限は{count}本です", settingsUnavailable: "パラメータ設定は準備中です", invalidSubtitle: "50MB以内のSRT字幕のみ対応しています" },
+    upload: { title: "素材をアップロード", chooseVideos: "動画ファイルを選択", addMore: "追加", dragPrefix: "動画をここにドラッグ、または", chooseFile: "ファイルを選択", limits: "MP4 / MOV / AVI、1ファイル最大5GB、最大{count}本", selectedVideos: "選択した動画", uploadingMaterials: "素材をアップロード中です。ファイルを追加しないでください。", detectingVideoSubtitles: "動画字幕を検出しています。しばらくお待ちください。", uploadSubtitle: "{name}の字幕をアップロード", removeSubtitle: "{name}を削除", reorderVideo: "{name}の順序を変更", removeVideo: "{name}を削除" },
+    subtitle: { matched: "SRT割り当て済み", aiRecognition: "未アップロード・AI認識を使用", pending: "認識待ち・AI認識を使用", clickOrAi: "字幕をアップロード、またはAI認識を使用", detecting: "字幕領域を検出中（{progress}）" },
+    summary: { title: "制作サマリー", duration: "元動画の合計時間", estimated: "予想消費量", balance: "現在の残高", next: "次へ：パラメータ設定", nextWaiting: "字幕を検出中…", detectingSubtitles: "{count}本の動画の字幕領域を検出中です。完了すると次へ進めます。" },
+    messages: { invalidVideo: "5GB以内のMP4、MOV、AVIのみ対応しています", maxVideos: "{type}は最大{count}本までアップロードできます", tooMany: "{type}には現在{current}本あり、上限は{count}本です", settingsUnavailable: "パラメータ設定は準備中です", invalidSubtitle: "50MB以内のSRT字幕のみ対応しています", orderSaveAfterUploadFailed: "素材はアップロードされましたが、順序を保存できませんでした。ドラッグして再試行してください。", orderSaveFailed: "素材の順序を保存できませんでした。再試行してください。", orderSaveBeforeNextFailed: "素材の順序が保存されていないため、パラメータ設定を開けません。再試行してください。", waitSubtitleDetection: "{count}本の動画の字幕領域を検出中です。完了してから次へ進んでください。" },
   },
   projects: {
     routeHeading: "マイプロジェクト", heading: "マイプロジェクト", description: "すべての制作タスクと生成結果を管理", search: "プロジェクト名を検索", create: "新規制作", notice: "処理中にページを離れても進捗は自動保存されます",
@@ -212,25 +240,124 @@ export const ja = {
     status: { all: "すべてのステータス", complete: "完了", processing: "処理中", processingPercent: "処理中 {progress}%", draft: "下書き", failed: "生成失敗" },
     filters: { ariaLabel: "プロジェクトフィルター", types: "プロジェクトタイプ", status: "ステータスで絞り込む" },
     table: { project: "プロジェクト", type: "タイプ", status: "ステータス", created: "作成日時", credits: "クレジット", actions: "操作", progress: "{name}の処理進捗 {progress}%" },
-    actions: { result: "結果を見る", export: "書き出し", progress: "進捗を見る", continue: "編集を続ける", reason: "理由を見る", retry: "再生成" },
+    actions: { result: "結果を見る", export: "書き出し", exporting: "ダウンロード中…", progress: "進捗を見る", continue: "編集を続ける", reason: "理由を見る", retry: "再生成" },
+    bulkDelete: { selected: "{count} 件選択中", hint: "分析開始前、完了済み、または失敗したタスクのみ削除できます", button: "一括削除（{count}）", selectAll: "このページの削除可能なプロジェクトをすべて選択", selectAllShort: "削除可能項目を全選択", clearAll: "選択を解除", selectProject: "プロジェクト {name} を選択", unavailable: "プロジェクト {name} は処理中のため削除できません", dialogTitle: "選択したプロジェクトを削除しますか？", dialogDescription: "選択した {count} 件のプロジェクトと関連コンテンツを削除します。この操作は取り消せません。", cancel: "キャンセル", confirm: "{count} 件を削除", deleting: "削除中…" },
     empty: { title: "一致するプロジェクトがありません", description: "フィルターを変更するか新規制作を始めてください" },
     pagination: { ariaLabel: "プロジェクトのページ切り替え", previous: "前のページ", next: "次のページ", page: "{page}ページ", perPage: "1ページ{count}件" },
-    messages: { unavailable: "{name}：{action}は準備中です", pageChanged: "{page}ページに切り替えました" },
+    messages: { unavailable: "{name}：{action}は準備中です", retryUnavailable: "{name}：再生成機能は準備中です", retryFailed: "{name}：再生成用の下書きを作成できませんでした。", retryUnsupported: "{name}：このプロジェクト種類では再生成できません", exportStarted: "{name}：生成動画のダウンロードを開始しました", exportVideoUnavailable: "{name}：ダウンロードできる動画が見つかりません", exportFailed: "{name}：動画のダウンロードに失敗しました。時間をおいて再試行してください。", pageChanged: "{page}ページに切り替えました", failureReason: "{name}：生成失敗の理由：{reason}", failureReasonUnavailable: "{name}：失敗理由を取得できませんでした", failureReasonReadFailed: "{name}：失敗理由の取得に失敗しました。時間をおいて再試行してください。", loading: "プロジェクトを読み込み中…", loadFailed: "プロジェクトを読み込めませんでした。時間をおいて再試行してください。", deleteSuccess: "{count} 件のプロジェクトの削除を受け付けました", deletePartial: "{success} 件の削除を受け付け、{failed} 件は失敗しました", deleteFailed: "{count} 件のプロジェクトを削除できませんでした。時間をおいて再試行してください。" },
   },
   editor: {
     routeHeading: "マルチトラック解説エディター", mobileNotice: "マルチトラックの詳細編集にはデスクトップをご利用ください",
-    topbar: { back: "戻る", backAria: "分析ページに戻る", editing: "編集中", autosaved: "自動保存済み", undo: "元に戻す", redo: "やり直す", credits: "制作クレジット", saveDraft: "下書きを保存", generate: "動画を生成" },
-    clips: { highlights: "ハイライト {count} 件", recommend: "もう一度おすすめ", highEnergy: "盛り上がり", add: "クリップを追加" },
+    topbar: { back: "戻る", backAria: "分析ページに戻る", editing: "編集中", autosaved: "自動保存済み", credits: "制作クレジット", saveDraft: "下書きを保存", generate: "動画を生成", readOnly: "閲覧のみ", locked: "ロック済み", saving: "保存中…", saveFailed: "保存に失敗しました", generating: "生成中…", reviewMode: "表形式モード", switchingMode: "切り替え中…" },
+    clips: { highlights: "ハイライト {count} 件" },
     tabs: { script: "解説台本", subtitle: "音声字幕", bgm: "背景音楽" },
-    script: { current: "現在のクリップ台本", input: "現在のクリップ台本を編集", characters: "{count} 文字", rewrite: "AI で書き直す", style: "台本スタイル", styles: { reversal: "鮮烈な逆転", suspense: "サスペンス展開" } },
-    settings: { summary: "クイック設定の概要", voiceRole: "音声キャラクター", volume: "ボリューム {value}%", volumeControl: "音声ボリュームを調整", speed: "話速 {value}×", speedControl: "音声の話速を調整", subtitleStyle: "字幕スタイル", backgroundMusic: "背景音楽", edit: "編集", editVoiceRole: "音声キャラクターを編集", editSubtitleStyle: "字幕スタイルを編集", editBackgroundMusic: "背景音楽を編集" },
-    presets: { voiceRole: "落ち着いた男性音声 · 顧言", subtitleStyle: "ネオン縁取り", bgmStyle: "壮大な雰囲気" },
+    script: { current: "現在のクリップ台本", input: "現在のクリップ台本を編集", characters: "{count} 文字" },
+    settings: { summary: "クイック設定の概要", voiceRole: "音声キャラクター", volume: "ボリューム {value}%", volumeControl: "音声ボリュームを調整", speed: "話速 {value}×", speedControl: "音声の話速を調整", subtitleStyle: "字幕スタイル", backgroundMusic: "背景音楽" },
     subtitle: { title: "字幕ファイルの内容", locked: "タイムライン固定・テキストのみ編集可能", cue: "{time} の字幕を編集" },
-    bgm: { title: "背景音楽", currentFile: "現在のファイル：{file}", reselect: "音楽を選び直してアップロード", hint: "プロトタイプは現在の選択を保存し、書き出し時にバックエンドがアップロードファイルを読み込みます。" },
-    preview: { ariaLabel: "動画プレビュー", safeArea: "セーフエリア", progress: "プレビュー再生位置", start: "先頭へ移動", backOne: "1秒戻る", play: "再生", pause: "一時停止", forwardOne: "1秒進む", end: "末尾へ移動", volume: "ボリューム", speed: "再生速度", fullscreen: "全画面プレビュー" },
+    bgm: { title: "背景音楽", currentFile: "現在のファイル：{file}", none: "未設定" },
+    preview: { ariaLabel: "動画プレビュー", safeArea: "セーフエリア", progress: "プレビュー再生位置", start: "先頭へ移動", backOne: "1秒戻る", play: "再生", pause: "一時停止", forwardOne: "1秒進む", end: "末尾へ移動", fullscreen: "全画面プレビュー" },
     timeline: { ariaLabel: "マルチトラックタイムライン", noOverlap: "クリップ同士は重ねられません", zoomOut: "タイムラインを縮小", zoom: "タイムラインのズーム", zoomIn: "タイムラインを拡大", trimStart: "開始位置をトリミング", trimEnd: "終了位置をトリミング", tracks: { video: "動画クリップ", script: "解説台本", voice: "音声オーディオ", bgm: "背景音楽" } },
     waveform: { voicePreview: "音声プレビュー", bgmWaveform: "背景音楽の波形" },
-    messages: { draftSaved: "下書きを保存しました", clipsRecommended: "クリップを再提案しました", rewriteReady: "AI の書き直しを生成しました" },
-    content: { projectName: "霸总短剧解说 01", defaultCaption: "精绝古城的谜团，正在镜头中一点点揭开。" },
+    messages: { draftSaved: "下書きを保存しました", loading: "エディターの下書きを読み込み中…", readFailed: "エディターの下書きを読み込めません。", invalidDraft: "エディター API のデータが不完全です。", draftUnavailable: "このプロジェクトには編集可能な下書きがありません。分析完了後に再試行してください。", saveFailed: "下書きを保存できません。再試行してください。", saveBeforeGenerateFailed: "下書きを保存できないため、動画生成を開始していません。", switchModeFailed: "下書きを保存できなかったため、表形式モードを開いていません。" },
   },
+  review: {
+    routeHeading: "ショートドラマ解説の手動確認",
+    eyebrow: "MANUAL REVIEW",
+    heading: "解説クリップを確認",
+    description: "各クリップの元動画範囲、画面説明、解説台本、原音設定を確認します。変更内容はマルチトラック下書きと同期されます。",
+    contentLabel: "解説クリップ確認リスト",
+    rowLabel: "解説クリップ {number}",
+    sourcePreview: "{number} 行目の元動画プレビュー",
+    assetSelect: "{number} 行目の元動画を選択",
+    timeInput: "{number} 行目の{field}",
+    pictureInput: "{number} 行目の画面説明を編集",
+    scriptInput: "{number} 行目の解説台本を編集",
+    originalSoundInput: "{number} 行目で元動画の音声を再生するか設定",
+    columns: { sequence: "番号", source: "元動画", timecode: "タイムコード", picture: "画面説明", script: "解説台本", originalSound: "元動画を再生", actions: "操作" },
+    fields: { start: "開始時間", end: "終了時間" },
+    placeholders: { picture: "このクリップの画面内容を説明", script: "このクリップの解説台本を入力" },
+    values: { yes: "はい", no: "いいえ" },
+    actions: {
+      editorMode: "エディターモード", switching: "切り替え中…", save: "下書きを保存", generate: "動画を生成", generating: "生成中…",
+      delete: "削除", deleteRow: "{number} 行目を削除", moveUp: "上へ", moveUpRow: "{number} 行目を上へ移動", moveDown: "下へ", moveDownRow: "{number} 行目を下へ移動", insertAfter: "行を追加", insertAfterRow: "{number} 行目の後に新しい行を追加",
+    },
+    status: { locked: "ロック済み", saving: "保存中…", failed: "保存に失敗", saved: "自動保存済み" },
+    validation: {
+      ready: "{count} 件のクリップを確認済み", pending: "あと {count} 項目の確認が必要です", missingAsset: "再生可能な元動画を選択してください", invalidStart: "開始時間は 0 以上にしてください", invalidEnd: "終了時間は開始時間より後にしてください", outOfRange: "終了時間が元動画の長さを超えています", emptyScript: "解説台本を入力してください", duplicateRegion: "クリップ識別子が重複しています。再読み込みしてください。", emptyRows: "少なくとも 1 件のクリップを残してください", timecode: "HH:MM:SS.mmm 形式で入力してください",
+    },
+    messages: {
+      missingProject: "プロジェクトが指定されていません。タスクフローから手動確認を開いてください。", invalidDraft: "エディター API のデータが不完全です。", draftUnavailable: "確認できる下書きがありません。AI 分析完了後に再試行してください。", readFailed: "確認用の下書きを読み込めません。", saveFailed: "下書きを保存できません。再試行してください。", loading: "確認内容を読み込み中…", fixBeforeSave: "時間または素材のエラーを修正してから保存してください。", switchFailed: "下書きを保存できなかったため、エディターモードを開いていません。", fixBeforeGenerate: "必須項目と時間のエラーをすべて修正してください。", generateFailed: "動画生成を開始できません。再試行してください。", readOnly: "動画はすでに生成処理中です。現在の内容は閲覧のみです。", previewUnavailable: "この素材には再生可能な URL がありません", noAssets: "利用できる動画素材がありません",
+    },
+  },
+  videoTranslation: {
+  "back": "ダッシュボードへ戻る",
+  "name": "動画翻訳",
+  "flow": "動画翻訳フロー",
+  "mode": "制作モード",
+  "modeHint": "Configure how the translation is produced.",
+  "manual": "手動確認",
+  "manualHint": "Review before rendering",
+  "auto": "自動生成",
+  "autoHint": "Run the whole workflow automatically",
+  "language": "翻訳言語",
+  "ratio": "出力比率",
+  "voice": "共通ボイス",
+  "originalSound": "元音声",
+  "mute": "ミュート",
+  "muteHint": "Translated audio only",
+  "keep": "保持",
+  "keepHint": "Mix original and translated audio",
+  "voice_replacement": "音声を置換",
+  "voice_replacementHint": "環境音・効果音・BGMを残し、話者の声だけを翻訳音声に置換します",
+  "voiceReplacementSurcharge": "環境音の保持には音声分離を使用するため、{credits} クレジット/分が追加されます（全ての元動画を合算して切り上げ）。",
+  "noVoiceReplacementSurcharge": "翻訳音声のみでは音声分離を使用しないため、環境音保持の追加料金はかかりません。",
+  "estimatedCost": "元動画は {minutes} 分として課金されます。見積りは {credits} クレジット（環境音保持の追加分 {surcharge} クレジットを含む）です。",
+  "translated_voice_only": "翻訳音声のみ",
+  "translated_voice_onlyHint": "元動画の音声をすべて削除し、翻訳音声だけを残します",
+  "music": "BGM",
+  "musicHint": "Optional background music",
+  "chooseMusic": "BGMを選択",
+  "previous": "戻る",
+  "saving": "Saving…",
+  "start": "AI翻訳を開始",
+  "subtitleLayout": "字幕とマスク設定",
+  "subtitleHint": "Caption areas are detected automatically.",
+  "sourceSubtitle": "元字幕",
+  "targetSubtitle": "翻訳字幕",
+  "keepSource": "元字幕を保持",
+  "recognizing": "字幕を認識中…",
+  "processing": "AI翻訳処理中",
+  "edit": "翻訳セリフを編集",
+  "time": "時間",
+  "source": "元字幕",
+  "target": "翻訳文",
+  "preview": "試聴",
+  "render": "動画を生成",
+  "rendering": "動画を生成中",
+  "complete": "エクスポート完了",
+  "completeHint": "翻訳動画を利用できます。",
+  "download": "ダウンロード",
+  "steps": {
+    "upload": "タスク作成",
+    "settings": "設定",
+    "translation": "AI翻訳",
+    "edit": "セリフ編集",
+    "render": "動画生成"
+  },
+  "languages": {'en': '英語', 'ja': '日本語', 'ko': '韓国語', 'de': 'ドイツ語', 'fr': 'フランス語', 'es': 'スペイン語', 'pt': 'ポルトガル語', 'ru': 'ロシア語', 'vi': 'ベトナム語', 'th': 'タイ語', 'id': 'インドネシア語', 'ar': 'アラビア語'},
+  "ratios": {"original": "元の比率", "9:16": "9:16", "16:9": "16:9", "1:1": "1:1", "4:3": "4:3", "3:4": "3:4"},
+  "errors": {
+    "config": "Unable to load settings",
+    "project": "Missing project ID",
+    "save": "Unable to save settings",
+    "music": "Unable to upload music",
+    "progress": "Unable to load progress",
+    "segments": "Unable to load lines",
+    "limit": "Preview is limited to 100 characters or words",
+    "preview": "Preview failed",
+    "render": "Render failed",
+    "result": "Unable to load the export result"
+  }
+}
 };
+translations.set('AI 视频生成｜影创工坊', 'AI動画生成｜スタジオ');

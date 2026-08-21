@@ -5,6 +5,14 @@ redis_url = "redis://127.0.0.1:6379/4"
 redis_key_prefix = "narrato:business:"
 celery_broker_url = "redis://127.0.0.1:6379/5"
 celery_queue_prefix = "narrato.business"
+# Celery beat 触发、Business Worker 直接轮询第三方模型任务并转存产物；前端只读取本地任务状态。
+ai_video_poll_interval_seconds = 15.0
+ai_video_poll_batch_size = 100
+ai_video_poll_lease_seconds = 60.0
+ai_video_poll_max_backoff_seconds = 300.0
+ai_video_poll_max_errors = 12
+# submitting 状态等待此时长后，才由 Worker 用本地任务幂等键恢复供应商提交。
+ai_video_submission_recovery_delay_seconds = 60.0
 core_base_url = "https://core.example.com"
 # 仅本机开发允许 http://127.0.0.1 或 http://localhost 的 Core 服务。
 allow_insecure_core_loopback = false
@@ -22,6 +30,15 @@ smtp_use_starttls = true
 verification_code_hmac_secret = "replace-with-high-entropy-hmac-secret"
 verification_code_ttl_seconds = 600
 session_ttl_seconds = 2592000
+# Admin uses a distinct token namespace; set an independent 32+ byte random secret in production.
+admin_session_ttl_seconds = 28800
+admin_session_hmac_secret = "replace-with-separate-admin-session-secret"
+# First startup after Alembic creates this separate Admin superuser once. Store only in private config.
+admin_bootstrap_username = "Admin"
+admin_bootstrap_password = "replace-with-strong-admin-password"
+admin_bootstrap_display_name = "Admin"
+# Comma-separated origins for the separately deployed admin UI; leave empty to reject cross-origin browser access.
+admin_cors_origins = "https://admin.example.com"
 auth_redis_timeout_seconds = 3.0
 password_argon2_time_cost = 3
 password_argon2_memory_cost_kib = 65536
@@ -30,6 +47,8 @@ password_argon2_parallelism = 2
 oss_endpoint = ""
 # 浏览器 H5 表单直传地址：协议 + Bucket + Endpoint，例如 https://example-bucket.oss-cn-shanghai.aliyuncs.com。
 oss_url = ""
+# 当配置 oss_url 时，必须同步设置对象的公开 CDN 地址。
+cdn_public_base_url = ""
 oss_bucket = ""
 oss_access_key_id = ""
 oss_access_key_secret = ""

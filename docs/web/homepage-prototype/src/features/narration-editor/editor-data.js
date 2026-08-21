@@ -1,69 +1,106 @@
-const MEDIA_ROOT = '/media/narration-editor';
-
-export const EDITOR_MEDIA = {
-  videos: [
-    `${MEDIA_ROOT}/古墓迷宫震全球1.mp4`,
-    `${MEDIA_ROOT}/古墓迷宫震全球2.mp4`,
-    `${MEDIA_ROOT}/古墓迷宫震全球3.mp4`,
-  ],
-  posters: [
-    `${MEDIA_ROOT}/episode-1-poster.jpg`,
-    `${MEDIA_ROOT}/episode-2-poster.jpg`,
-    `${MEDIA_ROOT}/episode-3-poster.jpg`,
-  ],
-  audio: `${MEDIA_ROOT}/0e5bf3db017e0e593c4eef4144d7c68a.mp3`,
-  subtitles: `${MEDIA_ROOT}/古墓迷宫震全球3.srt`,
-};
-
-function toSeconds(timestamp) {
-  const [hours, minutes, secondsAndMilliseconds] = timestamp.trim().split(':');
-  const [seconds, milliseconds = '0'] = secondsAndMilliseconds.replace('.', ',').split(',');
-
-  return (Number(hours) * 3600)
-    + (Number(minutes) * 60)
-    + Number(seconds)
-    + (Number(milliseconds.padEnd(3, '0').slice(0, 3)) / 1000);
-}
-
-/**
- * Parses a standard SRT document into timeline-friendly cues.
- * Multi-line captions are normalized into a single readable line.
- */
-export function parseSrt(text) {
-  return [...text.matchAll(/(?:^|\n)\s*\d+\s*\n([\d:,.]+)\s*-->\s*([\d:,.]+)[^\n]*\n([\s\S]*?)(?=\n\s*\n|$)/g)]
-    .map(([, start, end, body]) => ({
-      start: toSeconds(start),
-      end: toSeconds(end),
-      text: body.trim().replace(/\n+/g, ' '),
-    }))
-    .filter((cue) => cue.text);
-}
-
 export const findCue = (cues, seconds) => cues.find(
   (cue) => cue.start <= seconds && seconds < cue.end,
 ) ?? null;
 
-const SCRIPT_SEGMENTS = [
-  '古墓入口的谜团，正从这片沙海中浮现。',
-  '真实存在的精绝古城，藏着远超传说的秘密。',
-  '这座地下王国的核心，正等待被重新发现。',
-];
+const EDITOR_DRAFT_VERSION = 1;
+const TRACK_IDS = new Set(['video', 'script', 'voice', 'bgm']);
 
-// Read from the approved local MP4 files with ffprobe: 180s, 180s, 90s.
-export const VIDEO_DURATIONS = [180, 180, 90];
+function finiteNumber(value, fallback) {
+  if (value === null || value === undefined || value === '') return fallback;
+  const number = Number(value);
+  return Number.isFinite(number) ? number : fallback;
+}
 
-/** @type {Array<{id:string, trackId:'video'|'script'|'voice'|'bgm', start:number, duration:number, sourceStart?:number, assetId?:string, text?:string, regionId?:string}>} */
-export const INITIAL_CLIPS = [
-  ...EDITOR_MEDIA.videos.flatMap((assetId, index) => {
-    const start = VIDEO_DURATIONS.slice(0, index).reduce((total, duration) => total + duration, 0);
-    const duration = VIDEO_DURATIONS[index];
-    const regionId = `segment-${index + 1}`;
+function validClip(clip) {
+  return clip && typeof clip.id === 'string' && TRACK_IDS.has(clip.trackId)
+    && Number.isFinite(clip.start) && clip.start >= 0
+    && Number.isFinite(clip.duration) && clip.duration > 0
+    && (clip.trackId === 'script' || (typeof clip.assetId === 'string' && typeof clip.assetUrl === 'string'));
+}
 
-    return [
-      { id: `video-${index + 1}`, trackId: 'video', start, duration, sourceStart: 0, assetId, regionId },
-      { id: `script-${index + 1}`, trackId: 'script', start, duration, text: SCRIPT_SEGMENTS[index], regionId },
-      { id: `voice-${index + 1}`, trackId: 'voice', start, duration, sourceStart: start, assetId: EDITOR_MEDIA.audio, regionId },
-    ];
-  }),
-  { id: 'bgm-1', trackId: 'bgm', start: 0, duration: 450, sourceStart: 0, assetId: EDITOR_MEDIA.audio, regionId: 'music-bed' },
-];
+/** 将交互态收敛为可由服务端完整覆盖保存的草稿，不保存播放头、选区等瞬时 UI 状态。 */
+export function createEditorDraft({ clips, cues, voiceRole, volume, rate, subtitleStyle, videoRatio, backgroundMusic }) {
+  const settings = {
+    voice_role: voiceRole,
+    volume: Number(volume),
+    rate: Number(rate),
+    subtitle_style: subtitleStyle,
+    video_ratio: videoRatio,
+  };
+  if (backgroundMusic?.assetId && backgroundMusic?.cdnUrl) {
+    settings.background_music = {
+      asset_id: backgroundMusic.assetId,
+      cdn_url: backgroundMusic.cdnUrl,
+      volume: Number(backgroundMusic.volume),
+      ...(backgroundMusic.filename ? { filename: backgroundMusic.filename } : {}),
+    };
+  }
+  return {
+    version: EDITOR_DRAFT_VERSION,
+    clips: clips.map(({ id, trackId, start, duration, sourceStart, assetId, assetUrl, text, regionId, picture, originalSound }) => ({
+      id, track_id: trackId, start, duration, ...(Number.isFinite(sourceStart) ? { source_start: sourceStart } : {}),
+      ...(typeof assetId === 'string' ? { asset_id: assetId } : {}), ...(typeof assetUrl === 'string' ? { asset_url: assetUrl } : {}), ...(typeof text === 'string' ? { text } : {}),
+      ...(typeof regionId === 'string' ? { region_id: regionId } : {}),
+      ...(trackId === 'script' ? {
+        picture: typeof picture === 'string' ? picture : '',
+        original_sound: originalSound === true,
+      } : {}),
+    })),
+    subtitles: cues.map(({ start, end, text, regionId }) => ({
+      start,
+      end,
+      text,
+      ...(typeof regionId === 'string' ? { region_id: regionId } : {}),
+    })),
+    settings,
+  };
+}
+
+/** 仅接受当前编辑器能够安全渲染的真实 API 字段；不提供本地演示数据回退。 */
+export function readEditorDraft(content) {
+  if (!content || typeof content !== 'object') return null;
+  const clips = Array.isArray(content.clips) ? content.clips.map((clip) => ({
+    id: clip.id, trackId: clip.track_id, start: Number(clip.start), duration: Number(clip.duration),
+    sourceStart: Number.isFinite(Number(clip.source_start)) ? Number(clip.source_start) : undefined,
+    assetId: clip.asset_id, assetUrl: clip.asset_url, text: clip.text, regionId: clip.region_id,
+    ...(clip.track_id === 'script' ? {
+      picture: typeof clip.picture === 'string' ? clip.picture : '',
+      originalSound: clip.original_sound === true,
+    } : {}),
+  })).filter(validClip) : [];
+  if (!clips.length) return null;
+  const cues = Array.isArray(content.subtitles) ? content.subtitles
+    .map((cue) => ({
+      start: Number(cue.start),
+      end: Number(cue.end),
+      text: cue.text,
+      ...(typeof cue.region_id === 'string' ? { regionId: cue.region_id } : {}),
+    }))
+    .filter((cue) => Number.isFinite(cue.start) && Number.isFinite(cue.end) && cue.end > cue.start && typeof cue.text === 'string') : [];
+  const settings = content.settings && typeof content.settings === 'object' ? content.settings : {};
+  const rawBackgroundMusic = settings.background_music && typeof settings.background_music === 'object'
+    ? settings.background_music
+    : null;
+  const backgroundMusic = rawBackgroundMusic
+    && typeof rawBackgroundMusic.asset_id === 'string'
+    && typeof rawBackgroundMusic.cdn_url === 'string'
+    ? {
+      assetId: rawBackgroundMusic.asset_id,
+      cdnUrl: rawBackgroundMusic.cdn_url,
+      filename: typeof rawBackgroundMusic.filename === 'string' ? rawBackgroundMusic.filename : '',
+      volume: finiteNumber(rawBackgroundMusic.volume, 50),
+    }
+    : null;
+  return {
+    clips,
+    cues,
+    settings: {
+      voiceRole: typeof settings.voice_role === 'string' ? settings.voice_role : '',
+      volume: finiteNumber(settings.volume, 100),
+      rate: finiteNumber(settings.rate, 1),
+      subtitleStyle: typeof settings.subtitle_style === 'string' ? settings.subtitle_style : '',
+      videoRatio: typeof settings.video_ratio === 'string' ? settings.video_ratio : '',
+      backgroundMusic,
+    },
+  };
+}

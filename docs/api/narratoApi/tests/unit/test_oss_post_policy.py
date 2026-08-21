@@ -1,14 +1,22 @@
 from __future__ import annotations
 
 import base64
+import hashlib
+import hmac
 import json
-from datetime import date
+from datetime import UTC, date, datetime
+from email.utils import format_datetime
+from typing import Any
 
 import pytest
 
-from narrato_api.assets.constraints import AssetDeclarationError
+from narrato_api.assets.constraints import AssetDeclarationError, validate_asset_declaration
 from narrato_api.assets.service import project_for_update_statement
-from narrato_api.integrations.oss_client import HttpOssClient, OssPostPolicyService
+from narrato_api.integrations.oss_client import (
+    HttpOssClient,
+    OssClientError,
+    OssPostPolicyService,
+)
 
 
 def test_oss_client_composes_bucket_url_from_endpoint_host() -> None:
@@ -17,6 +25,66 @@ def test_oss_client_composes_bucket_url_from_endpoint_host() -> None:
     assert client.public_url("game339", "narrato/api/episode.mp4") == (
         "https://game339.oss-cn-shanghai.aliyuncs.com/narrato/api/episode.mp4"
     )
+
+
+def test_oss_delete_uses_aliyun_access_key_signature(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    now = datetime(2026, 8, 5, 8, 9, 10, tzinfo=UTC)
+    captured: dict[str, Any] = {}
+
+    class _Response:
+        def __enter__(self) -> _Response:
+            return self
+
+        def __exit__(self, *args: object) -> None:
+            return None
+
+    def fake_urlopen(request: Any, *, timeout: int) -> _Response:
+        captured["request"] = request
+        captured["timeout"] = timeout
+        return _Response()
+
+    monkeypatch.setattr("narrato_api.integrations.oss_client.urlopen", fake_urlopen)
+    client = HttpOssClient(
+        endpoint="oss-cn-shanghai.aliyuncs.com",
+        access_key_id="access-key",
+        access_key_secret="access-secret",
+        now=lambda: now,
+    )
+
+    client.delete_object("game339", "narrato/api/episode.mp4")
+
+    request = captured["request"]
+    request_date = format_datetime(now, usegmt=True)
+    string_to_sign = (
+        "DELETE\n\n\n" f"{request_date}\n" "/game339/narrato/api/episode.mp4"
+    )
+    signature = base64.b64encode(
+        hmac.new(
+            b"access-secret", string_to_sign.encode("utf-8"), hashlib.sha1
+        ).digest()
+    ).decode("ascii")
+    assert request.full_url == (
+        "https://game339.oss-cn-shanghai.aliyuncs.com/" "narrato/api/episode.mp4"
+    )
+    assert request.method == "DELETE"
+    assert request.get_header("Date") == request_date
+    assert request.get_header("Authorization") == f"OSS access-key:{signature}"
+    assert captured["timeout"] == 10
+
+
+def test_oss_delete_requires_access_key_credentials(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        "narrato_api.integrations.oss_client.urlopen",
+        lambda *args, **kwargs: pytest.fail("network must not be called"),
+    )
+    client = HttpOssClient(endpoint="oss-cn-shanghai.aliyuncs.com")
+
+    with pytest.raises(OssClientError, match="OSS delete is not configured"):
+        client.delete_object("game339", "narrato/api/episode.mp4")
 
 
 def test_video_policy_uses_fixed_api_prefix_type_and_300_mib_limit() -> None:
@@ -123,3 +191,19 @@ def test_video_reservation_uses_postgresql_project_row_lock() -> None:
     statement = project_for_update_statement(user_id="usr_1", project_id="prj_1")
 
     assert "FOR UPDATE" in str(statement.compile(dialect=postgresql.dialect()))
+
+
+def test_image_policy_uses_fixed_mime_and_20_mib_limit() -> None:
+    service = OssPostPolicyService(
+        upload_url="https://uploads.example.test", bucket="narrato",
+        access_key_id="key", access_key_secret="secret", today=lambda: date(2026, 7, 17), token_factory=lambda: "image-token",
+    )
+    policy = service.create_policy(asset_type="image", filename="reference.PNG", size_bytes=20_971_520, existing_video_count=0)
+    assert policy.key == "narrato/api/2026/07/17/image-token.png"
+    assert policy.fields["Content-Type"] == "image/png"
+    assert policy.max_size_bytes == 20_971_520
+
+
+def test_ai_video_video_capacity_can_exceed_legacy_five_limit() -> None:
+    declaration = validate_asset_declaration(asset_type="video", filename="reference.mp4", size_bytes=1, existing_video_count=9, max_video_count=50)
+    assert declaration.extension == ".mp4"

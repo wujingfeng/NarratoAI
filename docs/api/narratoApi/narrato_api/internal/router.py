@@ -12,6 +12,8 @@ from narrato_api.api.dependencies import get_request_id, get_settings
 from narrato_api.api.errors import ApiError
 from narrato_api.api.responses import ApiResponse, StrictModel
 from narrato_api.config import Settings
+from narrato_api.integrations.core_client import HttpCoreClient
+from narrato_api.workflows.orchestrator import WorkflowDispatchError, WorkflowOrchestrator
 from narrato_api.workflows.reconciler import WorkflowReconciler
 
 router = APIRouter()
@@ -25,7 +27,7 @@ class CoreCallbackEvent(StrictModel):
     core_task_id: str = Field(min_length=1, max_length=128)
     attempt_no: int = Field(ge=0)
     state_version: int = Field(ge=0)
-    status: Literal["succeeded", "failed"]
+    status: Literal["succeeded", "failed", "cancelled"]
     result: dict[str, object] = Field(default_factory=dict)
     error: dict[str, object] | None = None
 
@@ -62,6 +64,30 @@ def get_workflow_reconciler(request: Request) -> WorkflowReconciler:
     )
 
 
+def get_analysis_core_client(
+    settings: Annotated[Settings, Depends(get_settings)],
+) -> HttpCoreClient:
+    """创建用于提交分析节点的 Core 客户端。"""
+
+    return HttpCoreClient(
+        base_url=str(settings.core_base_url), request_token=settings.core_request_token
+    )
+
+
+def get_workflow_orchestrator(
+    request: Request,
+    settings: Annotated[Settings, Depends(get_settings)],
+) -> WorkflowOrchestrator:
+    """构造回调提交后可立即推进下游节点的编排器。"""
+
+    return WorkflowOrchestrator(
+        lambda: sessionmaker(
+            bind=request.app.state.database_engine, expire_on_commit=False
+        )(),
+        video_translation_model_id=settings.video_translation_model_id,
+    )
+
+
 @router.post(
     "/internal/core/callbacks",
     response_model=ApiResponse[CoreCallbackReceipt],
@@ -72,6 +98,10 @@ def receive_core_callback(
     idempotency_key: Annotated[str | None, Header(alias="X-Idempotency-Key")] = None,
     reconciler: Annotated[
         WorkflowReconciler | None, Depends(get_workflow_reconciler)
+    ] = None,
+    core_client: Annotated[HttpCoreClient | None, Depends(get_analysis_core_client)] = None,
+    orchestrator: Annotated[
+        WorkflowOrchestrator | None, Depends(get_workflow_orchestrator)
     ] = None,
     request_id: Annotated[str, Depends(get_request_id)] = "",
 ) -> ApiResponse[CoreCallbackReceipt]:
@@ -85,6 +115,8 @@ def receive_core_callback(
         )
     if reconciler is None:
         raise RuntimeError("workflow reconciler dependency is unavailable")
+    if core_client is None or orchestrator is None:
+        raise RuntimeError("workflow dispatch dependencies are unavailable")
     accepted = reconciler.reconcile_callback(
         core_task_id=body.core_task_id,
         event_id=body.event_id,
@@ -96,6 +128,16 @@ def receive_core_callback(
             "attempt_no": body.attempt_no,
         },
     )
+    # 事务已在 reconcile_callback 中提交；成功回调即时推进下游，避免依赖
+    # beat 的下一轮扫描。提交失败时 Outbox 保持 pending，由重放任务可靠恢复。
+    if accepted and body.status == "succeeded":
+        try:
+            orchestrator.dispatch_ready(
+                workflow_id=reconciler.workflow_id_for_core_task(body.core_task_id),
+                core_client=core_client,
+            )
+        except (LookupError, WorkflowDispatchError):
+            pass
     return ApiResponse(
         code="CORE_CALLBACK_ACCEPTED",
         message="Core callback accepted",

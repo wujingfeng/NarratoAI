@@ -10,7 +10,7 @@ from narrato_api.api.responses import StrictModel
 class UploadPolicyRequest(StrictModel):
     """申请单个 OSS 表单所需的受限文件声明。"""
 
-    asset_type: Literal["video", "subtitle"]
+    asset_type: Literal["image", "video", "subtitle", "audio"]
     filename: str = Field(min_length=1, max_length=255)
     size_bytes: int = Field(ge=0)
     content_type: str = Field(min_length=1, max_length=128)
@@ -36,3 +36,22 @@ class AssetData(StrictModel):
 
     id: str
     status: Literal["validating", "ready", "invalid"]
+    cdn_url: str
+
+
+class AssetRemovalData(StrictModel):
+    """素材删除成功响应。"""
+
+    removed: bool
+
+
+class AssetOrderRequest(StrictModel):
+    """用户确认的完整视频素材顺序。"""
+
+    asset_ids: list[str] = Field(min_length=1, max_length=5)
+
+
+class AssetOrderData(StrictModel):
+    """服务端持久化后的规范视频素材顺序。"""
+
+    asset_ids: list[str]

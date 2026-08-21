@@ -35,6 +35,23 @@ class Settings(BaseSettings):
     allow_insecure_core_loopback: bool = False
     core_request_token: str = Field(default="", repr=False)
     core_callback_token: str = Field(default="", repr=False)
+    video_translation_model_id: str = Field(
+        default="model_qwen_plus", min_length=1, max_length=40
+    )
+    workflow_poll_interval_seconds: float = Field(default=15.0, ge=1, le=300)
+    workflow_outbox_replay_interval_seconds: float = Field(default=5.0, ge=1, le=300)
+    workflow_outbox_lease_seconds: float = Field(default=60.0, ge=5, le=3600)
+    project_deletion_sweep_interval_seconds: float = Field(default=10.0, ge=1, le=300)
+    # AI 视频供应商状态由 Celery beat/worker 主动收敛；Web refresh 仅作手动兜底。
+    ai_video_poll_interval_seconds: float = Field(default=15.0, ge=1, le=300)
+    ai_video_poll_batch_size: int = Field(default=100, ge=1, le=1000)
+    # Provider adapter caps one HTTP call at 30s; keep the DB lease above it.
+    ai_video_poll_lease_seconds: float = Field(default=60.0, ge=35, le=3600)
+    ai_video_poll_max_backoff_seconds: float = Field(default=300.0, ge=1, le=3600)
+    ai_video_poll_max_errors: int = Field(default=12, ge=1, le=100)
+    ai_video_submission_recovery_delay_seconds: float = Field(
+        default=60.0, ge=5, le=3600
+    )
     readiness_timeout_seconds: float = Field(default=3.0, ge=1, le=30)
     smtp_host: str = ""
     smtp_port: int = Field(default=587, ge=1, le=65535)
@@ -49,12 +66,20 @@ class Settings(BaseSettings):
     verification_code_ttl_seconds: int = Field(default=600, ge=60, le=3600)
     verification_code_send_lease_seconds: int = Field(default=30, ge=5, le=300)
     session_ttl_seconds: int = Field(default=2_592_000, ge=300, le=7_776_000)
+    admin_session_ttl_seconds: int = Field(default=28_800, ge=300, le=86_400)
+    admin_session_hmac_secret: str = Field(default="", repr=False)
+    admin_bootstrap_username: str = "Admin"
+    admin_bootstrap_password: str = Field(default="", repr=False)
+    admin_bootstrap_display_name: str = "Admin"
+    admin_cors_origins: str = ""
     auth_redis_timeout_seconds: float = Field(default=3.0, gt=0, le=30)
     password_argon2_time_cost: int = Field(default=3, ge=1, le=10)
     password_argon2_memory_cost_kib: int = Field(default=65_536, ge=8_192, le=262_144)
     password_argon2_parallelism: int = Field(default=2, ge=1, le=8)
     oss_endpoint: str = ""
+    # Browser uploads still go directly to OSS; persisted asset URLs must use CDN.
     oss_url: str = ""
+    cdn_public_base_url: str = ""
     oss_bucket: str = ""
     oss_access_key_id: str = Field(default="", repr=False)
     oss_access_key_secret: str = Field(default="", repr=False)
@@ -115,6 +140,23 @@ class Settings(BaseSettings):
             raise ValueError("OSS URL must be a credential-free HTTPS URL")
         return value.rstrip("/")
 
+    @field_validator("cdn_public_base_url")
+    @classmethod
+    def require_absolute_https_cdn_url(cls, value: str) -> str:
+        """CDN 公网基地址必须是无凭据 HTTPS URL。"""
+
+        if not value:
+            return value
+        parsed = urlsplit(value)
+        if (
+            parsed.scheme != "https"
+            or not parsed.netloc
+            or parsed.username
+            or parsed.password
+        ):
+            raise ValueError("CDN public base URL must be a credential-free HTTPS URL")
+        return value.rstrip("/")
+
     @model_validator(mode="after")
     def validate_verification_delivery_timeouts(self) -> Settings:
         """校验 Core 传输边界、验证码发送超时与 SMTP TLS 模式。"""
@@ -129,6 +171,11 @@ class Settings(BaseSettings):
                 raise ValueError(
                     "HTTP core_base_url requires allow_insecure_core_loopback on a loopback host"
                 )
+
+        if self.oss_url and not self.cdn_public_base_url:
+            raise ValueError(
+                "cdn_public_base_url is required when oss_url is configured"
+            )
 
         if self.smtp_use_ssl and self.smtp_use_starttls:
             raise ValueError("smtp_use_ssl and smtp_use_starttls cannot both be true")

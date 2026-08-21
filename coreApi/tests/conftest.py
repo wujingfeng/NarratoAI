@@ -49,7 +49,7 @@ def settings(tmp_path) -> Settings:
         service_token="test-service-token",
         callback_token="test-callback-token",
         callback_url="https://narrato.example.test/api/v1/internal/core/callbacks",
-        oss_public_base_url="https://cdn.example.test",
+        cdn_public_base_url="https://cdn.example.test",
         cdn_allowed_hosts=["cdn.example.test"],
         work_root=tmp_path / "work",
     )

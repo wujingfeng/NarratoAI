@@ -84,8 +84,8 @@ for (const [locale, resources] of Object.entries({ "zh-CN": zhCN, en, ja })) {
   assert.equal(resources.home.demo.kicker, "CASE DEMO", `${locale} demo kicker must come from resources`);
 }
 
-const task5ResourceRoots = ["projectResult", "narration", "analysis"];
-const task5EqualContentBoundaries = new Set(["narration.ratios.landscape", "narration.ratios.square"]);
+const task5ResourceRoots = ["narration", "analysis"];
+const task5EqualContentBoundaries = new Set();
 const readResourceLeaves = (value, prefix = "", leaves = new Map()) => {
   for (const [key, child] of Object.entries(value)) {
     const resourcePath = prefix ? `${prefix}.${key}` : key;
@@ -103,7 +103,7 @@ for (const [locale, resources] of Object.entries({ en, ja })) {
   }
 }
 
-const editorEqualContentBoundaries = new Set(["editor.content.projectName", "editor.content.defaultCaption"]);
+const editorEqualContentBoundaries = new Set();
 for (const [locale, resources] of Object.entries({ "zh-CN": zhCN, en, ja })) {
   assert.equal(typeof resources.editor, "object", `${locale} must define Task 6 editor resources`);
 }
@@ -394,26 +394,22 @@ try {
   await page.getByLabel(ja.editor.script.input).waitFor();
   await page.getByLabel(ja.editor.preview.progress).waitFor();
   await page.getByLabel(ja.editor.timeline.zoom).waitFor();
-  for (const label of [ja.editor.preview.start, ja.editor.preview.play, ja.editor.preview.forwardOne, ja.editor.preview.end, ja.editor.preview.volume, ja.editor.preview.fullscreen]) {
+  for (const label of [ja.editor.preview.start, ja.editor.preview.play, ja.editor.preview.forwardOne, ja.editor.preview.end, ja.editor.preview.fullscreen]) {
     await page.getByRole("button", { name: label, exact: true }).waitFor();
   }
-  await page.getByLabel(ja.editor.preview.speed, { exact: true }).waitFor();
   assert.deepEqual(
     await page.locator(".timeline-row > label").evaluateAll((labels) => labels.map((label) => label.lastChild.textContent.trim())),
     Object.values(ja.editor.timeline.tracks),
   );
   assert.ok(await page.getByRole("button", { name: ja.editor.timeline.trimStart, exact: true }).count() > 0);
   assert.ok(await page.getByRole("button", { name: ja.editor.timeline.trimEnd, exact: true }).count() > 0);
-  for (const preset of Object.values(ja.editor.presets)) await page.locator(".inspector-settings").getByText(preset, { exact: true }).waitFor();
-  for (const action of [ja.editor.settings.editVoiceRole, ja.editor.settings.editSubtitleStyle, ja.editor.settings.editBackgroundMusic]) {
-    await page.getByRole("button", { name: action, exact: true }).waitFor();
-  }
+  await page.getByLabel(ja.editor.settings.volumeControl, { exact: true }).waitFor();
+  await page.getByLabel(ja.editor.settings.speedControl, { exact: true }).waitFor();
   await page.getByRole("button", { name: ja.editor.tabs.subtitle, exact: true }).click();
   await page.locator(".subtitle-editor textarea").first().waitFor();
   await page.getByLabel(ja.editor.subtitle.cue.replace("{time}", "00:00"), { exact: true }).waitFor();
   await page.getByRole("button", { name: ja.editor.tabs.bgm, exact: true }).click();
   await page.getByText(ja.editor.bgm.currentFile.replace("{file}", "0e5bf3db017e0e593c4eef4144d7c68a.mp3"), { exact: true }).waitFor();
-  await page.getByText(ja.editor.bgm.reselect, { exact: true }).waitFor();
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth), true, "editor must not create page-level horizontal overflow");
   await page.setViewportSize({ width: 1024, height: 900 });
   const compactSwitcherBox = await page.getByTestId("language-switcher-trigger").boundingBox();

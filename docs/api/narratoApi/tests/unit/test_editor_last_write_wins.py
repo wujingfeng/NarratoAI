@@ -23,6 +23,7 @@ def _editor_service() -> tuple[EditorService, sessionmaker]:
                 user_id="usr_lww",
                 product="short_drama",
                 status="waiting_for_edit",
+                current_stage="edit",
             )
         )
         session.add(

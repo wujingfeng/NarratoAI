@@ -9,8 +9,8 @@ from sqlalchemy import (
     Float,
     ForeignKey,
     Index,
+    Integer,
     String,
-    UniqueConstraint,
 )
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -28,7 +28,7 @@ class Asset(Base):
 
     __tablename__ = "assets"
     __table_args__ = (
-        CheckConstraint("asset_type IN ('video', 'subtitle')", name="ck_assets_type"),
+        CheckConstraint("asset_type IN ('image', 'video', 'subtitle', 'audio')", name="ck_assets_type"),
         CheckConstraint(
             "status IN ('validating', 'ready', 'invalid')", name="ck_assets_status"
         ),
@@ -36,7 +36,7 @@ class Asset(Base):
             "length(filename) BETWEEN 1 AND 255", name="ck_assets_filename_length"
         ),
         CheckConstraint("size_bytes >= 0", name="ck_assets_size_bytes"),
-        UniqueConstraint("bucket", "object_key", name="uq_assets_bucket_object_key"),
+        CheckConstraint("sort_order >= 0", name="ck_assets_sort_order"),
         Index("ix_assets_project_type", "project_id", "asset_type"),
         Index("ix_assets_user_created", "user_id", "created_at"),
     )
@@ -57,6 +57,7 @@ class Asset(Base):
     object_key: Mapped[str] = mapped_column(String(1024), nullable=False)
     cdn_url: Mapped[str] = mapped_column(String(2048), nullable=False)
     size_bytes: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     duration_seconds: Mapped[float | None] = mapped_column(Float, nullable=True)
     core_task_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
     reservation_expires_at: Mapped[datetime | None] = mapped_column(

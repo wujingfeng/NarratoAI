@@ -133,6 +133,23 @@ def test_media_probe_post_is_202_idempotent_and_dispatches_once(api_client):
     assert status.json()["data"]["artifacts"] == []
 
 
+def test_media_probe_post_accepts_background_music_audio(api_client):
+    client, dispatcher = api_client
+    response = client.post(
+        "/api/v1/media-probe/tasks",
+        headers={**AUTH, "X-Idempotency-Key": "audio-probe"},
+        json={
+            "source_url": "https://cdn.example.test/narrato/api/theme.mp3",
+            "media_type": "audio",
+            "declared_extension": "mp3",
+        },
+    )
+
+    assert response.status_code == 202
+    assert response.json()["data"]["status"] == "queued"
+    assert len(dispatcher.task_ids) == 1
+
+
 def test_dispatch_outbox_recovers_first_broker_failure(app, settings):
     Base.metadata.create_all(get_engine(settings))
     failing = FailingDispatcher()

@@ -37,3 +37,9 @@
 .editor-inspector nav button,.timeline-row>label{overflow-wrap:anywhere;line-height:1.2;white-space:normal}
 @media(max-width:1279px){.editor-topbar>.editor-status,.editor-topbar>.editor-save{display:none}}
 @media(max-width:1023px){.editor-shell:before{content:attr(data-mobile-notice)}}
+
+/* The alternate review mode is a separate route; save the shared draft before leaving. */
+.editor-topbar>.editor-mode{display:flex;align-items:center;gap:7px;min-height:38px;margin-left:auto;padding:0 13px;border:1px solid #394a66;border-radius:8px;background:#0b1524;color:#dce5f2;white-space:nowrap}
+.editor-topbar>.editor-mode:hover:not(:disabled){border-color:#8d61e8;background:#151a32;color:#fff}
+.editor-topbar>.editor-mode:disabled{cursor:not-allowed;opacity:.5}
+.editor-topbar>.editor-mode+.editor-status{margin-left:0}

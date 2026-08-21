@@ -31,12 +31,13 @@ def _register_artifact(
     artifact_id: str,
     project_id: str,
     created_at: datetime,
+    kind: str = "video",
 ) -> None:
     session.add(
         RegisteredArtifact(
             id=artifact_id,
             project_id=project_id,
-            kind="video",
+            kind=kind,
             cdn_url=f"https://cdn.example.test/exports/{artifact_id}.mp4",
             created_at=created_at,
         )
@@ -70,12 +71,14 @@ def test_list_registered_artifacts_returns_completed_projects_artifacts_in_stabl
             artifact_id="art_a",
             project_id=project.id,
             created_at=created_at,
+            kind="subtitle",
         )
         _register_artifact(
             session,
             artifact_id="art_later",
             project_id=project.id,
             created_at=datetime(2026, 7, 18, tzinfo=timezone.utc),
+            kind="voice",
         )
         _register_artifact(
             session,

@@ -86,9 +86,9 @@ class SmtpMailClient:
         if any(char in email for char in "\r\n"):
             raise ValueError("SMTP header injection rejected")
         subject = (
-            "NarratoAI 注册验证码"
+            "影创工坊 注册验证码"
             if purpose == "register"
-            else "NarratoAI 密码重置验证码"
+            else "影创工坊 密码重置验证码"
         )
         message = EmailMessage()
         message["From"] = self.sender

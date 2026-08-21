@@ -1,5 +1,11 @@
 const MIN_DURATION = 0.5;
 
+function finiteNumber(value, fallback) {
+  if (value === null || value === undefined || value === "") return fallback;
+  const number = Number(value);
+  return Number.isFinite(number) ? number : fallback;
+}
+
 function sortedTrackClips(clips, trackId, excludedId) {
   return clips.filter((clip) => clip.trackId === trackId && clip.id !== excludedId).sort((a, b) => a.start - b.start);
 }
@@ -18,15 +24,25 @@ function replaceClip(state, id, transform) {
   return state.map((clip) => clip.id === id ? transform(clip) : clip);
 }
 
-export function createEditorState(clips) {
+export function createEditorState(clips, settings = {}) {
+  const persistentSettings = {
+    voiceRole: settings.voiceRole || "",
+    volume: finiteNumber(settings.volume, 100),
+    rate: finiteNumber(settings.rate, 1),
+    subtitleStyle: settings.subtitleStyle || "",
+    videoRatio: settings.videoRatio || "",
+    backgroundMusic: settings.backgroundMusic || null,
+  };
+  if (!clips.length) return { clips: [], activeClipIds: [], playhead: 0, isPlaying: false, pixelsPerSecond: 1, rulerZoom: 1, minimumZoom: 1, ...persistentSettings, toast: "" };
   const timelineDuration = Math.max(...clips.map((clip) => clip.start + clip.duration));
   const usableWidth = Math.max(320, (typeof window === "undefined" ? 1440 : window.innerWidth) * .85 - 125);
   const minimumZoom = Math.max(1, Math.floor((usableWidth / timelineDuration) * 10) / 10);
-  return { clips, activeClipIds: ["video-1"], playhead: 0, isPlaying: false, pixelsPerSecond: minimumZoom, rulerZoom: minimumZoom, minimumZoom, voiceRole: "沉稳男声·顾言", volume: 90, rate: 1.05, toast: "" };
+  return { clips, activeClipIds: [clips.find((clip) => clip.trackId === "video")?.id].filter(Boolean), playhead: 0, isPlaying: false, pixelsPerSecond: minimumZoom, rulerZoom: minimumZoom, minimumZoom, ...persistentSettings, toast: "" };
 }
 
 export function editorReducer(state, action) {
   switch (action.type) {
+    case "hydrate": return createEditorState(action.clips, action.settings);
     case "seek": return { ...state, playhead: Math.max(0, action.seconds) };
     case "playing": return { ...state, isPlaying: action.value };
     case "select": return { ...state, activeClipIds: action.append ? [...new Set([...state.activeClipIds, ...action.ids])] : action.ids };

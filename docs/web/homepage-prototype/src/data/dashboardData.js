@@ -26,7 +26,7 @@ export const dashboardNavItems = [
   navItem("create", MagicWand, "main", "/dashboard/create"),
   navItem("projects", ClockCounterClockwise, "main", "/dashboard/projects"),
   navItem("narration", FilmSlate, "tools", "/dashboard/narration/settings"),
-  navItem("translation", Translate, "tools"),
+  navItem("translation", Translate, "tools", "/dashboard/video-translation/upload"),
   navItem("remix", Scissors, "tools"),
   navItem("credits", Coins, "account"),
   navItem("account", UserCircle, "account"),
@@ -47,6 +47,7 @@ export const dashboardTools = [
     descriptionKey: "dashboard.featuredTools.video.description",
     tone: "violet",
     icon: VideoCamera,
+    to: "/dashboard/ai-video",
     unavailableMessageKey: "dashboard.unavailable.aiVideo",
   },
   {
@@ -60,8 +61,8 @@ export const dashboardTools = [
 ];
 
 export const dashboardCreationEntries = [
-  { id: "narration", titleKey: "dashboard.creationEntries.narration.title", descriptionKey: "dashboard.creationEntries.narration.description", icon: FilmSlate, to: "/dashboard/create", tone: "violet" },
-  { id: "translation", titleKey: "dashboard.creationEntries.translation.title", descriptionKey: "dashboard.creationEntries.translation.description", icon: Translate, unavailableMessageKey: "dashboard.unavailable.translation", tone: "cyan" },
+  { id: "narration", titleKey: "dashboard.creationEntries.narration.title", descriptionKey: "dashboard.creationEntries.narration.description", icon: FilmSlate, to: "/dashboard/narration/settings", tone: "violet" },
+  { id: "translation", titleKey: "dashboard.creationEntries.translation.title", descriptionKey: "dashboard.creationEntries.translation.description", icon: Translate, to: "/dashboard/video-translation/upload", tone: "cyan" },
   { id: "remix", titleKey: "dashboard.creationEntries.remix.title", descriptionKey: "dashboard.creationEntries.remix.description", icon: Scissors, unavailableMessageKey: "dashboard.unavailable.remix", tone: "orange" },
 ];
 
@@ -92,14 +93,6 @@ export const dashboardCases = [
   { id: "case-reversal-04", titleKey: "dashboard.cases.reversal.title", metaKey: "dashboard.cases.reversal.meta", video: "https://gamecdn.beiyinapp.com/2026-02-10/86ff488a26d0a9566ee68864070710bb.mp4", tone: "violet", unavailableMessageKey: "dashboard.unavailable.case" },
   { id: "case-action-04", titleKey: "dashboard.cases.action.title", metaKey: "dashboard.cases.action.meta", video: "https://gamecdn.beiyinapp.com/2026-02-10/5ddbe9d8975e28965b0669d46412a71f.mp4", tone: "orange", unavailableMessageKey: "dashboard.unavailable.case" },
 ];
-
-export const recentProjects = [
-  { id: "narration-01", title: "霸总短剧解说 01", type: "narration", titleKey: null, status: "complete", statusKey: "dashboard.status.complete", progress: null, credits: 120, image: "/assets/short-drama-thumb.webp" },
-  { id: "remix-city", title: "都市逆袭 · 混剪", type: "remix", titleKey: null, status: "processing", statusKey: "dashboard.status.processing", progress: 66, credits: 80, image: "/assets/film-action-thumb.webp" },
-  { id: "translation-mystery", title: "悬疑短剧翻译", type: "translation", titleKey: null, status: "draft", statusKey: "dashboard.status.draft", progress: null, credits: 150, image: "/assets/documentary-thumb.webp" },
-];
-
-export const dashboardCredits = { balance: 1280, monthlyUsed: 240 };
 
 export const inspirations = [
   {

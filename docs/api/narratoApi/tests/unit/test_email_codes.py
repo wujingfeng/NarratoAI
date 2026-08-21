@@ -185,6 +185,7 @@ def test_smtp_ssl_uses_implicit_tls_without_starttls(monkeypatch) -> None:
     """465 隐式 TLS 必须使用 SMTP_SSL，不能再协商 STARTTLS。"""
 
     calls: list[str] = []
+    subjects: list[str] = []
 
     class Connection:
         def __enter__(self):
@@ -204,7 +205,7 @@ def test_smtp_ssl_uses_implicit_tls_without_starttls(monkeypatch) -> None:
             calls.append("login")
 
         def send_message(self, message):
-            del message
+            subjects.append(str(message["Subject"]))
             calls.append("send")
 
     def smtp_ssl(host, port, *, timeout):
@@ -229,6 +230,7 @@ def test_smtp_ssl_uses_implicit_tls_without_starttls(monkeypatch) -> None:
     )
 
     assert calls == ["ssl", "ehlo", "login", "send"]
+    assert subjects == ["影创工坊 注册验证码"]
 
 
 def test_smtp_tls_modes_are_mutually_exclusive() -> None:

@@ -6,10 +6,12 @@ import pytest
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import sessionmaker
 
+from narrato_api.assets.models import Asset
 from narrato_api.auth.models import User
 from narrato_api.billing.models import CreditAccount, CreditLedger
 from narrato_api.billing.service import BillingService, InsufficientCreditsError
 from narrato_api.database import Base
+from narrato_api.projects.models import Project
 
 
 def _billing_service() -> tuple[BillingService, sessionmaker, str]:
@@ -113,3 +115,65 @@ def test_cli_grant_is_idempotent_against_a_migrated_sqlite_database(
         entries = session.scalars(select(CreditLedger)).all()
         assert account is not None and account.balance == 25
         assert len(entries) == 1
+
+
+def test_cli_rewrites_only_legacy_oss_asset_urls(
+    tmp_path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    from alembic import command
+    from alembic.config import Config
+
+    from narrato_api.cli import main
+
+    database_path = tmp_path / "assets.db"
+    project_root = Path(__file__).resolve().parents[2]
+    alembic_config = Config(str(project_root / "alembic.ini"))
+    alembic_config.set_main_option("script_location", str(project_root / "migrations"))
+    alembic_config.set_main_option("sqlalchemy.url", f"sqlite:///{database_path}")
+    command.upgrade(alembic_config, "head")
+
+    engine = create_engine(f"sqlite:///{database_path}")
+    sessions = sessionmaker(bind=engine, expire_on_commit=False)
+    with sessions.begin() as session:
+        session.add_all(
+            [
+                User(id="usr_cli", email="cli@example.com", password_hash="test-hash"),
+                Project(id="prj_cli", user_id="usr_cli", product="short_drama"),
+                Asset(
+                    id="ast_legacy",
+                    user_id="usr_cli",
+                    project_id="prj_cli",
+                    asset_type="video",
+                    status="ready",
+                    filename="episode.mp4",
+                    bucket="bucket",
+                    object_key="narrato/api/episode.mp4",
+                    cdn_url="https://bucket.oss.example.test/narrato/api/episode.mp4",
+                    size_bytes=100,
+                ),
+            ]
+        )
+    engine.dispose()
+
+    config_path = tmp_path / "cli.toml"
+    config_path.write_text(
+        "\n".join(
+            [
+                f'database_url = "sqlite:///{database_path}"',
+                'oss_url = "https://bucket.oss.example.test"',
+                'cdn_public_base_url = "https://cdn.example.test"',
+            ]
+        )
+        + "\n"
+    )
+    monkeypatch.setenv("NARRATO_API_CONFIG", str(config_path))
+
+    assert main(["assets", "rewrite-cdn-urls"]) == 0
+    assert capsys.readouterr().out == "would_update=1\n"
+    assert main(["assets", "rewrite-cdn-urls", "--apply"]) == 0
+    assert capsys.readouterr().out == "updated=1\n"
+
+    with sessions() as session:
+        asset = session.get(Asset, "ast_legacy")
+        assert asset is not None
+        assert asset.cdn_url == "https://cdn.example.test/narrato/api/episode.mp4"

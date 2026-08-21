@@ -2,8 +2,15 @@ from __future__ import annotations
 
 import json
 from contextlib import contextmanager
+from urllib.error import HTTPError
 
-from narrato_api.integrations.core_client import HttpCoreClient, MediaProbeResult
+import pytest
+
+from narrato_api.integrations.core_client import (
+    CoreClientRejectedError,
+    HttpCoreClient,
+    MediaProbeResult,
+)
 
 
 class FakeResponse:
@@ -61,3 +68,19 @@ def test_core_client_polls_real_task_endpoint_after_202(monkeypatch) -> None:
     )
     assert [item.get_method() for item in requests] == ["POST", "GET"]
     assert requests[1].full_url.endswith("/api/v1/tasks/core_1")
+
+
+def test_core_client_reports_core_validation_rejection_separately(monkeypatch) -> None:
+    def reject(*_args: object, **_kwargs: object) -> None:
+        raise HTTPError("https://core.example.test/api/v1/media-probe/tasks", 422, "", {}, None)
+
+    monkeypatch.setattr("narrato_api.integrations.core_client.urlopen", reject)
+    client = HttpCoreClient(base_url="https://core.example.test", request_token="token")
+
+    with pytest.raises(CoreClientRejectedError):
+        client.probe_media(
+            source_url="https://cdn.example.test/narrato/api/theme.mp3",
+            media_type="audio",
+            declared_extension="mp3",
+            caller_task_id="ast_audio",
+        )

@@ -19,7 +19,7 @@ export function CreationSummary({ durationLabel, estimatedCredits, balance, onNe
         </div>
         <div>
           <dt>{t("create.summary.balance")}</dt>
-          <dd className="create-summary__balance">{formatNumber(balance)}</dd>
+          <dd className="create-summary__balance">{Number.isFinite(balance) ? formatNumber(balance) : "—"}</dd>
         </div>
       </dl>
       <button className="create-summary__next" type="button" onClick={onNext} disabled={disabled}>

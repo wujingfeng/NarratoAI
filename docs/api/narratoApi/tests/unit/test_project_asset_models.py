@@ -87,3 +87,16 @@ def test_project_and_asset_persist_user_ownership_and_timestamps() -> None:
         assert project is not None and project.created_at is not None
         assert asset is not None and asset.created_at is not None
         assert project.user_id == asset.user_id == "usr_1"
+
+
+def test_asset_database_constraints_allow_image_assets() -> None:
+    engine = create_database_engine("sqlite:///:memory:")
+    Base.metadata.create_all(engine)
+    with Session(engine) as session:
+        session.add(User(id="usr_image", email="image@example.com", password_hash="hash"))
+        session.flush()
+        session.add(Project(id="prj_image", user_id="usr_image", product="ai_video"))
+        session.flush()
+        session.add(Asset(id="ast_image", user_id="usr_image", project_id="prj_image", asset_type="image", status="ready", filename="reference.png", bucket="narrato", object_key="narrato/api/reference.png", cdn_url="https://cdn.example/reference.png", size_bytes=1))
+        session.commit()
+        assert session.get(Asset, "ast_image").asset_type == "image"

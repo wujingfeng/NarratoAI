@@ -149,6 +149,20 @@ def test_analysis_rejects_max_tokens_above_frozen_model_limit(
     assert response.json()["code"] == "MAX_TOKENS_EXCEEDED"
 
 
+def test_analysis_rejects_original_sound_ratio_outside_streamlit_options(
+    analysis_client,
+):
+    client, _, analysis_model, _ = analysis_client
+    body = analysis_body(analysis_model)
+    body["config_snapshot"] = {"original_sound_ratio": 35}
+    response = client.post(
+        "/api/v1/video-analysis/tasks",
+        headers=headers("invalid-original-sound-ratio"),
+        json=body,
+    )
+    assert response.status_code == 422
+
+
 def test_analysis_post_is_idempotent_and_extra_forbid(analysis_client, settings):
     client, dispatcher, analysis_model, _ = analysis_client
     body = analysis_body(analysis_model)

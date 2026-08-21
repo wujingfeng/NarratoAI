@@ -20,6 +20,7 @@ from narrato_api.editor.service import (
     EditorDraftNotFoundError,
     EditorLockedError,
     EditorProjectNotFoundError,
+    EditorRenderSnapshotError,
     EditorService,
     EditorWorkflowNotFoundError,
 )
@@ -40,6 +41,8 @@ def _editor_error(error: Exception) -> ApiError:
         return ApiError("EDITOR_NOT_FOUND", "Editor draft not found", 404)
     if isinstance(error, (EditorLockedError, EditorWorkflowNotFoundError)):
         return ApiError("EDITOR_LOCKED", "Editor is locked", 409)
+    if isinstance(error, EditorRenderSnapshotError):
+        return ApiError("EDITOR_RENDER_INVALID", str(error), 422)
     raise error
 
 
@@ -121,6 +124,7 @@ def submit_render(
         EditorProjectNotFoundError,
         EditorWorkflowNotFoundError,
         EditorDraftNotFoundError,
+        EditorRenderSnapshotError,
     ) as error:
         raise _editor_error(error) from error
     return ApiResponse(

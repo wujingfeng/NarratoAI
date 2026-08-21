@@ -83,8 +83,8 @@ def test_stale_attempt_cannot_complete_task(task_service, task, session):
     assert task.status == CoreTaskStatus.SUCCEEDED
 
 
-def test_retry_limit_means_initial_plus_three_automatic_retries(task_service):
-    """默认三次自动重试允许四个 attempt。"""
+def test_lease_expiration_does_not_consume_business_retry_budget(task_service):
+    """进程中断可持续创建新 attempt，不能因服务重启耗尽业务重试。"""
 
     core_task = task_service.create_core_task(
         caller="narrato-api",
@@ -113,8 +113,9 @@ def test_retry_limit_means_initial_plus_three_automatic_retries(task_service):
     task_service.session.commit()
     assert task_service.expire_and_restart(attempt.id, retry_delay_seconds=0) is None
     session_task = task_service.get_task(core_task.id)
-    assert session_task.status == CoreTaskStatus.FAILED
+    assert session_task.status == CoreTaskStatus.RETRY_WAIT
     assert session_task.current_attempt_no == 4
+    assert session_task.retry_count == 0
 
 
 def test_terminal_task_cannot_return_to_running(task_service, task):
@@ -172,6 +173,47 @@ def test_retryable_failure_preserves_error_and_schedules_retry(
         )
     )
     assert dispatch is not None and dispatch.available_at > dispatch.created_at
+
+
+def test_processing_failures_still_respect_business_retry_budget(task_service):
+    """Provider/媒体临时错误使用独立预算，避免真正故障无限循环。"""
+
+    core_task = task_service.create_core_task(
+        caller="narrato-api",
+        route="/api/v1/tasks/tts",
+        task_type="tts",
+        idempotency_key="business-retry-budget",
+        input_snapshot={"text": "hello"},
+        max_retries=1,
+    )
+    first = task_service.start_attempt(core_task.id)
+    task_service.fail_attempt(
+        first.id,
+        first.lease_token,
+        {"code": "PROVIDER_TEMPORARY"},
+        retryable=True,
+        lease_version=first.lease_version,
+        retry_delay_seconds=0,
+    )
+    current = task_service.get_task(core_task.id)
+    assert current.retry_count == 1
+    second = task_service.claim_dispatched_task(
+        core_task.id,
+        expected_state_version=current.state_version,
+        not_before=utc_now() - timedelta(seconds=1),
+    )
+    assert second is not None
+    task_service.fail_attempt(
+        second.id,
+        second.lease_token,
+        {"code": "PROVIDER_TEMPORARY"},
+        retryable=True,
+        lease_version=second.lease_version,
+        retry_delay_seconds=0,
+    )
+    failed = task_service.get_task(core_task.id)
+    assert failed.status == CoreTaskStatus.FAILED
+    assert failed.error == {"code": "RETRY_EXHAUSTED", "retryable": False}
 
 
 def test_deterministic_failure_enters_terminal_failed(task_service, task):

@@ -5,8 +5,14 @@ const source = (file) => readFile(new URL(`../src/${file}`, import.meta.url), "u
 
 const app = await source("App.jsx");
 const page = await source("pages/CreatePage.jsx");
+const narrationSettingsPage = await source("pages/NarrationSettingsPage.jsx");
 const summary = await source("components/create/CreationSummary.jsx");
+const typeSelector = await source("components/create/CreationTypeSelector.jsx");
+const uploadPanel = await source("components/create/VideoUploadPanel.jsx");
+const uploadedVideoList = await source("components/create/UploadedVideoList.jsx");
+const projectApi = await source("features/projects/projectApi.js");
 const createData = await source("data/createData.js");
+const dashboardData = await source("data/dashboardData.js");
 
 assert.match(app, /import\s+\{\s*CreatePage\s*\}/, "CreatePage must be imported by App");
 assert.match(app, /path="\/create"\s+element=\{<RequireAuth><CreatePage \/><\/RequireAuth>\}/, "CreatePage must be exposed as protected /create route");
@@ -14,6 +20,23 @@ assert.match(createData, /export const creationTypes/, "create data must provide
 assert.match(createData, /export const initialCreateVideos/, "create data must provide initial videos");
 assert.match(page, /estimateProjectCost/, "CreatePage must read the API cost estimate");
 assert.match(page, /canStartProject/, "CreatePage must gate start on asset readiness");
+assert.match(page, /!canStart \|\| isUploading \|\| isReordering \|\| apiCredits !== null/, "CreatePage must not estimate cost while an upload or reorder is in progress");
+assert.match(page, /reorderProjectVideoAssets/, "CreatePage must persist the visible video order");
+assert.match(page, /subtitleAssetStatus:\s*"uploading"/, "Subtitle selection must invalidate stale ready state before requesting an upload policy");
+assert.match(page, /export function CreateUploadFlow/, "CreatePage must expose its real upload and estimate flow for tool entry reuse");
+assert.match(narrationSettingsPage, /<CreateUploadFlow fixedType="narration"/, "Narration entry must reuse the real create upload flow");
+assert.match(narrationSettingsPage, /currentStage=\{projectId \? currentStage : "create"\}/, "Narration entry must show the create stage before a project exists");
+assert.doesNotMatch(narrationSettingsPage, /请先创建任务并上传素材，再设置参数/, "Narration entry must not fall back to the old blocking alert");
+assert.match(dashboardData, /id:\s*"narration"[\s\S]*?to:\s*"\/dashboard\/narration\/settings"/, "Dashboard narration card must open the narration feature directly");
 assert.match(summary, /disabled=\{disabled\}/, "start control must receive disabled state");
 assert.match(summary, /estimatedCredits/, "start control must render API fee data");
+assert.match(summary, /create-summary__next/, "summary must keep the pre-merge action styling hook");
+assert.match(typeSelector, /create-type-section/, "type selector must keep the pre-merge section layout");
+assert.match(typeSelector, /create-type-grid/, "type selector must keep the pre-merge card grid");
+assert.match(uploadPanel, /create-upload-section/, "upload panel must keep the pre-merge upload layout");
+assert.match(uploadPanel, /UploadedVideoList/, "upload panel must use the pre-merge video row layout");
+assert.match(uploadedVideoList, /DndContext/, "video rows must support pointer and keyboard reordering");
+assert.match(uploadedVideoList, /sortableKeyboardCoordinates/, "video reordering must remain keyboard accessible");
+assert.match(projectApi, /assets\/order[\s\S]*method:\s*"POST"[\s\S]*asset_ids/, "video order must be sent through the public project order action API");
+assert.match(createData, /FilmSlate/, "creation types must retain the pre-merge visual icons");
 console.log("PASS create route and project-start flow");

@@ -1,8 +1,9 @@
-import { apiRequest } from "../../services/httpClient.js";
+import { ApiError, apiRequest } from "../../services/httpClient.js";
 
 /** 浏览器直传的单文件上限；服务端策略同样会再次校验。 */
 export const MAX_UPLOAD_SIZE_BYTES = 300 * 1024 * 1024;
 export const MAX_SUBTITLE_SIZE_BYTES = 5 * 1024 * 1024;
+export const MAX_AUDIO_SIZE_BYTES = 100 * 1024 * 1024;
 
 const CONTENT_TYPE_BY_EXTENSION = {
   video: {
@@ -14,6 +15,13 @@ const CONTENT_TYPE_BY_EXTENSION = {
     // OSS POST Policy 对 SRT 统一使用二进制 MIME，避免浏览器推断差异。
     ".srt": "application/octet-stream",
   },
+  audio: {
+    ".mp3": "audio/mpeg",
+    ".wav": "audio/wav",
+    ".m4a": "audio/mp4",
+    ".aac": "audio/aac",
+    ".ogg": "audio/ogg",
+  },
 };
 
 function fileExtension(filename) {
@@ -23,11 +31,11 @@ function fileExtension(filename) {
 
 function declaration(file, assetType) {
   const contentType = CONTENT_TYPE_BY_EXTENSION[assetType]?.[fileExtension(file.name)];
-  if (!contentType) throw new Error(assetType === "subtitle" ? "仅支持 SRT 字幕文件" : "不支持的文件格式");
+  if (!contentType) throw new Error(assetType === "subtitle" ? "仅支持 SRT 字幕文件" : assetType === "audio" ? "仅支持 MP3、WAV、M4A、AAC 或 OGG 音频文件" : "不支持的文件格式");
 
-  const maxSize = assetType === "subtitle" ? MAX_SUBTITLE_SIZE_BYTES : MAX_UPLOAD_SIZE_BYTES;
+  const maxSize = assetType === "subtitle" ? MAX_SUBTITLE_SIZE_BYTES : assetType === "audio" ? MAX_AUDIO_SIZE_BYTES : MAX_UPLOAD_SIZE_BYTES;
   if (file.size > maxSize) {
-    throw new Error(assetType === "subtitle" ? "字幕文件不能超过 5 MiB" : "单个文件不能超过 300 MiB");
+    throw new Error(assetType === "subtitle" ? "字幕文件不能超过 5 MiB" : assetType === "audio" ? "背景音乐不能超过 100 MiB" : "单个文件不能超过 300 MiB");
   }
 
   return {
@@ -54,8 +62,16 @@ export async function uploadAsset(projectId, file, assetType, dependencies = {})
   Object.entries(policy.fields).forEach(([key, value]) => form.append(key, value));
   form.append("key", policy.key);
   form.append("file", file);
-  const ossResponse = await postToOss(policy.url, form);
-  if (!ossResponse.ok) throw new Error(`OSS upload failed: ${ossResponse.status || "unknown"}`);
+  let ossResponse;
+  try {
+    ossResponse = await postToOss(policy.url, form);
+  } catch (error) {
+    if (error?.name === "AbortError") throw error;
+    throw new ApiError(0, "OSS_UPLOAD_UNAVAILABLE", "OSS upload failed", null);
+  }
+  if (!ossResponse.ok) {
+    throw new ApiError(ossResponse.status || 0, "OSS_UPLOAD_REJECTED", "OSS upload failed", null);
+  }
 
   return request(`/projects/${projectId}/uploads/complete`, {
     method: "POST",

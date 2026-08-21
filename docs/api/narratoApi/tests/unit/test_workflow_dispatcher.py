@@ -70,8 +70,9 @@ def test_pending_event_is_claimed_once_and_woken_with_its_stable_idempotency_key
     dispatcher, sessions, event_id = _dispatcher()
     wakes: list[tuple[str, str]] = []
 
-    def wake_up(claimed_event_id: str, idempotency_key: str) -> None:
+    def wake_up(claimed_event_id: str, idempotency_key: str) -> bool:
         wakes.append((claimed_event_id, idempotency_key))
+        return True
 
     assert dispatcher.dispatch(event_id, wake_up)
     assert not dispatcher.dispatch(event_id, wake_up)
@@ -93,7 +94,7 @@ def test_pending_event_is_claimed_once_and_woken_with_its_stable_idempotency_key
 def test_wake_failure_returns_claimed_event_to_durable_retryable_state() -> None:
     dispatcher, sessions, event_id = _dispatcher()
 
-    def wake_up(_event_id: str, _idempotency_key: str) -> None:
+    def wake_up(_event_id: str, _idempotency_key: str) -> bool:
         raise RuntimeError("broker unavailable")
 
     assert not dispatcher.dispatch(event_id, wake_up)
@@ -105,3 +106,37 @@ def test_wake_failure_returns_claimed_event_to_durable_retryable_state() -> None
         1,
         None,
     )
+
+
+def test_no_ready_node_keeps_event_pending_for_the_next_replay() -> None:
+    dispatcher, sessions, event_id = _dispatcher()
+
+    assert not dispatcher.dispatch(event_id, lambda _event_id, _key: False)
+
+    with sessions() as session:
+        event = session.get(WorkflowOutbox, event_id)
+    assert event is not None and (event.status, event.attempt_count, event.sent_at) == (
+        "pending",
+        1,
+        None,
+    )
+
+
+def test_expired_sending_lease_is_requeued_for_automatic_replay() -> None:
+    dispatcher, sessions, event_id = _dispatcher()
+    with sessions.begin() as session:
+        event = session.get(WorkflowOutbox, event_id)
+        assert event is not None
+        event.status = "sending"
+        event.dispatch_lease_id = "lost-worker"
+        event.dispatch_started_at = utc_now() - timedelta(seconds=61)
+
+    assert dispatcher.requeue_expired_sending(lease_seconds=60) == 1
+
+    with sessions() as session:
+        event = session.get(WorkflowOutbox, event_id)
+    assert event is not None and (
+        event.status,
+        event.dispatch_lease_id,
+        event.dispatch_started_at,
+    ) == ("pending", None, None)

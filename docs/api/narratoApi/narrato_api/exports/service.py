@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 from hashlib import sha256
 from typing import Any, NotRequired, Protocol, TypedDict, cast
 
@@ -14,6 +14,7 @@ from narrato_api.integrations.core_client import (
     CoreJianyingResource,
 )
 from narrato_api.projects.service import lookup_completed_project_result
+from narrato_api.workflows.models import Workflow, WorkflowNode, WorkflowNodeAttempt
 
 
 class JianyingResource(TypedDict):
@@ -70,6 +71,79 @@ _CORE_DESTINATIONS = {
 }
 
 
+def _result_containers(result: object) -> list[Mapping[str, object]]:
+    """兼容 Core 终态在回调和轮询路径中的一层包装差异。"""
+
+    if not isinstance(result, Mapping):
+        return []
+    containers = [result]
+    nested = result.get("result")
+    if isinstance(nested, Mapping):
+        containers.append(nested)
+    return containers
+
+
+def _load_final_render_snapshot(
+    session: Session,
+    *,
+    project_id: str,
+    revision: EditorRevision,
+) -> tuple[list[dict[str, Any]], dict[str, object]]:
+    """读取与 Revision 对应的最终成片时间轴，而不是原素材裁剪时间。"""
+
+    attempts = session.scalars(
+        select(WorkflowNodeAttempt)
+        .join(WorkflowNode, WorkflowNode.id == WorkflowNodeAttempt.workflow_node_id)
+        .join(Workflow, Workflow.id == WorkflowNode.workflow_id)
+        .where(
+            Workflow.project_id == project_id,
+            WorkflowNode.name == "video_render",
+            WorkflowNodeAttempt.state == "completed",
+        )
+        .order_by(
+            WorkflowNodeAttempt.completed_at.desc(),
+            WorkflowNodeAttempt.attempt_number.desc(),
+        )
+    )
+    for attempt in attempts:
+        for container in _result_containers(attempt.result):
+            metadata = container.get("metadata")
+            if not isinstance(metadata, Mapping) or metadata.get("snapshot_id") != revision.id:
+                continue
+            snapshot = metadata.get("jianying_snapshot")
+            if not isinstance(snapshot, Mapping):
+                continue
+            timeline = snapshot.get("timeline")
+            video = snapshot.get("video")
+            if (
+                isinstance(timeline, list)
+                and all(isinstance(item, Mapping) for item in timeline)
+                and isinstance(video, Mapping)
+                and type(video.get("width")) is int
+                and type(video.get("height")) is int
+                and type(video.get("duration")) in (int, float)
+            ):
+                return [dict(item) for item in timeline], dict(video)
+
+    # 兼容早期已经把最终时间轴直接冻结到 Revision 顶层的历史数据。
+    legacy_timeline = revision.content.get("timeline")
+    if isinstance(legacy_timeline, list) and all(
+        isinstance(item, Mapping) for item in legacy_timeline
+    ):
+        return [dict(item) for item in legacy_timeline], {}
+    raise JianyingManifestSnapshotNotFoundError(
+        "final render snapshot was not found"
+    )
+
+
+def _canonical_content_type(value: object) -> str:
+    """资源协议比较 MIME 主类型，忽略合法的 charset 等参数。"""
+
+    if not isinstance(value, str):
+        return ""
+    return value.partition(";")[0].strip().lower()
+
+
 def build_jianying_manifest(
     artifacts: Iterable[RegisteredArtifact],
 ) -> JianyingManifest:
@@ -118,23 +192,40 @@ def build_owned_completed_project_jianying_manifest(
     )
     if revision is None:
         raise JianyingManifestSnapshotNotFoundError("editor revision was not found")
-    timeline = revision.content.get("timeline")
-    if not isinstance(timeline, list):
-        raise JianyingManifestSnapshotNotFoundError(
-            "editor revision timeline was not found"
-        )
+    timeline, video_metadata = _load_final_render_snapshot(
+        session,
+        project_id=result.project_id,
+        revision=revision,
+    )
     resources = build_jianying_manifest(result.artifacts)["resources"]
     core_resources: list[CoreJianyingResource] = []
     for resource, artifact in zip(
         resources, sorted(result.artifacts, key=lambda item: item.id)
     ):
         if not all(key in resource for key in ("size", "checksum", "content_type")):
-            raise ValueError("registered artifact Core metadata is incomplete")
+            raise JianyingManifestSnapshotNotFoundError(
+                "registered artifact Core metadata is incomplete"
+            )
         core_kind = _CORE_KIND_ALIASES.get(artifact.kind, artifact.kind)
         core_directory, core_extension = _CORE_DESTINATIONS.get(
             core_kind, ("resource", ".bin")
         )
         digest = sha256(artifact.id.encode("utf-8")).hexdigest()[:32]
+        width = resource.get("width")
+        height = resource.get("height")
+        duration = resource.get("duration")
+        if core_kind == "video":
+            width = width if width is not None else video_metadata.get("width")
+            height = height if height is not None else video_metadata.get("height")
+            duration = duration if duration is not None else video_metadata.get("duration")
+            if (
+                type(width) is not int
+                or type(height) is not int
+                or type(duration) not in (int, float)
+            ):
+                raise JianyingManifestSnapshotNotFoundError(
+                    "rendered video metadata is incomplete"
+                )
         core_resources.append(
             CoreJianyingResource(
                 kind=core_kind,
@@ -142,10 +233,10 @@ def build_owned_completed_project_jianying_manifest(
                 url=resource["cdn_url"],
                 size=resource["size"],
                 checksum=resource["checksum"],
-                content_type=resource["content_type"],
-                width=resource.get("width"),
-                height=resource.get("height"),
-                duration=resource.get("duration"),
+                content_type=_canonical_content_type(resource["content_type"]),
+                width=cast(int | None, width),
+                height=cast(int | None, height),
+                duration=cast(float | None, duration),
             )
         )
     return core_client.build_jianying_manifest(

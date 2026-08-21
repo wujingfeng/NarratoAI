@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from contextlib import contextmanager
+from hashlib import sha256
 
 import pytest
 from sqlalchemy import create_engine
@@ -12,6 +13,29 @@ from narrato_api.auth.models import User
 from narrato_api.database import Base
 from narrato_api.editor.models import EditorRevision
 from narrato_api.projects.models import Project
+
+
+def _complete_artifacts(project_id: str) -> list[RegisteredArtifact]:
+    return [
+        RegisteredArtifact(
+            id=f"art_{kind}",
+            project_id=project_id,
+            kind=kind,
+            cdn_url=f"https://cdn.example.test/final.{extension}",
+            size=1024,
+            checksum="sha256:" + "a" * 64,
+            content_type=content_type,
+            width=1920 if kind == "video" else None,
+            height=1080 if kind == "video" else None,
+            duration=1.0 if kind in {"video", "voice"} else None,
+        )
+        for kind, extension, content_type in (
+            ("video", "mp4", "video/mp4"),
+            ("subtitle", "srt", "application/x-subrip"),
+            ("voice", "wav", "audio/wav"),
+            ("timeline", "json", "application/json"),
+        )
+    ]
 
 
 class FakeResponse:
@@ -150,18 +174,7 @@ def test_owned_completed_project_manifest_uses_latest_revision_and_core_resource
                         ]
                     },
                 ),
-                RegisteredArtifact(
-                    id="art_1",
-                    project_id="prj_1",
-                    kind="video",
-                    cdn_url="https://cdn.example.test/final.mp4",
-                    size=1024,
-                    checksum="sha256:" + "a" * 64,
-                    content_type="video/mp4",
-                    width=1920,
-                    height=1080,
-                    duration=1.0,
-                ),
+                *_complete_artifacts("prj_1"),
             ]
         )
         session.commit()
@@ -180,9 +193,13 @@ def test_owned_completed_project_manifest_uses_latest_revision_and_core_resource
     assert core.request["timeline"] == [
         {"source_asset_id": "ast_1", "start": 0, "end": 1, "narration": "Hi"}
     ]
-    resource = core.request["resources"][0]
+    assert len(core.request["resources"]) == 4
+    resource = next(
+        item for item in core.request["resources"] if item.kind == "video"
+    )
     assert resource.kind == "video"
-    assert resource.zip_path == "assets/video/a462bcfc56c8dc6f20f67e81eab83864.mp4"
+    artifact_digest = sha256(b"art_video").hexdigest()[:32]
+    assert resource.zip_path == f"assets/video/{artifact_digest}.mp4"
     assert resource.url == "https://cdn.example.test/final.mp4"
     assert (resource.size, resource.checksum, resource.content_type) == (
         1024,
@@ -207,6 +224,7 @@ def test_owned_completed_project_manifest_rejects_missing_revision() -> None:
                 id="prj_1", user_id="usr_1", product="short_drama", status="completed"
             )
         )
+        session.add_all(_complete_artifacts("prj_1"))
         session.commit()
 
         with pytest.raises(JianyingManifestSnapshotNotFoundError) as error:

@@ -86,7 +86,7 @@ def test_required_configuration_rejects_invalid_task7_security_semantics(setting
     )
     assert (
         required_configuration_is_present(
-            base.model_copy(update={"oss_public_base_url": "http://cdn.example.test"})
+            base.model_copy(update={"cdn_public_base_url": "http://cdn.example.test"})
         )
         is False
     )
@@ -125,6 +125,14 @@ def test_required_configuration_rejects_invalid_task7_security_semantics(setting
     assert (
         required_configuration_is_present(
             base.model_copy(update={"callback_url": "https://127.0.0.1/callback"})
+        )
+        is False
+    )
+    assert (
+        required_configuration_is_present(
+            base.model_copy(
+                update={"callback_url": "https://api.example.com/callback"}
+            )
         )
         is False
     )

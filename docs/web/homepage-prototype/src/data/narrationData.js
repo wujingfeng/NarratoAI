@@ -1,6 +1,6 @@
 import { ChatCircleDots, Heart, Lightning, Smiley } from "@phosphor-icons/react";
 
-export const narrationSteps = ["upload", "settings", "analysis", "edit", "script", "voice", "export"].map((id) => ({ id, labelKey: `narration.steps.${id}` }));
+export const narrationSteps = ["create", "settings", "analysis", "edit", "render", "export"].map((id) => ({ id, labelKey: `narration.steps.${id}` }));
 
 export const narrationStyles = [
   { id: "reversal", titleKey: "narration.styles.reversal.title", descriptionKey: "narration.styles.reversal.description", icon: Lightning, tone: "violet" },

@@ -167,6 +167,20 @@ def test_jianying_references_subtitle_timeline_and_has_real_text_track():
     }
 
 
+def test_jianying_allows_a_completed_video_without_caption_cues():
+    body = fixture()
+    body["timeline"] = []
+
+    manifest = JianyingBuilder().build(**body)
+
+    draft = json.loads(
+        next(item.content for item in manifest.files if item.zip_path == "draft_info.json")
+    )
+    assert draft["materials"]["texts"] == []
+    text_track = next(track for track in draft["tracks"] if track["type"] == "text")
+    assert text_track["segments"] == []
+
+
 @pytest.mark.parametrize(
     "checksum", ["sha256:x", "sha256:" + "A" * 64, "sha256:" + "z" * 64, " md5:x"]
 )

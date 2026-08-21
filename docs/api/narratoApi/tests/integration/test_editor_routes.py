@@ -7,13 +7,18 @@ from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
+from narrato_api.assets.models import Asset
 from narrato_api.auth.models import User
 from narrato_api.auth.router import get_auth_service
 from narrato_api.config import Settings
 from narrato_api.database import Base
-from narrato_api.projects.models import Project
+from narrato_api.projects.models import Project, ProjectNarrationSettings
 from narrato_api.main import create_app
-from narrato_api.workflows.models import Workflow, WorkflowTemplateSnapshot
+from narrato_api.workflows.models import (
+    Workflow,
+    WorkflowNode,
+    WorkflowTemplateSnapshot,
+)
 
 
 class FakeAuthService:
@@ -27,6 +32,32 @@ class FakeAuthService:
                 id="usr_other", email="other@example.test", password_hash="hash"
             )
         raise RuntimeError("unexpected token")
+
+
+def _renderable_draft(text: str) -> dict[str, object]:
+    return {
+        "clips": [
+            {
+                "id": "video-1",
+                "track_id": "video",
+                "start": 0,
+                "duration": 5,
+                "source_start": 0,
+                "asset_id": "ast_video",
+                "region_id": "region-1",
+            },
+            {
+                "id": "script-1",
+                "track_id": "script",
+                "start": 0,
+                "duration": 5,
+                "text": text,
+                "region_id": "region-1",
+            },
+        ],
+        "subtitles": [{"start": 0, "end": 5, "text": text}],
+        "settings": {"voice_role": "voice-1"},
+    }
 
 
 @pytest.fixture
@@ -44,6 +75,28 @@ def editor_client(tmp_path) -> Iterator[TestClient]:
                     user_id="usr_owner",
                     product="short_drama",
                     status="waiting_for_edit",
+                    current_stage="edit",
+                ),
+                Asset(
+                    id="ast_video",
+                    user_id="usr_owner",
+                    project_id="prj_1",
+                    asset_type="video",
+                    status="ready",
+                    filename="episode.mp4",
+                    bucket="test-bucket",
+                    object_key="projects/prj_1/episode.mp4",
+                    cdn_url="https://cdn.example.test/projects/prj_1/episode.mp4",
+                    size_bytes=1024,
+                    duration_seconds=5,
+                ),
+                ProjectNarrationSettings(
+                    project_id="prj_1",
+                    settings={
+                        "voice_id": "voice-1",
+                        "video_ratio": "9:16",
+                        "subtitle_style": "classic",
+                    },
                 ),
                 WorkflowTemplateSnapshot(
                     id="tpl_1", template_name="short_drama", version="v1", definition={}
@@ -54,6 +107,26 @@ def editor_client(tmp_path) -> Iterator[TestClient]:
                     project_id="prj_1",
                     template_snapshot_id="tpl_1",
                     state="waiting_for_edit",
+                ),
+                WorkflowNode(
+                    id="wnd_edit",
+                    workflow_id="wf_1",
+                    name="waiting_for_edit",
+                    state="queued",
+                    depends_on=["script_generation"],
+                    retryable=False,
+                    manual_gate=True,
+                    max_attempts=1,
+                ),
+                WorkflowNode(
+                    id="wnd_render",
+                    workflow_id="wf_1",
+                    name="video_render",
+                    state="queued",
+                    depends_on=["waiting_for_edit"],
+                    retryable=True,
+                    manual_gate=False,
+                    max_attempts=3,
                 ),
             ]
         )
@@ -85,15 +158,17 @@ def test_editor_routes_authenticate_own_lww_save_and_lock_after_render(
         == 404
     )
 
+    first_draft = _renderable_draft("first")
+    last_draft = _renderable_draft("last")
     first = editor_client.post(
         "/api/v1/projects/prj_1/editor/save",
         headers=headers,
-        json={"content": {"tracks": [{"name": "first"}]}},
+        json={"content": first_draft},
     )
     second = editor_client.post(
         "/api/v1/projects/prj_1/editor/save",
         headers=headers,
-        json={"content": {"tracks": [{"name": "last"}]}},
+        json={"content": last_draft},
     )
     assert first.status_code == second.status_code == 200
     draft_id = first.json()["data"]["draft_id"]
@@ -102,7 +177,7 @@ def test_editor_routes_authenticate_own_lww_save_and_lock_after_render(
     assert current.status_code == 200
     assert current.json()["data"] == {
         "draft_id": draft_id,
-        "content": {"tracks": [{"name": "last"}]},
+        "content": last_draft,
         "locked": False,
     }
 
