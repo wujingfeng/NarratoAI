@@ -1,12 +1,10 @@
-node_modules/
-.npm-cache/
-dist/
+node_modules
+dist
 .env
 .env.*
 !.env.example
+.DS_Store
+coverage
 artifacts/
-output/
-.playwright-cli/
-coverage/
 playwright-report/
 test-results/

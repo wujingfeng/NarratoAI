@@ -1,7 +1,14 @@
 .venv/
+.mypy_cache/
+.ruff_cache/
 __pycache__/
 *.py[cod]
 *.egg-info/
 .pytest_cache/
 *.db
 config.toml
+.env
+.env.*
+!.env.example
+runtime/
+artifacts/
