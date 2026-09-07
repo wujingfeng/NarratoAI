@@ -18,6 +18,7 @@ import { ProjectEditorPage } from "./pages/ProjectEditorPage.jsx";
 import { NarrationStagePage } from "./pages/NarrationStagePage.jsx";
 import { VideoTranslationPage } from "./pages/VideoTranslationPage.jsx";
 import { AiVideoPage } from "./pages/AiVideoPage.jsx";
+import { AiAssistantPage } from "./pages/AiAssistantPage.jsx";
 
 function RequireAuth({ children }) {
   const { isAuthenticated } = useAuth();
@@ -38,6 +39,7 @@ export function App() {
         <Route path="/create" element={<RequireAuth><CreatePage /></RequireAuth>} />
         <Route path="/dashboard/create" element={<RequireAuth><CreatePage /></RequireAuth>} />
         <Route path="/dashboard/projects" element={<RequireAuth><ProjectsPage /></RequireAuth>} />
+        <Route path="/dashboard/ai-assistant" element={<RequireAuth><AiAssistantPage /></RequireAuth>} />
         <Route path="/dashboard/ai-video" element={<RequireAuth><AiVideoPage /></RequireAuth>} />
         <Route path="/dashboard/video-translation/upload" element={<RequireAuth><VideoTranslationPage view="upload" /></RequireAuth>} />
         <Route path="/dashboard/video-translation/settings" element={<RequireAuth><VideoTranslationPage view="settings" /></RequireAuth>} />

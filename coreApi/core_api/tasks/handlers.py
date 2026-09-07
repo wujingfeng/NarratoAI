@@ -270,6 +270,8 @@ class AtomicTaskHandler:
             heartbeat_once=heartbeat_once,
         )
         if task.task_type in {
+            "asr",
+            "audio_understanding",
             "video_analysis",
             "script_generation",
             "tts",
@@ -291,6 +293,27 @@ class AtomicTaskHandler:
                 ),
                 progress=10,
             )
+        if self.short_drama_adapter is not None:
+            set_stream_sink = getattr(
+                getattr(self.short_drama_adapter, "provider", None),
+                "set_stream_sink",
+                None,
+            )
+            if callable(set_stream_sink):
+
+                def publish_stream_snapshot(
+                    stage: str, content: str, completed: bool
+                ) -> None:
+                    self.task_service.update_attempt_stream(
+                        attempt.id,
+                        attempt.lease_token,
+                        attempt.lease_version,
+                        stage=stage,
+                        content=content,
+                        completed=completed,
+                    )
+
+                set_stream_sink(publish_stream_snapshot)
         try:
             with pump:
                 if (
@@ -302,6 +325,17 @@ class AtomicTaskHandler:
                     )
                 elif task.task_type == "asr" and self.asr_adapter is not None:
                     result = self.asr_adapter.run(
+                        workspace=workspace,
+                        core_task_id=task.id,
+                        attempt_no=attempt.attempt_no,
+                        lease_guard=pump.guard,
+                        **task.input_snapshot,
+                    )
+                elif (
+                    task.task_type == "audio_understanding"
+                    and self.short_drama_adapter is not None
+                ):
+                    result = self.short_drama_adapter.run_audio_understanding(
                         workspace=workspace,
                         core_task_id=task.id,
                         attempt_no=attempt.attempt_no,
@@ -408,10 +442,16 @@ class AtomicTaskHandler:
         except (InfrastructureError, AdapterError, ArtifactSecurityError) as exc:
             code = getattr(exc, "code", "ATOMIC_TASK_FAILED")
             retryable = bool(getattr(exc, "retryable", False))
+            error_builder = getattr(exc, "error_payload", None)
+            error_payload = (
+                error_builder()
+                if callable(error_builder)
+                else {"code": code}
+            )
             self.task_service.fail_attempt(
                 attempt.id,
                 attempt.lease_token,
-                {"code": code},
+                error_payload,
                 retryable=retryable,
                 lease_version=attempt.lease_version,
             )

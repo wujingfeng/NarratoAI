@@ -28,7 +28,7 @@ def get_capabilities(
 ) -> ApiResponse[CapabilityCatalogDTO]:
     """返回当前已启用且密钥可解析的统一能力目录。"""
 
-    catalog = CapabilityService(session, settings.provider_secrets).catalog()
+    catalog = CapabilityService(session, settings.resolved_provider_secrets).catalog()
     return ApiResponse(
         code="OK",
         message="能力目录读取成功",

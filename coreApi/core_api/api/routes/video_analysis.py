@@ -91,9 +91,11 @@ class ShortDramaSourceInput(BaseModel):
 
     source_asset_id: str = Field(min_length=1, max_length=80)
     video_url: str = Field(min_length=1, max_length=2048)
+    video_name: str | None = Field(default=None, min_length=1, max_length=255)
+    subtitle_name: str | None = Field(default=None, min_length=1, max_length=255)
     subtitle_url: str | None = Field(default=None, min_length=1, max_length=2048)
     subtitle_artifact: ArtifactInput | None = None
-    duration_seconds: float | None = Field(default=None, gt=0, le=600)
+    duration_seconds: float = Field(gt=0, le=600)
 
     @model_validator(mode="after")
     def only_one_subtitle_reference(self) -> ShortDramaSourceInput:
@@ -112,8 +114,15 @@ class ShortDramaConfigSnapshot(BaseModel):
     drama_genre: str = Field(default="", max_length=120)
     narration_style: str = Field(default="", max_length=120)
     original_sound_ratio: int = Field(default=30, ge=0, le=100)
+    requirements: str = Field(default="", max_length=2000)
+    target_duration_seconds: int | None = Field(default=None, ge=10, le=1800)
     temperature: float = Field(default=0.7, ge=0, le=2)
     max_tokens: int = Field(default=4096, ge=1, le=131072)
+    fps: int = Field(default=1, ge=1, le=1)
+    min_frame_tokens: int = Field(default=64, ge=64, le=64)
+    min_frame_tokens_mode: str = Field(
+        default="provider_default", pattern="^provider_default$"
+    )
 
 
 def validate_max_tokens(
@@ -236,7 +245,7 @@ def create_video_analysis_task(
     )
     if replay is not None:
         return replay
-    capabilities = CapabilityService(session, settings.provider_secrets)
+    capabilities = CapabilityService(session, settings.resolved_provider_secrets)
     model = capabilities.require_model(
         payload.model_id, "video_analysis", language=payload.language
     )

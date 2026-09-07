@@ -64,13 +64,20 @@ is_service_master_pid() {
   local command parent_pid
 
   case "$name" in
-    *-worker|*-scheduler)
-      # Celery pool child 会继承 master 的完整 argv，单纯 pgrep 会把所有
-      # ForkPoolWorker 误当成独立服务。只控制 nohup 后由 init 接管的 master。
+    *-worker)
+      # Celery worker pool child 会继承 master 的完整 argv，单纯 pgrep 会把
+      # ForkPoolWorker 误当成独立服务。worker 只控制 nohup 后由 init 接管的 master。
       command="$(ps -p "$pid" -o command= 2>/dev/null || true)"
       parent_pid="$(ps -p "$pid" -o ppid= 2>/dev/null | tr -d '[:space:]')"
       [[ -n "$command" && "$parent_pid" == "1" ]] || return 1
       [[ "$command" != *"ForkPoolWorker"* && "$command" != *"SpawnPoolWorker"* && "$command" != *"celeryd:"* ]]
+      ;;
+    *-scheduler)
+      # Beat 没有 Worker pool。它可能由终端、launchd 或 nohup 启动，父进程
+      # 并不一定是 1；若强制要求 PPID=1，restart 无法停掉旧 Beat，遗留 pidfile
+      # 会导致下一次启动永远报“Seems we're already running”。
+      command="$(ps -p "$pid" -o command= 2>/dev/null || true)"
+      [[ -n "$command" && "$command" != *"ForkPoolWorker"* && "$command" != *"SpawnPoolWorker"* && "$command" != *"celeryd:"* ]]
       ;;
     *)
       return 0
@@ -218,6 +225,26 @@ status_process() {
   fi
 }
 
+clear_stale_pidfile() {
+  local path="$1"
+  local name="$2"
+  local pid command
+
+  [[ -f "$path" ]] || return 0
+  pid="$(tr -d '[:space:]' <"$path")"
+  if [[ ! "$pid" =~ ^[0-9]+$ ]] || ! kill -0 "$pid" 2>/dev/null; then
+    rm -f "$path"
+    echo "已清理 ${name} 的过期 PID 文件"
+    return 0
+  fi
+
+  command="$(ps -p "$pid" -o command= 2>/dev/null || true)"
+  if [[ "$command" != *"celery"* || "$command" != *"beat"* ]]; then
+    rm -f "$path"
+    echo "已清理 ${name} 的无效 PID 文件"
+  fi
+}
+
 start_business() {
   start_process narrato-api-web "$BUSINESS_DIR" \
     NARRATO_API_CONFIG \
@@ -225,6 +252,7 @@ start_business() {
   start_process narrato-api-worker "$BUSINESS_DIR" \
     NARRATO_API_CONFIG \
     "$BUSINESS_DIR/.venv/bin/celery" -A narrato_api.celery_app:celery_app worker --loglevel=INFO --queues=narrato.business.default
+  clear_stale_pidfile "$RUNTIME_DIR/business-scheduler.pid" "narrato-api-scheduler"
   start_process narrato-api-scheduler "$BUSINESS_DIR" \
     NARRATO_API_CONFIG \
     "$BUSINESS_DIR/.venv/bin/celery" -A narrato_api.celery_app:celery_app beat --loglevel=INFO \
@@ -247,16 +275,16 @@ start_core() {
     --pidfile="$RUNTIME_DIR/core-scheduler.pid" --schedule="$RUNTIME_DIR/core-celerybeat-schedule"
   start_process core-worker-analysis "$CORE_DIR" \
     CORE_API_CONFIG \
-    "$CORE_DIR/.venv/bin/celery" -A core_api.celery_app:celery_app worker --loglevel=INFO --queues=narrato.core.default --hostname=core-analysis@%h --concurrency=2
+    "$CORE_DIR/.venv/bin/celery" -A core_api.celery_app:celery_app worker --loglevel=INFO --queues=narrato.core.analysis,narrato.core.default --hostname=core-analysis@%h --concurrency=2
   start_process core-worker-asr "$CORE_DIR" \
     CORE_API_CONFIG \
-    "$CORE_DIR/.venv/bin/celery" -A core_api.celery_app:celery_app worker --loglevel=INFO --queues=narrato.core.default --hostname=core-asr@%h --concurrency=1
+    "$CORE_DIR/.venv/bin/celery" -A core_api.celery_app:celery_app worker --loglevel=INFO --queues=narrato.core.asr --hostname=core-asr@%h --concurrency=1
   start_process core-worker-tts "$CORE_DIR" \
     CORE_API_CONFIG \
-    "$CORE_DIR/.venv/bin/celery" -A core_api.celery_app:celery_app worker --loglevel=INFO --queues=narrato.core.default --hostname=core-tts@%h --concurrency=2
+    "$CORE_DIR/.venv/bin/celery" -A core_api.celery_app:celery_app worker --loglevel=INFO --queues=narrato.core.tts --hostname=core-tts@%h --concurrency=2
   start_process core-worker-render "$CORE_DIR" \
     CORE_API_CONFIG \
-    "$CORE_DIR/.venv/bin/celery" -A core_api.celery_app:celery_app worker --loglevel=INFO --queues=narrato.core.default --hostname=core-render@%h --concurrency=1
+    "$CORE_DIR/.venv/bin/celery" -A core_api.celery_app:celery_app worker --loglevel=INFO --queues=narrato.core.render --hostname=core-render@%h --concurrency=1
 }
 
 stop_core() {

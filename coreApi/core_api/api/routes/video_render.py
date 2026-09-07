@@ -40,6 +40,14 @@ class RenderTimelineInput(BaseModel):
     start: float = Field(ge=0, le=86_400)
     end: float = Field(gt=0, le=86_400)
     narration: str = Field(min_length=1, max_length=10_000)
+    subtitle: str | None = Field(default=None, max_length=10_000)
+    original_sound: bool = False
+    event_id: str | None = Field(default=None, max_length=160)
+    visual_anchor: float | None = Field(default=None, ge=0, le=86_400)
+    narration_anchor_text: str | None = Field(default=None, max_length=1_000)
+    match_confidence: float | None = Field(default=None, ge=0, le=1)
+    visual_lead: float = Field(default=0.15, ge=-2, le=2)
+    narration_start_offset: float | None = Field(default=None, ge=0, le=86_400)
 
 
 class VideoRenderTaskRequest(BaseModel):
@@ -51,6 +59,7 @@ class VideoRenderTaskRequest(BaseModel):
     language: str = Field(default="zh-CN", min_length=1, max_length=32)
     sources: list[RenderSourceInput] = Field(min_length=1, max_length=20)
     timeline: list[RenderTimelineInput] = Field(min_length=1, max_length=2_000)
+    render_config: dict[str, object] = Field(default_factory=dict)
     caller_task_id: str | None = Field(default=None, max_length=80)
 
     @model_validator(mode="after")
@@ -99,7 +108,7 @@ def create_video_render_task(
     )
     if replay is not None:
         return replay
-    capabilities = CapabilityService(session, settings.provider_secrets)
+    capabilities = CapabilityService(session, settings.resolved_provider_secrets)
     voice = capabilities.require_voice(
         payload.voice_id,
         language=payload.language,
@@ -113,6 +122,7 @@ def create_video_render_task(
         "sources": sources,
         "source_order": [item.source_asset_id for item in payload.sources],
         "timeline": [item.model_dump(mode="json") for item in payload.timeline],
+        "render_config": payload.render_config,
     }
     return create_atomic_task(
         session=session,

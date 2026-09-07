@@ -115,7 +115,13 @@ def register_workflow_tasks(app: Celery, settings: Settings) -> None:
                     event_id=f"poll:{core_task_id}:{result.state_version}:{result.status}",
                     state_version=result.state_version,
                     state=result.status,
-                    result={"result": payload, "artifacts": list(result.artifacts)},
+                    result={
+                        "result": payload,
+                        "artifacts": list(result.artifacts),
+                        # 失败时必须保留 Core 的稳定错误码。否则项目阶段只能
+                        # 显示 failed，既无法解释失败，也无法让前端给出正确重试提示。
+                        "error": result.error,
+                    },
                 ):
                     applied += 1
                     if result.status == "succeeded":

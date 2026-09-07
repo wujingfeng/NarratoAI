@@ -1,55 +1,101 @@
+# PostgreSQL 数据库连接地址，包含驱动、账号、主机、端口和数据库名。
 database_url = "postgresql+psycopg://narrato_business@127.0.0.1/narrato_business"
+# 建立数据库连接的最长等待时间（秒）。
 database_connect_timeout_seconds = 3.0
+# 数据库读操作的最长等待时间（秒）。
 database_read_timeout_seconds = 3.0
+# Redis 连接地址；不同服务应使用独立数据库编号。
 redis_url = "redis://127.0.0.1:6379/4"
+# 该服务写入 Redis 键时使用的统一前缀，用于命名空间隔离。
 redis_key_prefix = "narrato:business:"
+# Celery 消息代理连接地址，用于投递异步任务。
 celery_broker_url = "redis://127.0.0.1:6379/5"
+# Celery 任务队列名称前缀，用于与其他服务的 Worker 隔离。
 celery_queue_prefix = "narrato.business"
 # Celery beat 触发、Business Worker 直接轮询第三方模型任务并转存产物；前端只读取本地任务状态。
+# 后台轮询 AI 视频供应商任务状态的基础间隔（秒）。
 ai_video_poll_interval_seconds = 15.0
+# 每轮最多领取并轮询的 AI 视频任务数量。
 ai_video_poll_batch_size = 100
+# Worker 领取 AI 视频轮询任务后的租约时长（秒）。
 ai_video_poll_lease_seconds = 60.0
+# AI 视频任务轮询失败后的最大退避间隔（秒）。
 ai_video_poll_max_backoff_seconds = 300.0
+# AI 视频任务连续轮询失败达到该次数后标记为失败。
 ai_video_poll_max_errors = 12
 # submitting 状态等待此时长后，才由 Worker 用本地任务幂等键恢复供应商提交。
+# 提交中的任务超过该时长后，允许 Worker 按幂等键恢复供应商提交。
 ai_video_submission_recovery_delay_seconds = 60.0
+# Business API 调用 Core API 的基础地址。
 core_base_url = "https://core.example.com"
 # 仅本机开发允许 http://127.0.0.1 或 http://localhost 的 Core 服务。
+# 是否允许 Business API 通过本机 HTTP 地址访问 Core API，仅限本地开发。
 allow_insecure_core_loopback = false
+# Business API 请求 Core API 时携带的内部鉴权令牌。
 core_request_token = "replace-with-core-request-token"
+# Business API 校验来自 Core API 回调时使用的鉴权令牌。
 core_callback_token = "replace-with-callback-token"
+# 服务就绪检查请求的超时时间（秒）。
 readiness_timeout_seconds = 3.0
+# SMTP 邮件服务器主机名。
 smtp_host = ""
+# SMTP 邮件服务器端口。
 smtp_port = 587
+# SMTP 认证用户名。
 smtp_username = ""
+# SMTP 认证密码或授权码。
 smtp_password = ""
+# 系统邮件显示的发件人地址。
 smtp_sender = "noreply@example.com"
+# SMTP 连接和发送邮件的超时时间（秒）。
 smtp_timeout_seconds = 10.0
+# 是否在连接建立时启用 SMTP SSL。
 smtp_use_ssl = false
+# 是否在明文连接后通过 STARTTLS 升级为加密连接。
 smtp_use_starttls = true
+# 对验证码相关数据进行 HMAC 签名的高熵密钥。
 verification_code_hmac_secret = "replace-with-high-entropy-hmac-secret"
+# 邮箱验证码的有效期（秒）。
 verification_code_ttl_seconds = 600
+# 普通用户会话或令牌的有效期（秒）。
 session_ttl_seconds = 2592000
 # Admin uses a distinct token namespace; set an independent 32+ byte random secret in production.
+# 后台管理员会话或令牌的有效期（秒）。
 admin_session_ttl_seconds = 28800
+# 管理员会话签名使用的独立高熵 HMAC 密钥。
 admin_session_hmac_secret = "replace-with-separate-admin-session-secret"
 # First startup after Alembic creates this separate Admin superuser once. Store only in private config.
+# 首次初始化时创建的管理员用户名。
 admin_bootstrap_username = "Admin"
+# 首次初始化时创建的管理员密码，仅应保存在私有配置中。
 admin_bootstrap_password = "replace-with-strong-admin-password"
+# 首次初始化管理员账号的显示名称。
 admin_bootstrap_display_name = "Admin"
 # Comma-separated origins for the separately deployed admin UI; leave empty to reject cross-origin browser access.
+# 允许访问后台管理接口的跨域来源，多个来源以英文逗号分隔。
 admin_cors_origins = "https://admin.example.com"
+# 认证模块访问 Redis 的超时时间（秒）。
 auth_redis_timeout_seconds = 3.0
+# Argon2 密码哈希的迭代成本；越高越耗时。
 password_argon2_time_cost = 3
+# Argon2 密码哈希使用的内存成本（KiB）。
 password_argon2_memory_cost_kib = 65536
+# Argon2 密码哈希可使用的并行度。
 password_argon2_parallelism = 2
 # OSS 服务 Endpoint：仅填写域名，不含协议或 Bucket，例如 oss-cn-shanghai.aliyuncs.com。
+# 阿里云 OSS Endpoint 域名，不包含协议和 Bucket 名称。
 oss_endpoint = ""
 # 浏览器 H5 表单直传地址：协议 + Bucket + Endpoint，例如 https://example-bucket.oss-cn-shanghai.aliyuncs.com。
+# 浏览器直传 OSS 时使用的完整访问地址，包含协议、Bucket 和 Endpoint。
 oss_url = ""
 # 当配置 oss_url 时，必须同步设置对象的公开 CDN 地址。
+# 对象对外访问时使用的 CDN 公网基础地址。
 cdn_public_base_url = ""
+# 存储业务媒体文件的 OSS Bucket 名称。
 oss_bucket = ""
+# 访问 OSS 所使用的 AccessKey ID。
 oss_access_key_id = ""
+# 访问 OSS 所使用的 AccessKey Secret。
 oss_access_key_secret = ""
+# 服务日志输出级别，例如 DEBUG、INFO、WARNING 或 ERROR。
 log_level = "INFO"

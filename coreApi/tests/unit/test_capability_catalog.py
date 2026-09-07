@@ -11,6 +11,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, sessionmaker
 
 from core_api.api.errors import ApiError
+from core_api.adapters.narrato.short_drama import short_drama_provider_supported
 from core_api.capabilities.models import CoreModel, CoreProvider, CoreVoice
 from core_api.capabilities.seed import (
     ModelSeed,
@@ -134,6 +135,10 @@ CATALOG_SEEDS = (
         ),
     ),
 )
+
+
+def test_aliyun_openai_compatible_provider_supports_short_drama() -> None:
+    assert short_drama_provider_supported("aliyun") is True
 
 
 @pytest.fixture

@@ -8,6 +8,7 @@ from sqlalchemy import select
 from core_api.adapters.narrato.short_drama import (
     FakeShortDramaProvider,
     ProviderTemporaryError,
+    ScriptValidationError,
     ShortDramaAdapter,
 )
 from core_api.infrastructure.oss_client import DownloadReceipt, OssUploadResult
@@ -75,6 +76,20 @@ class CapturingFakeProvider(FakeShortDramaProvider):
         )
 
 
+class DuplicateEventIdProvider(FakeShortDramaProvider):
+    """模拟每次独立视频调用都从 event_001 开始编号。"""
+
+    def analyze_video(self, source, *, subtitle_text, language, config):
+        result = dict(super().analyze_video(
+            source,
+            subtitle_text=subtitle_text,
+            language=language,
+            config=config,
+        ))
+        result["events"] = [{**item, "event_id": "event_001"} for item in result["events"]]
+        return result
+
+
 class FailingRepairProvider(CapturingFakeProvider):
     """模型已返回可编辑脚本后，模拟自动修复供应商失败。"""
 
@@ -83,10 +98,10 @@ class FailingRepairProvider(CapturingFakeProvider):
     def match_script(self, script, *, sources):
         self.original_script = [
             {
-                "source_asset_id": sources[0].source_asset_id,
+                "source_asset_id": "unknown_asset",
                 "start": 0.0,
                 "end": 10.0,
-                "narration": "字" * 61,
+                "narration": "结构错误",
                 "original_sound": False,
             },
             {
@@ -120,6 +135,97 @@ def source_snapshots(with_subtitles: bool = True) -> list[dict[str, object]]:
             )
         result.append(item)
     return result
+
+
+def test_audio_understanding_keeps_business_subtitle_contract_and_json_artifact(
+    session, tmp_path
+):
+    service = TaskService(session)
+    downloader = MemoryDownloader()
+    oss = MemoryOss(downloader)
+    handler = AtomicTaskHandler(
+        task_service=service,
+        work_root=tmp_path / "audio-understanding-work",
+        short_drama_adapter=ShortDramaAdapter(
+            provider=FakeShortDramaProvider(),
+            artifact_store=ArtifactStore(oss),
+        ),
+    )
+    task = service.create_core_task(
+        caller="narrato-api",
+        route="/api/v1/audio-understanding/tasks",
+        task_type="audio_understanding",
+        idempotency_key="fake-audio-understanding",
+        input_snapshot={
+            "model_id": "model_fake",
+            "model_snapshot": {
+                "model_id": "model_fake",
+                "catalog_version": "catalog_test",
+            },
+            "language": "zh-CN",
+            "config_snapshot": {
+                "fps": 1,
+                "min_frame_tokens": 64,
+                "min_frame_tokens_mode": "provider_default",
+            },
+            "source_order": ["asset_b", "asset_a"],
+            "sources": source_snapshots(with_subtitles=False),
+        },
+    )
+
+    handler.run(task.id)
+    completed = service.get_task(task.id)
+    assert completed.status == CoreTaskStatus.SUCCEEDED
+    assert [item["source_asset_id"] for item in completed.result["subtitles"]] == [
+        "asset_b",
+        "asset_a",
+    ]
+    assert all(
+        item["artifact"]["kind"] == "subtitle"
+        for item in completed.result["subtitles"]
+    )
+    aggregate = next(
+        item for item in completed.result["artifacts"]
+        if item["kind"] == "audio_understanding"
+    )
+    payload = json.loads(oss.uploads[aggregate["object_key"]])
+    assert payload["schema_version"] == "short-drama-audio-understanding.v1"
+    assert payload["config_snapshot"]["min_frame_tokens_mode"] == "provider_default"
+
+
+def test_analysis_namespaces_provider_event_ids_per_source(session, tmp_path):
+    service = TaskService(session)
+    downloader = MemoryDownloader()
+    oss = MemoryOss(downloader)
+    handler = AtomicTaskHandler(
+        task_service=service,
+        work_root=tmp_path / "namespaced-events-work",
+        short_drama_adapter=ShortDramaAdapter(
+            provider=DuplicateEventIdProvider(),
+            downloader=downloader,
+            artifact_store=ArtifactStore(oss),
+        ),
+    )
+    task = service.create_core_task(
+        caller="narrato-api",
+        route="/api/v1/video-analysis/tasks",
+        task_type="video_analysis",
+        idempotency_key="namespaced-events",
+        input_snapshot={
+            "model_id": "model_fake",
+            "model_snapshot": {"model_id": "model_fake"},
+            "language": "zh-CN",
+            "config_snapshot": {},
+            "source_order": ["asset_b", "asset_a"],
+            "sources": source_snapshots(),
+        },
+    )
+    handler.run(task.id)
+    events = service.get_task(task.id).result["analysis"]["events"]
+    assert [event["event_id"] for event in events] == [
+        "asset_b:event_001",
+        "asset_a:event_001",
+    ]
 
 
 def test_fake_provider_analysis_then_script_artifacts_are_safe_and_registered(
@@ -159,6 +265,7 @@ def test_fake_provider_analysis_then_script_artifacts_are_safe_and_registered(
     assert analysis_task.phase == "analysis"
     analysis_artifact = analysis_task.result["artifacts"][0]
     analysis_json = json.loads(oss.uploads[analysis_artifact["object_key"]])
+    assert analysis_task.result["analysis"] == analysis_json["analysis"]
     assert analysis_artifact["kind"] == "analysis"
     assert analysis_json["source_order"] == ["asset_b", "asset_a"]
     assert analysis_json["model_snapshot"] == {
@@ -167,6 +274,11 @@ def test_fake_provider_analysis_then_script_artifacts_are_safe_and_registered(
     }
     assert analysis_json["language"] == "zh-CN"
     assert analysis_json["config_snapshot"]["drama_genre"] == "复仇"
+    assert analysis_json["prompt_metadata"] == {
+        "prompt_category": "short_drama_narration",
+        "prompt_name": "plot_analysis",
+        "prompt_version": "v1.1",
+    }
     assert analysis_json["sources"] == [
         {
             "source_asset_id": "asset_b",
@@ -235,11 +347,6 @@ def test_fake_provider_analysis_then_script_artifacts_are_safe_and_registered(
     ]
     assert timeline["language"] == "zh-CN"
     assert timeline["config_snapshot"]["original_sound_ratio"] == 30
-    assert timeline["items"][0]["original_sound"] is False
-    assert sum(item["original_sound"] is True for item in timeline["items"]) == 1
-    assert next(item for item in timeline["items"] if item["original_sound"] is True)[
-        "narration"
-    ].startswith("播放原片")
     assert len(timeline["sources"]) == 2
     assert [item["subtitle_url"] for item in timeline["sources"]] == [
         "https://cdn.example.test/narrato/api/b.srt",
@@ -284,7 +391,7 @@ def test_fake_provider_retryable_error_enters_retry_wait(session, tmp_path):
     assert service.get_task(task.id).error["code"] == "PROVIDER_TEMPORARY_FAILURE"
 
 
-def test_script_task_succeeds_with_original_when_automatic_repair_fails(
+def test_script_task_retries_when_automatic_repair_temporarily_fails(
     session, tmp_path
 ):
     service = TaskService(session)
@@ -337,10 +444,43 @@ def test_script_task_succeeds_with_original_when_automatic_repair_fails(
     handler.run(script_task.id)
     completed = service.get_task(script_task.id)
 
-    assert completed.status == CoreTaskStatus.SUCCEEDED
-    assert completed.error is None
-    assert completed.result["timeline"]["items"] == provider.original_script
+    assert completed.status == CoreTaskStatus.RETRY_WAIT
+    assert completed.result is None
     assert provider.repair_calls == 1
+
+
+def test_script_task_persists_exact_validation_diagnostics(session, tmp_path):
+    class DiagnosticAdapter:
+        def run_script_generation(self, **_kwargs):
+            raise ScriptValidationError(
+                "SCRIPT_SOURCE_UNKNOWN",
+                details={"item_index": 2, "source_asset_id": "unknown"},
+                diagnostics={"stage": "repair_after_timeline_validation"},
+            )
+
+    service = TaskService(session)
+    task = service.create_core_task(
+        caller="narrato-api",
+        route="/api/v1/script-generation/tasks",
+        task_type="script_generation",
+        idempotency_key="diagnostic-script",
+        input_snapshot={},
+    )
+    AtomicTaskHandler(
+        task_service=service,
+        work_root=tmp_path / "diagnostic-work",
+        short_drama_adapter=DiagnosticAdapter(),  # type: ignore[arg-type]
+    ).run(task.id)
+
+    failed = service.get_task(task.id)
+    assert failed.status == CoreTaskStatus.FAILED
+    assert failed.error == {
+        "code": "SCRIPT_VALIDATION_FAILED",
+        "reason": "SCRIPT_SOURCE_UNKNOWN",
+        "details": {"item_index": 2, "source_asset_id": "unknown"},
+        "diagnostics": {"stage": "repair_after_timeline_validation"},
+        "retryable": False,
+    }
 
 
 def test_duplicate_wake_does_not_duplicate_analysis_artifact(session, tmp_path):

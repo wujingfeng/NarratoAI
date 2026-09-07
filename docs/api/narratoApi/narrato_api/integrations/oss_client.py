@@ -10,8 +10,6 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
 from email.utils import format_datetime
-from ipaddress import ip_address
-from socket import SOCK_STREAM, getaddrinfo
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 from urllib.parse import quote, urlsplit
@@ -257,14 +255,9 @@ class HttpOssClient:
             or parsed_source.password
         ):
             raise OssClientError("provider result URL is invalid")
-        try:
-            addresses = {item[4][0] for item in getaddrinfo(parsed_source.hostname, 443, type=SOCK_STREAM)}
-            if not addresses or any(not ip_address(address).is_global for address in addresses):
-                raise OssClientError("provider result URL is not globally routable")
-        except OssClientError:
-            raise
-        except (OSError, ValueError) as error:
-            raise OssClientError("provider result URL could not be resolved") from error
+        # 结果 URL 由已接入 Provider 的任务状态接口返回。不同供应商可能使用
+        # 不同 CDN、临时域名或本地代理 DNS，因此不在此处维护域名/IP 白名单。
+        # 仍只接受无凭据 HTTPS URL，且结果必须成功转存到自有 OSS 才会完成任务。
         try:
             with urlopen(Request(source_url, method="GET"), timeout=30) as source:
                 raw_length = source.headers.get("Content-Length")

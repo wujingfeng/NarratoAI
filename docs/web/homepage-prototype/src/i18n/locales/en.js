@@ -204,7 +204,7 @@ export const en = {
   ...localized,
   dashboard: {
     routeHeading: "Workspace overview", footer: "影创工坊 · Make AI creation simple", thumbnailUnavailable: "Thumbnail unavailable for {name}", thumbnailAlt: "Thumbnail for {name}", coverAlt: "Cover for {name}",
-    nav: { overview: "Workspace overview", create: "New creation", projects: "My projects", narration: "Short-drama narration", translation: "Video translation", remix: "Short-drama remix", credits: "Credits", account: "Account" },
+    nav: { overview: "Workspace overview", create: "New creation", projects: "My projects", aiAssistant: "AI Assistant", narration: "Short-drama narration", translation: "Video translation", remix: "Short-drama remix", credits: "Credits", account: "Account" },
     mobile: { navigation: "Mobile workspace navigation", overview: "Overview", create: "Create", projects: "Projects", account: "Me" },
     sidebar: { navigation: "Workspace navigation", tools: "Tools", account: "Account" },
     header: { home: "影创工坊 home", accountActions: "Account quick actions", viewBalance: "View credit balance: {balance}", recharge: "Top up" },

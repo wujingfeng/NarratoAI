@@ -164,7 +164,8 @@ class CapabilityService:
             or not model.enabled
             or not self._provider_is_callable(model.provider)
             or (
-                capability_type in {"video_analysis", "script_generation"}
+                capability_type
+                in {"audio_understanding", "video_analysis", "script_generation"}
                 and not short_drama_provider_supported(model.provider.code)
             )
             or (

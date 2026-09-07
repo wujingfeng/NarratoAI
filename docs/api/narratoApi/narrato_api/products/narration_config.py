@@ -117,9 +117,8 @@ def get_short_drama_narration_config(
         subtitle_styles=[
             Option(id=item, name=item) for item in ("霓虹描边", "经典白色", "白字蓝边")
         ],
-        # 与 `streamlit run webui.py` 的 SHORT_DRAMA_ORIGINAL_SOUND_RATIO_OPTIONS
-        # 保持同一组可选值，默认值由设置契约固定为 30。
-        original_sound_ratios=list(range(0, 100, 10)),
+        # 原声音量支持 0..100 的任意整数，默认值由设置契约固定为 30。
+        original_sound_ratios=list(range(0, 101)),
     )
     return ApiResponse(
         code="OK", message="短剧解说配置读取成功", data=config, request_id=request_id

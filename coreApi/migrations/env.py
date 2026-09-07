@@ -6,6 +6,7 @@ from logging.config import fileConfig
 from alembic import context
 from sqlalchemy import engine_from_config, pool
 
+from core_api.config import load_settings
 from core_api.database import Base
 from core_api.capabilities import models as capability_models  # noqa: F401
 from core_api.tasks import models as task_models  # noqa: F401
@@ -14,7 +15,12 @@ config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-if database_url := os.getenv("CORE_API_DATABASE_URL"):
+database_url = os.getenv("CORE_API_DATABASE_URL")
+if not database_url and (config_path := os.getenv("CORE_API_CONFIG")):
+    # 部署进程与 Alembic 使用同一个私有 TOML，避免错误迁移 alembic.ini 中的
+    # 本地 SQLite 示例库。显式环境变量仍具有最高优先级。
+    database_url = load_settings(config_path).database_url
+if database_url:
     config.set_main_option("sqlalchemy.url", database_url.replace("%", "%%"))
 
 target_metadata = Base.metadata

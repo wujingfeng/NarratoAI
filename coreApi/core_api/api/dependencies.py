@@ -6,6 +6,7 @@ import threading
 import hmac
 import os
 from pathlib import Path
+from urllib.parse import urlsplit
 import secrets
 from collections.abc import Iterator
 from typing import Annotated, Protocol
@@ -179,6 +180,17 @@ def required_configuration_is_present(settings: Settings) -> bool:
         return False
     try:
         validate_callback_url(settings.callback_url)
+        if settings.asr_provider == "volcengine":
+            callback = urlsplit(settings.volcengine_asr_callback_base_url)
+            if (
+                callback.scheme != "https"
+                or not callback.hostname
+                or callback.username is not None
+                or callback.password is not None
+                or callback.query
+                or callback.fragment
+            ):
+                return False
         CdnUrlPolicy(set(settings.cdn_allowed_hosts))
         Oss2Client(
             endpoint=settings.oss_endpoint,

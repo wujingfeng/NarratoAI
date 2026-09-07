@@ -44,10 +44,38 @@ sudo install -m 0644 "$REPO_ROOT/coreApi/supervisor/core-worker-render.conf" /et
 
 `asr_provider = "local"` 使用部署机的 FunASR-Pack（默认）。切换为
 `asr_provider = "volcengine"` 时，填写 `volcengine_asr_appid`、
-`volcengine_asr_token` 与 `volcengine_asr_cluster`；Core 会直接把已受 CDN
-白名单保护的媒体 URL 提交给火山录音文件识别，并将其 `utterances` 转为统一
-SRT Artifact。凭据只写入权限为 `0600` 的 Core 私有 TOML，不得放入
+`volcengine_asr_token`、`volcengine_asr_cluster` 与公网可访问的
+`volcengine_asr_callback_base_url`。Core ASR 仅接受 `sources` 批量合同（1..5
+条）；音频 URL 可直接识别，视频会先用 FFmpeg 抽取 MP3、上传 Core OSS，再提交
+火山。每条来源的火山任务 ID、Callback 结果和轮询状态均持久化，Callback 与
+主动查询同时开启。凭据只写入权限为 `0600` 的 Core 私有 TOML，不得放入
 `provider_secrets`、任务快照、数据库或日志。切换后重启 `core-worker-asr`。
+
+### 火山方舟 LLM（短剧分析与解说文案）
+
+在私有 `core-api.toml` 填写 `volcengine_ark_base_url`、
+`volcengine_ark_api_key` 与 `volcengine_ark_model_id`。其中
+`volcengine_ark_model_id` 是方舟控制台的 Endpoint ID / Model ID，Core 在实际
+`/chat/completions` 请求中只读取该配置值，不会使用代码或数据库中的硬编码模型名。
+
+首次启用时，必须先迁移 **同一个 Core PostgreSQL 数据库**。未执行该步骤时，
+`core_providers` 表不存在，执行能力目录 SQL 会报 `relation "core_providers" does not exist`。
+
+```bash
+cd "$REPO_ROOT/coreApi"
+CORE_API_CONFIG="$REPO_ROOT/coreApi/config.toml" .venv/bin/alembic upgrade head
+```
+
+然后使用连接到该 Core PostgreSQL 数据库的 SQL 工具执行能力目录种子，并重启
+`core-api-web` 和 `core-worker-analysis`：
+
+```bash
+psql "$CORE_API_POSTGRES_DSN" -f "$REPO_ROOT/coreApi/sql/seed_volcengine_ark.sql"
+```
+
+三项配置中任意一项缺失时，`model_volcengine_ark` 不会出现在能力目录，因此业务端
+不能创建一个必然失败的短剧分析或文案任务。方舟密钥、Endpoint ID 与模型 ID 均不会
+写入任务快照、数据库或日志。
 
 ### 视频翻译的人声分离（AI MediaKit）
 
@@ -114,19 +142,13 @@ file(s) and matching private TOML backup, then run `supervisorctl reread && supe
 reloading reverted Nginx. Restore both services only when their
 version/configuration contract changed.
 
-## Current Celery queue limitation
+## Celery queue isolation
 
-The four Core worker names are capacity labels, not true queue isolation.
-`core_api.celery_app` currently sends durable wake tasks to the single
-`narrato.core.default` queue, so every role-named worker consumes that same
-queue. This increases shared capacity but cannot guarantee a task reaches its
-matching role.
-
-True per-role queue isolation needs future Celery task-routing work: separate
-queues and `task_routes`, followed by producer, consumer, retry, and
-dead-letter changes. Do not change Supervisor commands to unimplemented role
-queue names before that work lands; the current default queue's tasks would be
-stranded.
+Core 根据数据库任务类型将 wake 投递到 `narrato.core.asr`、
+`narrato.core.analysis`、`narrato.core.tts`、`narrato.core.render` 或
+`narrato.core.default`。ASR Worker 只消费 ASR 队列，长时间的供应商轮询不会再
+占用分析、TTS 或渲染容量。部署时必须同步更新全部 Supervisor Worker 配置；旧
+Worker 若仍只监听 default，会使角色队列中的任务滞留。
 
 ## OSS/CDN range CORS
 

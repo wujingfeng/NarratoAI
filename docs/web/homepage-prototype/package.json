@@ -7,6 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "test:i18n": "node --test src/i18n/locale.test.js",
+    "test:ai-assistant": "node --test src/features/ai-assistant/assistantConfig.test.js src/services/assistantApi.test.js",
     "verify:i18n": "node scripts/verify-i18n.mjs",
     "preview": "vite preview",
     "screenshot": "node scripts/capture-home.mjs",
@@ -28,6 +29,7 @@
     "verify:project-result": "node scripts/verify-project-result.mjs"
   },
   "dependencies": {
+    "@assistant-ui/react": "^0.15.16",
     "@dnd-kit/core": "^6.3.1",
     "@dnd-kit/sortable": "^10.0.0",
     "@dnd-kit/utilities": "^3.2.2",
@@ -38,8 +40,10 @@
     "onnxruntime-web": "^1.27.0",
     "react": "19.2.0",
     "react-dom": "19.2.0",
+    "react-markdown": "^10.1.0",
     "react-responsive-masonry": "^2.7.2",
     "react-router-dom": "^7.18.1",
+    "remark-gfm": "^4.0.1",
     "three": "0.185.1",
     "vite": "6.4.2",
     "wavesurfer.js": "^7.12.10"

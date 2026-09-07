@@ -5,6 +5,7 @@ from datetime import datetime
 from sqlalchemy.orm import Session
 
 from core_api.adapters.narrato.asr import AsrAdapter
+from core_api.adapters.narrato.volcengine_asr import VolcengineAsrTranscriber
 from core_api.adapters.narrato.media_probe import MediaProbeAdapter
 from core_api.adapters.narrato.short_drama import (
     ShortDramaAdapter,
@@ -18,7 +19,7 @@ from core_api.adapters.narrato.render import (
 )
 from core_api.runtime.process_runner import ProcessRunner
 from core_api.celery_app import celery_app
-from core_api.config import get_cached_settings
+from core_api.config import Settings, get_cached_settings
 from core_api.database import get_engine
 from core_api.infrastructure.oss_client import (
     CdnUrlPolicy,
@@ -35,6 +36,8 @@ from core_api.tasks.artifact_reconciliation import (
     ArtifactReconciliationJournal,
     ArtifactReconciliationScanner,
 )
+from core_api.tasks.asr_jobs import AsrProviderJobStore
+from core_api.tasks.queueing import queue_for_task_type
 
 
 class CeleryWakeDispatcher:
@@ -44,18 +47,82 @@ class CeleryWakeDispatcher:
         self,
         task_id: str,
         *,
+        task_type: str,
         expected_state_version: int,
         not_before: datetime,
         dispatch_id: str,
     ) -> None:
         """发布数据库事实中已到期且带版本的 wake。"""
 
-        wake_core_task.delay(
-            task_id,
-            expected_state_version,
-            not_before.isoformat(),
-            dispatch_id,
+        wake_core_task.apply_async(
+            args=(
+                task_id,
+                expected_state_version,
+                not_before.isoformat(),
+                dispatch_id,
+            ),
+            queue=queue_for_task_type(task_type),
         )
+
+
+def _create_source_transcriber(
+    *,
+    task_type: str,
+    settings: Settings,
+    job_store: AsrProviderJobStore,
+) -> VolcengineAsrTranscriber | None:
+    """仅为 ASR 任务校验并初始化远程识别供应商。"""
+
+    if task_type != "asr" or settings.asr_provider != "volcengine":
+        return None
+    return VolcengineAsrTranscriber(
+        appid=settings.volcengine_asr_appid,
+        token=settings.volcengine_asr_token,
+        cluster=settings.volcengine_asr_cluster,
+        poll_interval_seconds=settings.volcengine_asr_poll_interval_seconds,
+        total_timeout_seconds=settings.volcengine_asr_total_timeout_seconds,
+        language=settings.volcengine_asr_language,
+        use_itn=settings.volcengine_asr_use_itn,
+        use_punc=settings.volcengine_asr_use_punc,
+        with_speaker_info=settings.volcengine_asr_with_speaker_info,
+        callback_base_url=settings.volcengine_asr_callback_base_url,
+        job_store=job_store,
+    )
+
+
+def _short_drama_provider_arguments(
+    *,
+    settings: Settings,
+    provider_code: str,
+    provider_model_code: str,
+    secret_ref: str,
+    provider_settings: object,
+) -> dict[str, str]:
+    """解析一次短剧调用的私有连接参数。
+
+    方舟模型 ID 是部署配置，而非能力目录中的 model_id 或 provider_model_code。
+    因此切换火山 Endpoint 后只需更新 config.toml 并重启分析 Worker。
+    """
+
+    settings_map = provider_settings if isinstance(provider_settings, dict) else {}
+    result = {
+        "provider_code": provider_code,
+        "provider_model_code": provider_model_code,
+        "api_key": str(settings.provider_secrets.get(secret_ref, "")),
+        "base_url": str(
+            settings_map.get("base_url") or settings_map.get("api_base") or ""
+        ),
+        "prompt_category": str(
+            settings_map.get("prompt_category") or "short_drama_narration"
+        ),
+    }
+    if provider_code == "volcengine_ark":
+        result.update(
+            provider_model_code=settings.volcengine_ark_model_id,
+            api_key=settings.volcengine_ark_api_key,
+            base_url=settings.volcengine_ark_base_url,
+        )
+    return result
 
 
 def _run_atomic_task(
@@ -84,8 +151,13 @@ def _run_atomic_task(
         access_key_secret=settings.oss_access_key_secret,
         public_base_url=settings.oss_public_base_url,
     )
-    with Session(get_engine(settings), expire_on_commit=False) as session:
+    engine = get_engine(settings)
+    job_store = AsrProviderJobStore(
+        lambda: Session(engine, expire_on_commit=False)
+    )
+    with Session(engine, expire_on_commit=False) as session:
         service = TaskService(session)
+        task = service.get_task(task_id)
 
         def heartbeat_once(
             attempt_id: str, token: str, version: int, lease_seconds: float
@@ -102,7 +174,7 @@ def _run_atomic_task(
                     lease_seconds=lease_seconds,
                 )
 
-        def transcribe(local_file: str, subtitle_file: str) -> str | None:
+        def local_transcribe(local_file: str, subtitle_file: str) -> str | None:
             """显式传入本 attempt 输出文件调用既有本地 ASR。"""
 
             return create_with_local_fun_asr(
@@ -111,11 +183,20 @@ def _run_atomic_task(
                 api_url=settings.asr_local_api_url,
             )
 
+        source_transcriber = _create_source_transcriber(
+            task_type=task.task_type,
+            settings=settings,
+            job_store=job_store,
+        )
+
         short_drama_adapter = None
         tts_adapter = None
         render_adapter = None
-        task = service.get_task(task_id)
-        if task.task_type in {"video_analysis", "script_generation"}:
+        if task.task_type in {
+            "audio_understanding",
+            "video_analysis",
+            "script_generation",
+        }:
             model_snapshot = task.input_snapshot.get("model_snapshot")
             provider_code = (
                 model_snapshot.get("provider_code")
@@ -132,24 +213,17 @@ def _run_atomic_task(
                 if isinstance(model_snapshot, dict)
                 else None
             )
-            provider = create_short_drama_provider(
-                str(provider_code or ""),
+            provider_args = _short_drama_provider_arguments(
+                settings=settings,
+                provider_code=str(provider_code or ""),
                 provider_model_code=str(model_snapshot.get("provider_model_code") or "")
                 if isinstance(model_snapshot, dict)
                 else "",
-                api_key=str(settings.provider_secrets.get(str(secret_ref or ""), "")),
-                base_url=str(
-                    provider_settings.get("base_url")
-                    or provider_settings.get("api_base")
-                    or ""
-                )
-                if isinstance(provider_settings, dict)
-                else "",
-                prompt_category=str(
-                    provider_settings.get("prompt_category") or "short_drama_narration"
-                )
-                if isinstance(provider_settings, dict)
-                else "short_drama_narration",
+                secret_ref=str(secret_ref or ""),
+                provider_settings=provider_settings,
+            )
+            provider = create_short_drama_provider(
+                **provider_args,
                 model_limits={
                     **(
                         model_snapshot.get("provider_limits", {})
@@ -226,8 +300,14 @@ def _run_atomic_task(
             ),
             asr_adapter=AsrAdapter(
                 downloader=downloader,
-                transcriber=transcribe,
+                transcriber=local_transcribe if source_transcriber is None else None,
                 artifact_store=ArtifactStore(oss_client),
+                source_transcriber=source_transcriber,
+                source_url_validator=policy.validate if source_transcriber else None,
+                process_runner=ProcessRunner(heartbeat_interval_seconds=5)
+                if source_transcriber
+                else None,
+                provider_job_store=job_store if source_transcriber else None,
             ),
             short_drama_adapter=short_drama_adapter,
             tts_adapter=tts_adapter,
@@ -277,13 +357,17 @@ def publish_callback_outbox() -> None:
     settings = get_cached_settings()
     if not settings.callback_url or not settings.callback_token:
         return
-    client = HttpCallbackClient(
-        settings.callback_url,
-        settings.callback_token,
-        connect_timeout=settings.callback_connect_timeout_seconds,
-        read_timeout=settings.callback_read_timeout_seconds,
-        total_timeout=settings.callback_total_timeout_seconds,
-    )
+    try:
+        client = HttpCallbackClient(
+            settings.callback_url,
+            settings.callback_token,
+            connect_timeout=settings.callback_connect_timeout_seconds,
+            read_timeout=settings.callback_read_timeout_seconds,
+            total_timeout=settings.callback_total_timeout_seconds,
+        )
+    except ValueError:
+        # 配置错误不允许触碰 Outbox；readiness 会同步报告不可用。
+        return
     with Session(get_engine(settings), expire_on_commit=False) as session:
         CallbackOutboxPublisher(
             session,

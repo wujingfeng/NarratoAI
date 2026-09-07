@@ -191,10 +191,17 @@ def test_volcengine_tts_uses_frozen_credentials_and_decodes_wav(tmp_path):
     def respond(request):
         observed["authorization"] = request.headers["Authorization"]
         observed["payload"] = json.loads(request.content)
-        return httpx.Response(
-            200,
-            json={"code": 3000, "data": base64.b64encode(expected.read_bytes()).decode()},
-        )
+        return httpx.Response(200, json={
+            "code": 3000,
+            "data": base64.b64encode(expected.read_bytes()).decode(),
+            "addition": {
+                "duration": "500",
+                "frontend": json.dumps({"words": [
+                    {"word": "真", "start_time": 0.02, "end_time": 0.11},
+                    {"word": "实", "start_time": 0.11, "end_time": 0.20},
+                ]}),
+            },
+        })
 
     provider = VolcengineTtsProvider(
         endpoint="https://openspeech.bytedance.com/api/v1/tts",
@@ -203,7 +210,7 @@ def test_volcengine_tts_uses_frozen_credentials_and_decodes_wav(tmp_path):
         transport=httpx.MockTransport(respond),
     )
     target = tmp_path / "actual.wav"
-    provider.synthesize(
+    synthesis = provider.synthesize(
         "真实配音",
         target,
         voice_snapshot={
@@ -221,6 +228,9 @@ def test_volcengine_tts_uses_frozen_credentials_and_decodes_wav(tmp_path):
     }
     assert observed["payload"]["audio"]["encoding"] == "wav"
     assert observed["payload"]["audio"]["speed_ratio"] == 1.25
+    assert observed["payload"]["request"]["with_timestamp"] == 1
+    assert synthesis.duration_ms == 500
+    assert [word.word for word in synthesis.words] == ["真", "实"]
     assert target.read_bytes() == expected.read_bytes()
 
 

@@ -203,7 +203,7 @@ export const ja = {
   ...localized,
   dashboard: {
     routeHeading: "ワークスペース概要", footer: "影创工坊 · AI制作をもっとシンプルに", thumbnailUnavailable: "{name}のサムネイルを表示できません", thumbnailAlt: "{name}のサムネイル", coverAlt: "{name}のカバー",
-    nav: { overview: "ワークスペース概要", create: "新規制作", projects: "マイプロジェクト", narration: "ショートドラマ解説", translation: "動画翻訳", remix: "ショートドラマリミックス", credits: "制作クレジット", account: "アカウント" },
+    nav: { overview: "ワークスペース概要", create: "新規制作", projects: "マイプロジェクト", aiAssistant: "AIアシスタント", narration: "ショートドラマ解説", translation: "動画翻訳", remix: "ショートドラマリミックス", credits: "制作クレジット", account: "アカウント" },
     mobile: { navigation: "モバイルワークスペースナビゲーション", overview: "概要", create: "新規", projects: "プロジェクト", account: "マイページ" },
     sidebar: { navigation: "ワークスペースナビゲーション", tools: "ツール", account: "アカウント" },
     header: { home: "影创工坊ホーム", accountActions: "アカウントのクイック操作", viewBalance: "制作クレジット残高 {balance}", recharge: "チャージ" },

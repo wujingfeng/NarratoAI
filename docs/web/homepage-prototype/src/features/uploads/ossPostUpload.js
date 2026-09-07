@@ -22,6 +22,12 @@ const CONTENT_TYPE_BY_EXTENSION = {
     ".aac": "audio/aac",
     ".ogg": "audio/ogg",
   },
+  image: {
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".png": "image/png",
+    ".webp": "image/webp",
+  },
 };
 
 function fileExtension(filename) {

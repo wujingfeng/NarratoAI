@@ -12,6 +12,7 @@ from narrato_api.products.narration_config import router as product_config_route
 from narrato_api.products.video_translation import router as video_translation_router
 from narrato_api.products.ai_video import router as ai_video_router
 from narrato_api.admin.router import router as admin_router
+from narrato_api.conversations.router import router as conversations_router
 
 api_router = APIRouter()
 api_router.include_router(health_router, prefix="/health", tags=["health"])
@@ -24,3 +25,4 @@ api_router.include_router(product_config_router, tags=["products"])
 api_router.include_router(video_translation_router, tags=["video-translation"])
 api_router.include_router(ai_video_router, tags=["ai-video"])
 api_router.include_router(admin_router, tags=["admin"])
+api_router.include_router(conversations_router, tags=["assistant"])

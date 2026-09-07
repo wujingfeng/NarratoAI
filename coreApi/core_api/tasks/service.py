@@ -369,20 +369,7 @@ class TaskService:
         if attempt.error is None:
             attempt.error = {"code": "LEASE_EXPIRED", "retryable": True}
 
-        # max_retries 表示初次执行之外的自动重试次数，默认总计最多四次。
-        retries_used = task.current_attempt_no - 1
-        if retries_used >= task.max_retries:
-            task.error = {"code": "RETRY_EXHAUSTED", "retryable": False}
-            task.finished_at = now
-            self._transition(task, CoreTaskStatus.FAILED)
-            enqueue_state_callback(
-                self.session,
-                task,
-                event_id=f"evt_{task.id}_{task.state_version}",
-            )
-            self.session.commit()
-            return None
-
+        # Worker/租约丢失属于运行基础设施恢复，不消耗供应商业务重试预算。
         self._transition(task, CoreTaskStatus.RETRY_WAIT)
         enqueue_state_callback(
             self.session,
@@ -420,6 +407,55 @@ class TaskService:
             raise StaleLeaseError("STALE_LEASE")
         task.phase = phase
         task.progress = progress
+        task.updated_at = utc_now()
+        self.session.commit()
+        return task
+
+    def update_attempt_stream(
+        self,
+        attempt_id: str,
+        lease_token: str,
+        lease_version: int,
+        *,
+        stage: str,
+        content: str,
+        completed: bool = False,
+    ) -> CoreTask:
+        """Persist the latest bounded public inference snapshot for reconnects."""
+
+        if not stage or len(stage) > 80:
+            raise ValueError("stage 无效")
+        attempt, task = self._locked_attempt_and_task(attempt_id)
+        if not self._valid_current_lease(
+            task, attempt, lease_token, lease_version, now=utc_now()
+        ):
+            raise StaleLeaseError("STALE_LEASE")
+        previous = task.result if isinstance(task.result, dict) else {}
+        previous_stream = (
+            previous.get("stream")
+            if isinstance(previous.get("stream"), dict)
+            else {}
+        )
+        outputs = (
+            dict(previous_stream.get("outputs"))
+            if isinstance(previous_stream.get("outputs"), dict)
+            else {}
+        )
+        safe_content = content[:30_000]
+        if safe_content:
+            outputs[stage] = safe_content
+        sequence = previous_stream.get("sequence", 0)
+        sequence = sequence if type(sequence) is int and sequence >= 0 else 0
+        task.result = {
+            "stream": {
+                "sequence": sequence + 1,
+                "stage": stage,
+                "content": safe_content,
+                "outputs": outputs,
+                "completed": bool(completed),
+                "updated_at": utc_now().isoformat(),
+            }
+        }
         task.updated_at = utc_now()
         self.session.commit()
         return task
@@ -556,9 +592,16 @@ class TaskService:
 
         attempt.status = AttemptStatus.FAILED
         attempt.finished_at = now
-        retries_used = attempt.attempt_no - 1
+        retries_used = task.retry_count
         if retries_used >= task.max_retries:
-            task.error = {"code": "RETRY_EXHAUSTED", "retryable": False}
+            task.error = {
+                "code": str(
+                    (attempt.error or {}).get("code") or "ATOMIC_TASK_FAILED"
+                ),
+                "retryable": False,
+                "retry_exhausted": True,
+                "attempts": attempt.attempt_no,
+            }
             task.finished_at = now
             self._transition(task, CoreTaskStatus.FAILED)
             enqueue_state_callback(
@@ -568,6 +611,7 @@ class TaskService:
             return None
 
         task.error = attempt.error
+        task.retry_count += 1
         self._transition(task, CoreTaskStatus.RETRY_WAIT)
         enqueue_state_callback(
             self.session, task, event_id=f"evt_{task.id}_{task.state_version}"

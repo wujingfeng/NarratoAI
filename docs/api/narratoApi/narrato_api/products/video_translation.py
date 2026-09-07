@@ -81,6 +81,9 @@ SUPPORTED_LANGUAGES = (
 )
 RATIOS = ("original", "9:16", "16:9", "1:1", "4:3", "3:4")
 ORIGINAL_SOUND_MODES = ("voice_replacement", "translated_voice_only")
+# 翻译成片目前可被渲染器识别的字幕样式；助手 Run 从中随机一次并冻结到
+# project settings/run resolved_config，后续重试不会重新选择。
+SUPPORTED_SUBTITLE_STYLES = ("经典白色", "白字蓝边", "霓虹描边")
 NODES = (
     "subtitle_recognition",
     "subtitle_translation",
@@ -307,6 +310,7 @@ class TranslationSettings(StrictModel):
     video_ratio: str = "original"
     execution_mode: Literal["manual", "auto"] = "manual"
     voice_id: str | None = None
+    subtitle_style: str | None = None
     original_sound_mode: Literal["voice_replacement", "translated_voice_only"] = (
         "translated_voice_only"
     )

@@ -174,3 +174,91 @@ INSERT INTO model_play_mode_provider_prices (
   ('price_seedream_1k_usage', 'provider_seedream_reference', '1K', 'usage', NULL, NULL, 0, NULL, false, NOW(), NOW()),
   ('price_doubao_token', 'provider_doubao_chat', NULL, 'token', 0, 0, NULL, NULL, false, NOW(), NOW())
 ON CONFLICT (id) DO NOTHING;
+
+-- APIMart video providers. The host remains operations configuration; protocol
+-- selection is explicit in request_profile and never inferred from that host.
+INSERT INTO models (id, display_name, model_type, description, category, sort_order, is_enabled, is_default, created_at, updated_at)
+VALUES
+  ('seedance-2.0', 'Seedance 2.0', 'video', 'APIMart Seedance 2.0 视频生成', 'Seedance', 29, false, false, NOW(), NOW()),
+  ('seedance-1.5-pro', 'Seedance 1.5 Pro', 'video', 'APIMart Seedance 1.5 Pro 视频生成', 'Seedance', 28, false, false, NOW(), NOW()),
+  ('minimax-h3', 'MiniMax-H3', 'video', 'APIMart MiniMax-H3 视频生成', 'MiniMax', 27, false, false, NOW(), NOW()),
+  ('wan3.0-video', 'Wan 3.0', 'video', 'APIMart Wan 3.0 视频生成', 'Wan', 26, false, false, NOW(), NOW()),
+  ('kling-v3', 'Kling v3', 'video', 'APIMart Kling v3 视频生成', 'Kling', 25, false, false, NOW(), NOW())
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO model_play_modes (id, model_id, code, display_name, default_credits, active_provider_id, supports_generate_audio, is_enabled, is_default, sort_order, created_at, updated_at)
+VALUES
+  ('mode_seedance_20_apimart', 'seedance-2.0', 'reference_to_video', '参考生视频', 0, NULL, true, false, true, 29, NOW(), NOW()),
+  ('mode_seedance_15_apimart', 'seedance-1.5-pro', 'image_to_video', '图生视频', 0, NULL, true, false, true, 28, NOW(), NOW()),
+  ('mode_minimax_h3_apimart', 'minimax-h3', 'reference_to_video', '全能参考视频', 0, NULL, false, false, true, 27, NOW(), NOW()),
+  ('mode_wan_30_apimart', 'wan3.0-video', 'reference_to_video', '全能参考视频', 0, NULL, false, false, true, 26, NOW(), NOW()),
+  ('mode_kling_v3_apimart', 'kling-v3', 'image_to_video', '图生视频', 0, NULL, true, false, true, 25, NOW(), NOW())
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO model_play_mode_providers (id, play_mode_id, provider_code, request_profile, provider_model_id, submit_url, status_query_url, status_query_method, api_key, is_enabled, created_at, updated_at)
+VALUES
+  ('provider_apimart_seedance_25', 'mode_seedance_reference', 'apimart', 'seedance_2x', 'seedance-2.5', 'https://replace-with-apimart-host/v1/videos/generations', 'https://replace-with-apimart-host/v1/tasks/{task_id}', 'GET', '', false, NOW(), NOW()),
+  ('provider_apimart_seedance_20', 'mode_seedance_20_apimart', 'apimart', 'seedance_2x', 'seedance-2.0', 'https://replace-with-apimart-host/v1/videos/generations', 'https://replace-with-apimart-host/v1/tasks/{task_id}', 'GET', '', false, NOW(), NOW()),
+  ('provider_apimart_seedance_15', 'mode_seedance_15_apimart', 'apimart', 'seedance_15', 'seedance-1-5-pro', 'https://replace-with-apimart-host/v1/videos/generations', 'https://replace-with-apimart-host/v1/tasks/{task_id}', 'GET', '', false, NOW(), NOW()),
+  ('provider_apimart_minimax_h3', 'mode_minimax_h3_apimart', 'apimart', 'minimax_h3', 'MiniMax-H3', 'https://replace-with-apimart-host/v1/videos/generations', 'https://replace-with-apimart-host/v1/tasks/{task_id}', 'GET', '', false, NOW(), NOW()),
+  ('provider_apimart_wan_30', 'mode_wan_30_apimart', 'apimart', 'wan_30', 'wan3.0-video', 'https://replace-with-apimart-host/v1/videos/generations', 'https://replace-with-apimart-host/v1/tasks/{task_id}', 'GET', '', false, NOW(), NOW()),
+  ('provider_apimart_kling_v3', 'mode_kling_v3_apimart', 'apimart', 'kling_v3', 'kling-v3', 'https://replace-with-apimart-host/v1/videos/generations', 'https://replace-with-apimart-host/v1/tasks/{task_id}', 'GET', '', false, NOW(), NOW())
+ON CONFLICT (id) DO NOTHING;
+
+UPDATE model_play_modes
+SET active_provider_id = CASE id
+  WHEN 'mode_seedance_20_apimart' THEN 'provider_apimart_seedance_20'
+  WHEN 'mode_seedance_15_apimart' THEN 'provider_apimart_seedance_15'
+  WHEN 'mode_minimax_h3_apimart' THEN 'provider_apimart_minimax_h3'
+  WHEN 'mode_wan_30_apimart' THEN 'provider_apimart_wan_30'
+  WHEN 'mode_kling_v3_apimart' THEN 'provider_apimart_kling_v3'
+  ELSE active_provider_id
+END
+WHERE id IN ('mode_seedance_20_apimart', 'mode_seedance_15_apimart', 'mode_minimax_h3_apimart', 'mode_wan_30_apimart', 'mode_kling_v3_apimart');
+
+INSERT INTO model_play_mode_rules (id, play_mode_id, rule_kind, input_type, is_supported, is_required, max_count, max_text_units, supports_mention, sort_order, created_at, updated_at)
+VALUES
+  ('rule_apimart_s20_text', 'mode_seedance_20_apimart', 'input_constraint', 'text', true, false, NULL, 4000, false, 4, NOW(), NOW()),
+  ('rule_apimart_s20_image', 'mode_seedance_20_apimart', 'input_constraint', 'image', true, false, 9, NULL, true, 3, NOW(), NOW()),
+  ('rule_apimart_s20_video', 'mode_seedance_20_apimart', 'input_constraint', 'video', true, false, 3, NULL, true, 2, NOW(), NOW()),
+  ('rule_apimart_s20_audio', 'mode_seedance_20_apimart', 'input_constraint', 'audio', true, false, 3, NULL, true, 1, NOW(), NOW()),
+  ('rule_apimart_s15_text', 'mode_seedance_15_apimart', 'input_constraint', 'text', true, true, NULL, 4000, false, 2, NOW(), NOW()),
+  ('rule_apimart_s15_image', 'mode_seedance_15_apimart', 'input_constraint', 'image', true, false, 2, NULL, false, 1, NOW(), NOW()),
+  ('rule_apimart_h3_text', 'mode_minimax_h3_apimart', 'input_constraint', 'text', true, true, NULL, 7000, false, 4, NOW(), NOW()),
+  ('rule_apimart_h3_image', 'mode_minimax_h3_apimart', 'input_constraint', 'image', true, false, 50, NULL, true, 3, NOW(), NOW()),
+  ('rule_apimart_h3_video', 'mode_minimax_h3_apimart', 'input_constraint', 'video', true, false, 3, NULL, true, 2, NOW(), NOW()),
+  ('rule_apimart_h3_audio', 'mode_minimax_h3_apimart', 'input_constraint', 'audio', true, false, 3, NULL, true, 1, NOW(), NOW()),
+  ('rule_apimart_wan_text', 'mode_wan_30_apimart', 'input_constraint', 'text', true, false, NULL, 20000, false, 4, NOW(), NOW()),
+  ('rule_apimart_wan_image', 'mode_wan_30_apimart', 'input_constraint', 'image', true, false, 50, NULL, true, 3, NOW(), NOW()),
+  ('rule_apimart_wan_video', 'mode_wan_30_apimart', 'input_constraint', 'video', true, false, 50, NULL, true, 2, NOW(), NOW()),
+  ('rule_apimart_wan_audio', 'mode_wan_30_apimart', 'input_constraint', 'audio', true, false, 50, NULL, true, 1, NOW(), NOW()),
+  ('rule_apimart_kling_text', 'mode_kling_v3_apimart', 'input_constraint', 'text', true, false, NULL, 4000, false, 2, NOW(), NOW()),
+  ('rule_apimart_kling_image', 'mode_kling_v3_apimart', 'input_constraint', 'image', true, false, 2, NULL, false, 1, NOW(), NOW())
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO model_play_mode_rules (id, play_mode_id, rule_kind, is_supported, output_option_type, resolution, ratio, duration_seconds, sort_order, created_at, updated_at)
+VALUES
+  ('option_apimart_s20_resolution', 'mode_seedance_20_apimart', 'output_option', true, 'resolution', ARRAY['480p','720p','1080p','4k'], NULL, NULL, 3, NOW(), NOW()),
+  ('option_apimart_s20_ratio', 'mode_seedance_20_apimart', 'output_option', true, 'ratio', NULL, ARRAY['adaptive','16:9','9:16','1:1','4:3','3:4','21:9'], NULL, 2, NOW(), NOW()),
+  ('option_apimart_s20_duration', 'mode_seedance_20_apimart', 'output_option', true, 'duration', NULL, NULL, ARRAY['4','5','6','7','8','9','10','11','12','13','14','15'], 1, NOW(), NOW()),
+  ('option_apimart_s15_resolution', 'mode_seedance_15_apimart', 'output_option', true, 'resolution', ARRAY['480p','720p','1080p'], NULL, NULL, 3, NOW(), NOW()),
+  ('option_apimart_s15_ratio', 'mode_seedance_15_apimart', 'output_option', true, 'ratio', NULL, ARRAY['16:9','9:16','1:1','4:3','3:4','21:9'], NULL, 2, NOW(), NOW()),
+  ('option_apimart_s15_duration', 'mode_seedance_15_apimart', 'output_option', true, 'duration', NULL, NULL, ARRAY['4','5','6','7','8','9','10','11','12'], 1, NOW(), NOW()),
+  ('option_apimart_h3_resolution', 'mode_minimax_h3_apimart', 'output_option', true, 'resolution', ARRAY['768P','2K'], NULL, NULL, 3, NOW(), NOW()),
+  ('option_apimart_h3_ratio', 'mode_minimax_h3_apimart', 'output_option', true, 'ratio', NULL, ARRAY['16:9','9:16','1:1','4:3','3:4','21:9','adaptive'], NULL, 2, NOW(), NOW()),
+  ('option_apimart_h3_duration', 'mode_minimax_h3_apimart', 'output_option', true, 'duration', NULL, NULL, ARRAY['4','5','6','7','8','9','10','11','12','13','14','15'], 1, NOW(), NOW()),
+  ('option_apimart_wan_resolution', 'mode_wan_30_apimart', 'output_option', true, 'resolution', ARRAY['480P','720P','1080P'], NULL, NULL, 3, NOW(), NOW()),
+  ('option_apimart_wan_ratio', 'mode_wan_30_apimart', 'output_option', true, 'ratio', NULL, ARRAY['adaptive','16:9','9:16','1:1','4:3','3:4','21:9'], NULL, 2, NOW(), NOW()),
+  ('option_apimart_wan_duration', 'mode_wan_30_apimart', 'output_option', true, 'duration', NULL, NULL, ARRAY['-1','2','3','4','5','6','7','8','9','10','15','20','30'], 1, NOW(), NOW()),
+  ('option_apimart_kling_ratio', 'mode_kling_v3_apimart', 'output_option', true, 'ratio', NULL, ARRAY['16:9','9:16','1:1'], NULL, 2, NOW(), NOW()),
+  ('option_apimart_kling_duration', 'mode_kling_v3_apimart', 'output_option', true, 'duration', NULL, NULL, ARRAY['3','4','5','6','7','8','9','10','11','12','13','14','15'], 1, NOW(), NOW())
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO model_play_mode_provider_prices (id, provider_id, resolution, billing_unit, per_usage_credits, per_second_credits, is_enabled, created_at, updated_at)
+VALUES
+  ('price_apimart_s20_720p', 'provider_apimart_seedance_20', '720p', 'second', NULL, 0, false, NOW(), NOW()),
+  ('price_apimart_s15_720p', 'provider_apimart_seedance_15', '720p', 'second', NULL, 0, false, NOW(), NOW()),
+  ('price_apimart_h3_2k', 'provider_apimart_minimax_h3', '2K', 'second', NULL, 0, false, NOW(), NOW()),
+  ('price_apimart_wan_720p', 'provider_apimart_wan_30', '720P', 'second', NULL, 0, false, NOW(), NOW()),
+  ('price_apimart_kling_std', 'provider_apimart_kling_v3', NULL, 'second', NULL, 0, false, NOW(), NOW())
+ON CONFLICT (id) DO NOTHING;

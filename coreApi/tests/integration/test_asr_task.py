@@ -19,7 +19,7 @@ from core_api.runtime.artifact_store import ArtifactStore
 from core_api.runtime.artifact_store import ArtifactSecurityError
 from core_api.runtime.workspace import CoreTaskWorkspace, WorkspaceSecurityError
 from core_api.tasks.handlers import AtomicTaskHandler
-from core_api.tasks.models import CoreArtifact, CoreTask, CoreTaskStatus
+from core_api.tasks.models import AsrProviderJob, CoreArtifact, CoreTask, CoreTaskStatus
 from core_api.tasks.models import utc_now
 from core_api.tasks.service import StaleLeaseError, TaskService
 
@@ -37,8 +37,13 @@ def test_asr_post_creates_async_task_once(app, settings):
     dispatcher = RecordingDispatcher()
     app.dependency_overrides[get_task_dispatcher] = lambda: dispatcher
     body = {
-        "source_url": "https://cdn.example.test/narrato/api/audio.mp4",
-        "declared_extension": "mp4",
+        "sources": [
+            {
+                "source_asset_id": "asset_single",
+                "source_url": "https://cdn.example.test/narrato/api/audio.mp4",
+                "declared_extension": "mp4",
+            }
+        ],
         "caller_task_id": "node_asr_01",
     }
     headers = {
@@ -59,6 +64,17 @@ def test_asr_post_creates_async_task_once(app, settings):
                 "/api/v1/asr/tasks",
                 json={**body, "unknown": "field"},
                 headers={**headers, "X-Idempotency-Key": "asr-unknown"},
+            ).status_code
+            == 422
+        )
+        assert (
+            client.post(
+                "/api/v1/asr/tasks",
+                json={
+                    "source_url": "https://cdn.example.test/narrato/api/old.mp4",
+                    "declared_extension": "mp4",
+                },
+                headers={**headers, "X-Idempotency-Key": "asr-scalar-removed"},
             ).status_code
             == 422
         )
@@ -110,6 +126,50 @@ def test_asr_post_accepts_ordered_batch_sources(app, settings):
     ]
 
 
+def test_volcengine_callback_persists_terminal_result(app, settings):
+    engine = get_engine(settings)
+    Base.metadata.create_all(engine)
+    with Session(engine) as session:
+        task = TaskService(session).create_core_task(
+            caller="narrato-api",
+            route="/api/v1/asr/tasks",
+            task_type="asr",
+            idempotency_key="callback-asr",
+            input_snapshot={"sources": []},
+        )
+        session.add(
+            AsrProviderJob(
+                id="asrj_callback",
+                core_task_id=task.id,
+                source_index=0,
+                source_asset_id="asset_callback",
+                provider="volcengine",
+                provider_task_id="volc-task-1",
+                callback_key="c" * 40,
+                status="submitted",
+            )
+        )
+        session.commit()
+    with TestClient(app) as client:
+        response = client.post(
+            f"/api/v1/asr/callbacks/{'c' * 40}",
+            json={
+                "resp": {
+                    "id": "volc-task-1",
+                    "code": "1000",
+                    "utterances": [
+                        {"text": "字幕", "start_time": 0, "end_time": 500}
+                    ],
+                }
+            },
+        )
+    assert response.status_code == 200
+    with Session(engine) as session:
+        row = session.get(AsrProviderJob, "asrj_callback")
+        assert row is not None and row.status == "succeeded"
+        assert row.response_payload["resp"]["id"] == "volc-task-1"
+
+
 class FakeDownloader:
     def download(
         self, url: str, destination: Path, *, max_bytes: int
@@ -155,8 +215,13 @@ def test_asr_handler_uploads_and_registers_srt_artifact(session, tmp_path):
         task_type="asr",
         idempotency_key="handler-asr",
         input_snapshot={
-            "source_url": "https://cdn.example.test/narrato/api/audio.mp4",
-            "declared_extension": "mp4",
+            "sources": [
+                {
+                    "source_asset_id": "asset_single",
+                    "source_url": "https://cdn.example.test/narrato/api/audio.mp4",
+                    "declared_extension": "mp4",
+                }
+            ],
         },
     )
     fake_oss = FakeOss()
@@ -223,6 +288,8 @@ def test_asr_handler_returns_subtitle_artifact_for_each_source(session, tmp_path
     ]
     assert len(result["artifacts"]) == 2
     assert all(item["artifact"]["kind"] == "subtitle" for item in result["subtitles"])
+    assert all("00:00:00,000 --> 00:00:01,000" in item["preview_text"] for item in result["subtitles"])
+    assert all(item["preview_truncated"] is False for item in result["subtitles"])
 
 
 @pytest.mark.parametrize(
@@ -236,8 +303,13 @@ def test_asr_handler_rejects_empty_or_invalid_srt(session, tmp_path, srt):
         task_type="asr",
         idempotency_key=f"invalid-asr-{len(srt)}-{srt[:1]}",
         input_snapshot={
-            "source_url": "https://cdn.example.test/narrato/api/audio.mp4",
-            "declared_extension": "mp4",
+            "sources": [
+                {
+                    "source_asset_id": "asset_single",
+                    "source_url": "https://cdn.example.test/narrato/api/audio.mp4",
+                    "declared_extension": "mp4",
+                }
+            ],
         },
     )
 
@@ -375,8 +447,13 @@ def test_asr_fences_lease_before_oss_upload(tmp_path):
 
     with pytest.raises(StaleLeaseError):
         adapter.run(
-            source_url="https://cdn.example.test/narrato/api/audio.mp4",
-            declared_extension="mp4",
+            sources=[
+                {
+                    "source_asset_id": "asset_single",
+                    "source_url": "https://cdn.example.test/narrato/api/audio.mp4",
+                    "declared_extension": "mp4",
+                }
+            ],
             core_task_id="ctask_FENCE",
             attempt_no=1,
             workspace=workspace,

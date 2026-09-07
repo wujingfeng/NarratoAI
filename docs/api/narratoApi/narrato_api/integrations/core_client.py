@@ -15,6 +15,39 @@ class CoreClientError(RuntimeError):
 class CoreClientRejectedError(CoreClientError):
     """Core 已收到请求，但拒绝了媒体声明或媒体校验。"""
 
+    def __init__(
+        self,
+        message: str,
+        *,
+        code: str = "CORE_REQUEST_REJECTED",
+        http_status: int = 422,
+    ) -> None:
+        super().__init__(message)
+        self.code = code
+        self.http_status = http_status
+
+
+def _core_rejected_error(error: HTTPError) -> CoreClientRejectedError:
+    """从 Core 安全错误信封保留真实错误码，避免被统一文案吞掉。"""
+
+    code = "CORE_REQUEST_REJECTED"
+    message = "Core task request was rejected"
+    try:
+        payload = json.loads(error.read(65_536) or b"{}")
+    except (OSError, ValueError, TypeError):
+        payload = {}
+    raw_code = payload.get("code") if isinstance(payload, dict) else None
+    raw_message = payload.get("message") if isinstance(payload, dict) else None
+    if isinstance(raw_code, str) and 1 <= len(raw_code) <= 128:
+        code = raw_code
+    if isinstance(raw_message, str) and raw_message.strip():
+        message = raw_message.strip()[:500]
+    return CoreClientRejectedError(
+        message,
+        code=code,
+        http_status=error.code,
+    )
+
 
 def _duration_seconds(payload: object) -> float | None:
     """仅接受 Core 已验证媒体探测返回的正有限时长。"""
@@ -51,6 +84,7 @@ class CoreTaskResult:
     progress: int = 0
     result: object | None = None
     artifacts: tuple[dict[str, object], ...] = ()
+    error: dict[str, object] | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -184,9 +218,7 @@ class HttpCoreClient:
             # 422 是 Core 对请求声明的明确拒绝，不应伪装成服务不可用；认证、路由
             # 和服务端错误仍按不可用处理，避免将部署问题错误归因于用户文件。
             if error.code == 422:
-                raise CoreClientRejectedError(
-                    "Core media probe rejected the request"
-                ) from error
+                raise _core_rejected_error(error) from error
             raise CoreClientError("Core media probe request failed") from error
         except (URLError, TimeoutError, json.JSONDecodeError) as error:
             raise CoreClientError("Core media probe request failed") from error
@@ -226,19 +258,6 @@ class HttpCoreClient:
             return MediaProbeResult(valid=False, core_task_id=core_task_id)
         return MediaProbeResult(valid=None, core_task_id=core_task_id)
 
-    def submit_asr(
-        self, *, source_url: str, declared_extension: str, caller_task_id: str
-    ) -> str:
-        return self._submit_task(
-            "/api/v1/asr/tasks",
-            {
-                "source_url": source_url,
-                "declared_extension": declared_extension,
-                "caller_task_id": caller_task_id,
-            },
-            caller_task_id,
-        )
-
     def submit_asr_batch(
         self, *, sources: list[dict[str, object]], caller_task_id: str
     ) -> str:
@@ -247,6 +266,29 @@ class HttpCoreClient:
         return self._submit_task(
             "/api/v1/asr/tasks",
             {"sources": sources, "caller_task_id": caller_task_id},
+            caller_task_id,
+        )
+
+    def submit_audio_understanding(
+        self,
+        *,
+        model_id: str,
+        sources: list[dict[str, object]],
+        caller_task_id: str,
+    ) -> str:
+        """短剧专用：直接把公网视频 URL 交给方舟理解内嵌音频。"""
+
+        return self._submit_task(
+            "/api/v1/audio-understanding/tasks",
+            {
+                "model_id": model_id,
+                "sources": sources,
+                "language": "zh-CN",
+                "fps": 1,
+                "min_frame_tokens": 64,
+                "min_frame_tokens_mode": "provider_default",
+                "caller_task_id": caller_task_id,
+            },
             caller_task_id,
         )
 
@@ -442,6 +484,17 @@ class HttpCoreClient:
         ):
             raise CoreClientError("Core task response is invalid")
         artifacts = data.get("artifacts", [])
+        raw_error = data.get("error")
+        error: dict[str, object] | None = None
+        if isinstance(raw_error, dict) and isinstance(raw_error.get("code"), str):
+            error = {"code": raw_error["code"]}
+            if isinstance(raw_error.get("retryable"), bool):
+                error["retryable"] = raw_error["retryable"]
+            if isinstance(raw_error.get("reason"), str):
+                error["reason"] = raw_error["reason"]
+            for key in ("details", "diagnostics"):
+                if isinstance(raw_error.get(key), dict):
+                    error[key] = raw_error[key]
         return CoreTaskResult(
             data["core_task_id"],
             data["status"],
@@ -449,6 +502,7 @@ class HttpCoreClient:
             progress,
             data.get("result"),
             tuple(item for item in artifacts if isinstance(item, dict)),
+            error,
         )
 
     def get_voice_capabilities(self) -> tuple[CoreVoiceCapability, ...]:
@@ -535,10 +589,8 @@ class HttpCoreClient:
         except HTTPError as error:
             # 422 代表 Core 已经可用，但拒绝了当前任务契约或参数；调用方不能把它
             # 伪装成 503 服务不可用，否则前端会引导用户错误地排查服务状态。
-            if error.code == 422:
-                raise CoreClientRejectedError(
-                    "Core task request was rejected"
-                ) from error
+            if error.code in {409, 422}:
+                raise _core_rejected_error(error) from error
             raise CoreClientError("Core task submission failed") from error
         except (URLError, TimeoutError, json.JSONDecodeError) as error:
             raise CoreClientError("Core task submission failed") from error

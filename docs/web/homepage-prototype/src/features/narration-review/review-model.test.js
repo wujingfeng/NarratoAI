@@ -197,3 +197,36 @@ test("editor serialization preserves review metadata and defaults old drafts", (
   assert.equal(legacyScript.picture, "");
   assert.equal(legacyScript.originalSound, false);
 });
+
+test("editor draft roundtrips alignment anchors and drops them after text edit", () => {
+  const clips = saved.clips.map((clip) => clip.trackId === "script" ? {
+    ...clip,
+    text: "证据终于出现",
+    eventId: "asset-a:event-1",
+    visualAnchor: 2.4,
+    narrationAnchorText: "证据",
+    matchConfidence: 0.92,
+    visualLead: 0.15,
+    narrationStartOffset: 1.1,
+  } : clip);
+  const draft = createEditorDraft({ clips, cues: saved.cues, ...saved.settings });
+  const hydrated = readEditorDraft(draft);
+  const script = hydrated.clips.find((clip) => clip.trackId === "script");
+  assert.equal(script.eventId, "asset-a:event-1");
+  assert.equal(script.visualAnchor, 2.4);
+  assert.equal(script.narrationAnchorText, "证据");
+  assert.equal(script.matchConfidence, 0.92);
+  assert.equal(script.visualLead, 0.15);
+  assert.equal(script.narrationStartOffset, 1.1);
+
+  script.text = "用户已经改写文案";
+  const edited = createEditorDraft({
+    clips: hydrated.clips,
+    cues: hydrated.cues,
+    ...hydrated.settings,
+  });
+  const editedScript = edited.clips.find((clip) => clip.track_id === "script");
+  assert.equal("event_id" in editedScript, false);
+  assert.equal("visual_anchor" in editedScript, false);
+  assert.equal("narration_start_offset" in editedScript, false);
+});

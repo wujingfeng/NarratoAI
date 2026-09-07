@@ -8,6 +8,7 @@ Core 幂等键提交；提交响应随后才绑定 Core task ID。Broker 重放�
 from __future__ import annotations
 
 import hashlib
+from copy import deepcopy
 from collections.abc import Callable
 
 from sqlalchemy import func, select
@@ -15,7 +16,11 @@ from sqlalchemy.orm import Session
 
 from narrato_api.assets.models import Asset
 from narrato_api.editor.models import EditorRevision
-from narrato_api.integrations.core_client import CoreClientError, HttpCoreClient
+from narrato_api.integrations.core_client import (
+    CoreClientError,
+    CoreClientRejectedError,
+    HttpCoreClient,
+)
 from narrato_api.projects.models import Project, ProjectNarrationSettings
 from narrato_api.workflows.models import (
     Workflow,
@@ -29,6 +34,74 @@ from narrato_api.workflows.service import _new_id
 
 class WorkflowDispatchError(RuntimeError):
     """工作流无法准备或提交 Core 原子任务。"""
+
+
+ANALYSIS_PROJECTION_NODES = (
+    ("conflict_highlights", "plot_structure"),
+    ("highlight_scoring", "conflict_highlights"),
+)
+
+
+def _latest_completed_attempt(
+    session: Session, node: WorkflowNode
+) -> WorkflowNodeAttempt | None:
+    return session.scalar(
+        select(WorkflowNodeAttempt)
+        .where(
+            WorkflowNodeAttempt.workflow_node_id == node.id,
+            WorkflowNodeAttempt.state == "completed",
+        )
+        .order_by(WorkflowNodeAttempt.attempt_number.desc())
+    )
+
+
+def _complete_analysis_projection_nodes(
+    session: Session, nodes_by_name: dict[str, WorkflowNode]
+) -> None:
+    """把完整剧情报告投影到展示节点，禁止为同一报告重复调用 LLM。"""
+
+    for node_name, source_name in ANALYSIS_PROJECTION_NODES:
+        node = nodes_by_name.get(node_name)
+        source = nodes_by_name.get(source_name)
+        if (
+            node is None
+            or source is None
+            or node.state != "queued"
+            or source.state != "completed"
+        ):
+            continue
+        source_attempt = _latest_completed_attempt(session, source)
+        if source_attempt is None or not isinstance(source_attempt.result, dict):
+            continue
+        attempt = session.scalar(
+            select(WorkflowNodeAttempt)
+            .where(WorkflowNodeAttempt.workflow_node_id == node.id)
+            .order_by(WorkflowNodeAttempt.attempt_number.desc())
+            .with_for_update()
+        )
+        if attempt is not None and attempt.state == "running":
+            continue
+        if attempt is None:
+            attempt = WorkflowNodeAttempt(
+                id=_new_id("wat"),
+                workflow_node_id=node.id,
+                attempt_number=1,
+                state="completed",
+                state_version=source_attempt.state_version,
+            )
+            session.add(attempt)
+        else:
+            attempt.state = "completed"
+            attempt.state_version = source_attempt.state_version
+        projected = deepcopy(source_attempt.result)
+        projected["projection"] = {
+            "source_node": source_name,
+            "target_node": node_name,
+            "reused_analysis_artifact": True,
+        }
+        attempt.result = projected
+        attempt.completed_at = utc_now()
+        node.state = "completed"
 
 
 def _translation_allowed_duration_ms(
@@ -86,31 +159,26 @@ class WorkflowOrchestrator:
         ) = prepared
         try:
             if node_name == "subtitle_recognition":
-                batch_submit = getattr(core_client, "submit_asr_batch", None)
-                if callable(batch_submit):
-                    core_task_id = batch_submit(
-                        sources=[
-                            {
-                                "source_asset_id": source["source_asset_id"],
-                                "source_url": source["video_url"],
-                                "declared_extension": source["declared_extension"],
-                            }
-                            for source in sources
-                        ],
-                        caller_task_id=attempt_id,
-                    )
-                elif len(sources) == 1:
-                    # 保留旧测试/滚动部署单素材客户端兼容；生产客户端走批量接口。
-                    core_task_id = core_client.submit_asr(
-                        source_url=str(sources[0]["video_url"]),
-                        declared_extension=str(sources[0]["declared_extension"]),
-                        caller_task_id=attempt_id,
-                    )
-                else:
-                    raise WorkflowDispatchError("Core ASR batch API is unavailable")
+                core_task_id = core_client.submit_audio_understanding(
+                    model_id="model_volcengine_ark",
+                    sources=[
+                        {
+                            "source_asset_id": source["source_asset_id"],
+                            "video_url": source["video_url"],
+                            "video_name": source["video_name"],
+                            **(
+                                {"duration_seconds": source["duration_seconds"]}
+                                if source.get("duration_seconds") is not None
+                                else {}
+                            ),
+                        }
+                        for source in sources
+                    ],
+                    caller_task_id=attempt_id,
+                )
             elif node_name == "script_generation":
                 core_task_id = core_client.submit_script_generation(
-                    model_id="model_qwen_plus",
+                    model_id="model_volcengine_ark",
                     analysis_artifact=analysis_artifact,
                     sources=[
                         {
@@ -128,7 +196,7 @@ class WorkflowOrchestrator:
                         for source in sources
                     ],
                     caller_task_id=attempt_id,
-                    config_snapshot=_qwen_config_snapshot(settings),
+                    config_snapshot=_short_drama_config_snapshot(settings),
                 )
             elif node_name == "subtitle_translation":
                 if len(sources) != 1:
@@ -252,9 +320,9 @@ class WorkflowOrchestrator:
                     render_config=dict(render_snapshot.get("render_config") or {}),
                     caller_task_id=attempt_id,
                 )
-            else:
+            elif node_name == "plot_structure":
                 core_task_id = core_client.submit_video_analysis(
-                    model_id="model_qwen_plus",
+                    model_id="model_volcengine_ark",
                     sources=[
                         {
                             "source_asset_id": source["source_asset_id"],
@@ -271,8 +339,17 @@ class WorkflowOrchestrator:
                         for source in sources
                     ],
                     caller_task_id=attempt_id,
-                    config_snapshot=_qwen_config_snapshot(settings),
+                    config_snapshot=_short_drama_config_snapshot(settings),
                 )
+            else:
+                raise WorkflowDispatchError(
+                    f"unsupported Core workflow node: {node_name}"
+                )
+        except CoreClientRejectedError as error:
+            # 4xx/422 表示 Core 已经明确拒绝了当前请求，重放相同的 outbox 不会
+            # 改变结果。收敛为终态失败，避免用户永久停在“字幕识别中”。
+            self._fail_rejected_attempt(attempt_id=attempt_id, error=error)
+            return True
         except CoreClientError as error:
             # 保留 queued attempt。下次 Outbox 重放继续使用相同 caller_task_id，
             # 因而可恢复“Core 已受理但 HTTP 响应丢失”的场景。
@@ -293,6 +370,62 @@ class WorkflowOrchestrator:
                 if node is not None:
                     node.state = "running"
                 return True
+
+    def _fail_rejected_attempt(
+        self, *, attempt_id: str, error: CoreClientRejectedError
+    ) -> None:
+        """将 Core 的确定性请求拒绝写成工作流终态，禁止同一请求热重试。"""
+
+        with self.session_factory() as session:
+            with session.begin():
+                attempt = session.scalar(
+                    select(WorkflowNodeAttempt)
+                    .where(WorkflowNodeAttempt.id == attempt_id)
+                    .with_for_update()
+                )
+                if attempt is None or attempt.state in {"completed", "failed", "cancelled"}:
+                    return
+                node = session.get(WorkflowNode, attempt.workflow_node_id)
+                if node is None:
+                    return
+                workflow = session.get(Workflow, node.workflow_id)
+                attempt.state = "failed"
+                attempt.completed_at = utc_now()
+                attempt.result = {
+                    "error": {
+                        "code": error.code,
+                        "message": str(error),
+                        "retryable": False,
+                    }
+                }
+                node.state = "failed"
+
+                nodes = list(
+                    session.scalars(
+                        select(WorkflowNode)
+                        .where(WorkflowNode.workflow_id == node.workflow_id)
+                        .with_for_update()
+                    )
+                )
+                blocked = {node.name}
+                while True:
+                    descendants = [
+                        candidate
+                        for candidate in nodes
+                        if candidate.state == "queued"
+                        and any(dependency in blocked for dependency in candidate.depends_on)
+                    ]
+                    if not descendants:
+                        break
+                    for descendant in descendants:
+                        descendant.state = "cancelled"
+                        blocked.add(descendant.name)
+                if workflow is not None:
+                    workflow.state = "failed"
+                    workflow.state_version += 1
+                    project = session.get(Project, workflow.project_id)
+                    if project is not None:
+                        project.status = "failed"
 
     def _prepare_attempt(
         self, workflow_id: str
@@ -328,6 +461,7 @@ class WorkflowOrchestrator:
                     )
                 )
                 by_name = {node.name: node for node in nodes}
+                _complete_analysis_projection_nodes(session, by_name)
                 ready = next(
                     (
                         node
@@ -704,6 +838,7 @@ class WorkflowOrchestrator:
                         {
                             "source_asset_id": video.id,
                             "subtitle_url": subtitle.cdn_url,
+                            "subtitle_name": subtitle.filename,
                             "asset_id": subtitle.id,
                         }
                         for video, subtitle in matches
@@ -735,8 +870,8 @@ class WorkflowOrchestrator:
                 return True
 
 
-def _qwen_config_snapshot(settings: dict[str, object]) -> dict[str, object]:
-    """只传递 Core VideoAnalysisTaskRequest 接受的配置键。"""
+def _short_drama_config_snapshot(settings: dict[str, object]) -> dict[str, object]:
+    """只传递火山方舟短剧分析/文案接口接受的冻结配置。"""
 
     selected_style = settings.get("narration_style")
     selected_genre = (
@@ -746,12 +881,16 @@ def _qwen_config_snapshot(settings: dict[str, object]) -> dict[str, object]:
     )
     snapshot: dict[str, object] = {
         "original_sound_ratio": settings.get("original_sound_ratio", 30),
+        "fps": 1,
+        "min_frame_tokens": 64,
+        "min_frame_tokens_mode": "provider_default",
     }
     if isinstance(selected_genre, str) and selected_genre.strip():
         snapshot["drama_genre"] = selected_genre.strip()
     for key in (
-        "drama_name",
         "narration_style",
+        "requirements",
+        "target_duration_seconds",
         "temperature",
         "max_tokens",
     ):
@@ -759,6 +898,10 @@ def _qwen_config_snapshot(settings: dict[str, object]) -> dict[str, object]:
         if value is not None:
             snapshot[key] = value
     return snapshot
+
+
+# 保留内部旧导入名，避免部署滚动升级期间已有 Worker/测试模块导入失败。
+_qwen_config_snapshot = _short_drama_config_snapshot
 
 
 def _completed_subtitle_inputs(
@@ -797,8 +940,17 @@ def _completed_subtitle_inputs(
             if not isinstance(source_id, str) or source_id not in source_asset_ids:
                 continue
             subtitle_url = record.get("subtitle_url")
+            subtitle_name = record.get("subtitle_name")
+            name_snapshot = (
+                {"subtitle_name": subtitle_name}
+                if isinstance(subtitle_name, str) and subtitle_name
+                else {}
+            )
             if isinstance(subtitle_url, str) and subtitle_url:
-                result[source_id] = {"subtitle_url": subtitle_url}
+                result[source_id] = {
+                    "subtitle_url": subtitle_url,
+                    **name_snapshot,
+                }
                 continue
             artifact = record.get("artifact")
             if not isinstance(artifact, dict):
@@ -811,7 +963,8 @@ def _completed_subtitle_inputs(
                 and url
             ):
                 result[source_id] = {
-                    "subtitle_artifact": {"artifact_id": artifact_id, "url": url}
+                    "subtitle_artifact": {"artifact_id": artifact_id, "url": url},
+                    **name_snapshot,
                 }
     if len(result) == len(source_asset_ids):
         return result

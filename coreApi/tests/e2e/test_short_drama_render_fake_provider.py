@@ -13,6 +13,7 @@ from core_api.adapters.narrato.tts import FakeTtsProvider
 from core_api.infrastructure.oss_client import DownloadReceipt, OssUploadResult
 from core_api.runtime.artifact_store import ArtifactStore
 from core_api.runtime.process_runner import ProcessRunner
+from core_api.runtime.workspace import CoreTaskWorkspace
 from core_api.tasks.handlers import AtomicTaskHandler
 from core_api.tasks.callbacks import OutboxEventConflictError
 from core_api.tasks.models import CoreArtifact, CoreTaskStatus
@@ -39,6 +40,53 @@ class MemoryIO:
 
     def delete_object(self, object_key):
         self.deleted.append(object_key)
+
+
+def test_render_adapter_preserves_alignment_fields_for_backend(tmp_path):
+    class CapturingBackend(FakeRenderBackend):
+        received = None
+
+        def render(self, **kwargs):
+            self.received = kwargs["timeline"]
+            return super().render(**kwargs)
+
+    io = MemoryIO()
+    backend = CapturingBackend()
+    adapter = RenderAdapter(io, backend, ArtifactStore(io))
+    adapter.run(
+        workspace=CoreTaskWorkspace.create(tmp_path, "ctask_anchor", 1),
+        core_task_id="ctask_anchor",
+        attempt_no=1,
+        snapshot_id="revision_anchor",
+        source_order=["asset_a"],
+        sources=[{
+            "source_asset_id": "asset_a",
+            "video_url": "https://cdn.example.test/narrato/api/a.mp4",
+        }],
+        timeline=[{
+            "source_asset_id": "asset_a",
+            "start": 0,
+            "end": 3,
+            "narration": "证据出现",
+            "event_id": "asset_a:event_1",
+            "visual_anchor": 2.0,
+            "narration_anchor_text": "证据",
+            "match_confidence": 0.9,
+            "visual_lead": 0.15,
+            "narration_start_offset": 1.2,
+        }],
+        voice_id="voice_fake",
+        voice_snapshot={"voice_id": "voice_fake"},
+    )
+    assert backend.received[0] | {} == {
+        **backend.received[0],
+        "event_id": "asset_a:event_1",
+        "visual_anchor": 2.0,
+        "narration_anchor_text": "证据",
+        "match_confidence": 0.9,
+        "visual_lead": 0.15,
+        "narration_start_offset": 1.2,
+    }
 
 
 def test_render_task_duplicate_wake_registers_once(session, tmp_path):

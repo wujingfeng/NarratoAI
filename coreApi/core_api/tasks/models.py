@@ -98,6 +98,7 @@ class CoreTask(Base):
     state_version: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     current_attempt_no: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     max_retries: Mapped[int] = mapped_column(Integer, nullable=False, default=3)
+    retry_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     error: Mapped[dict[str, Any] | None] = mapped_column(JSON)
     result: Mapped[list[dict[str, Any]] | dict[str, Any] | None] = mapped_column(JSON)
     created_at: Mapped[datetime] = mapped_column(
@@ -118,6 +119,51 @@ class CoreTask(Base):
     dispatches: Mapped[list[CoreDispatchOutbox]] = relationship(
         back_populates="core_task", cascade="all, delete-orphan"
     )
+    asr_provider_jobs: Mapped[list[AsrProviderJob]] = relationship(
+        back_populates="core_task", cascade="all, delete-orphan"
+    )
+
+
+class AsrProviderJob(Base):
+    """一条批量 ASR 来源对应的可恢复第三方任务。"""
+
+    __tablename__ = "asr_provider_jobs"
+    __table_args__ = (
+        UniqueConstraint(
+            "core_task_id", "source_index", name="uq_asr_provider_jobs_task_source"
+        ),
+        UniqueConstraint(
+            "provider", "provider_task_id", name="uq_asr_provider_jobs_remote"
+        ),
+        UniqueConstraint("callback_key", name="uq_asr_provider_jobs_callback_key"),
+        CheckConstraint(
+            "status IN ('preparing', 'submitted', 'succeeded', 'failed')",
+            name="ck_asr_provider_jobs_status",
+        ),
+        Index("ix_asr_provider_jobs_status", "status", "updated_at"),
+    )
+
+    id: Mapped[str] = mapped_column(String(40), primary_key=True)
+    core_task_id: Mapped[str] = mapped_column(
+        ForeignKey("core_tasks.id", ondelete="CASCADE"), nullable=False
+    )
+    source_index: Mapped[int] = mapped_column(Integer, nullable=False)
+    source_asset_id: Mapped[str] = mapped_column(String(80), nullable=False)
+    provider: Mapped[str] = mapped_column(String(40), nullable=False)
+    provider_task_id: Mapped[str | None] = mapped_column(String(160))
+    callback_key: Mapped[str] = mapped_column(String(128), nullable=False)
+    prepared_audio_url: Mapped[str | None] = mapped_column(String(2048))
+    status: Mapped[str] = mapped_column(String(24), nullable=False, default="preparing")
+    response_payload: Mapped[dict[str, Any] | None] = mapped_column(JSON)
+    error: Mapped[dict[str, Any] | None] = mapped_column(JSON)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=utc_now
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=utc_now, onupdate=utc_now
+    )
+
+    core_task: Mapped[CoreTask] = relationship(back_populates="asr_provider_jobs")
 
 
 class CoreTaskAttempt(Base):

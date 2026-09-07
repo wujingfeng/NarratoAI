@@ -87,6 +87,61 @@ def test_oss_delete_requires_access_key_credentials(
         client.delete_object("game339", "narrato/api/episode.mp4")
 
 
+def test_copy_from_url_allows_provider_cdn_local_proxy_mapping(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Provider CDN 的 DNS 映射不影响 HTTPS 结果转存。"""
+
+    class _Response:
+        headers = {"Content-Length": "7", "Content-Type": "video/mp4"}
+
+        def __enter__(self) -> _Response:
+            return self
+
+        def __exit__(self, *args: object) -> None:
+            return None
+
+        def read(self, _size: int) -> bytes:
+            return b"content"
+
+    monkeypatch.setattr(
+        "narrato_api.integrations.oss_client.urlopen",
+        lambda *_args, **_kwargs: _Response(),
+    )
+    client = HttpOssClient(
+        endpoint="oss-cn-shanghai.aliyuncs.com",
+        access_key_id="access-key",
+        access_key_secret="access-secret",
+        cdn_public_base_url="https://cdn.example.test",
+    )
+    stored: dict[str, object] = {}
+    monkeypatch.setattr(client, "_put_stream", lambda **kwargs: stored.update(kwargs))
+
+    result = client.copy_from_url(
+        bucket="game339",
+        object_key="narrato/model-results/task/0.mp4",
+        source_url="https://storage.deepwl.cn/result.mp4",
+    )
+
+    assert stored["size_bytes"] == 7
+    assert result.cdn_url == "https://cdn.example.test/narrato/model-results/task/0.mp4"
+
+
+def test_copy_from_url_rejects_non_https_provider_result() -> None:
+    client = HttpOssClient(
+        endpoint="oss-cn-shanghai.aliyuncs.com",
+        access_key_id="access-key",
+        access_key_secret="access-secret",
+    )
+
+    with pytest.raises(OssClientError, match="invalid"):
+        client.copy_from_url(
+            bucket="game339",
+            object_key="narrato/model-results/task/0.mp4",
+            source_url="http://provider.example/result.mp4",
+        )
+
+
 def test_video_policy_uses_fixed_api_prefix_type_and_300_mib_limit() -> None:
     service = OssPostPolicyService(
         upload_url="https://uploads.example.test",

@@ -119,7 +119,7 @@ class QuoteRequest(StrictModel):
     model_id: str = Field(min_length=1, max_length=64)
     play_mode_id: str | None = Field(default=None, max_length=64)
     resolution: str | None = Field(default=None, max_length=32)
-    duration_seconds: int | None = Field(default=None, ge=1, le=3600)
+    duration_seconds: int | None = Field(default=None, ge=-1, le=3600)
 
 
 class QuoteData(StrictModel):
@@ -154,8 +154,10 @@ class TaskCreateRequest(StrictModel):
     audio_asset_ids: list[str] = Field(default_factory=list, max_length=50)
     resolution: str | None = Field(default=None, max_length=32)
     ratio: str | None = Field(default=None, max_length=16)
-    duration_seconds: int | None = Field(default=None, ge=1, le=3600)
+    duration_seconds: int | None = Field(default=None, ge=-1, le=3600)
     audio_enabled: bool = False
+    # Provider 专有字段只能由对应 request_profile 的白名单消费；该值会随任务冻结。
+    provider_options: dict[str, object] = Field(default_factory=dict)
     # 兼容旧客户端的素材引用标记；服务端会从素材和 Prompt 自动补齐映射说明。
     multi_subject_references: list[str] = Field(default_factory=list, max_length=50)
     # 保留给 API 集成方覆盖系统推断；Web 工作台不展示该输入项。
@@ -476,7 +478,7 @@ def _estimated_credits(prices: list[ModelPlayModeProviderPrice], duration_second
     for price in prices:
         if price.billing_unit == "usage":
             total += price.per_usage_credits or 0
-        elif price.billing_unit == "second" and duration_seconds is not None:
+        elif price.billing_unit == "second" and duration_seconds is not None and duration_seconds > 0:
             total += _round_credits(Decimal(duration_seconds) * Decimal(price.per_second_credits or 0))
     return total
 
@@ -519,7 +521,7 @@ def _task_data(session: Session, task: ModelTask) -> TaskData:
     outputs = _task_outputs(session, task.id)
     output = next(({"url": item.cdn_url, "text": item.text} for item in outputs if item.cdn_url or item.text), None)
     model = session.get(Model, task.model_id)
-    return TaskData(id=task.id, project_id=task.project_id, model_id=task.model_id, model_name=model.display_name if model else task.model_id, play_mode_id=task.play_mode_id, type=task.task_type, status=task.status, provider_task_id=task.provider_task_id, credits=task.default_credits_charged, final_credits=task.final_credits, input_token=task.input_token, output_token=task.output_token, outputs=outputs, input={"prompt": task.prompt or ""}, output=output, error_code=task.error_code, error_message=task.error_message, created_at=task.created_at.isoformat(), updated_at=task.updated_at.isoformat())
+    return TaskData(id=task.id, project_id=task.project_id, model_id=task.model_id, model_name=model.display_name if model else task.model_id, play_mode_id=task.play_mode_id, type=task.task_type, status=task.status, provider_task_id=task.provider_task_id, credits=task.default_credits_charged, final_credits=task.final_credits, input_token=task.input_token, output_token=task.output_token, outputs=outputs, input={"prompt": task.prompt or "", "provider_options": task.provider_options}, output=output, error_code=task.error_code, error_message=task.error_message, created_at=task.created_at.isoformat(), updated_at=task.updated_at.isoformat())
 
 
 def _owned_project(session: Session, user_id: str, project_id: str, *, lock: bool = False) -> Project:
@@ -533,7 +535,7 @@ def _owned_project(session: Session, user_id: str, project_id: str, *, lock: boo
 
 
 def _provider_payload(task: ModelTask, assets: dict[str, list[dict[str, object]]]) -> dict[str, object]:
-    return {"model_task_id": task.id, "model_id": task.model_id, "play_mode_id": task.play_mode_id, "provider_id": task.provider_id, "asset_ids": {kind: [item["asset_id"] for item in items] for kind, items in assets.items()}}
+    return {"model_task_id": task.id, "model_id": task.model_id, "play_mode_id": task.play_mode_id, "provider_id": task.provider_id, "provider_options": task.provider_options, "asset_ids": {kind: [item["asset_id"] for item in items] for kind, items in assets.items()}}
 
 
 def _submit_task(registry: ProviderRegistry, session: Session, task: ModelTask, *, messages: list[dict[str, object]] | None = None) -> ProviderResult:
@@ -543,7 +545,31 @@ def _submit_task(registry: ProviderRegistry, session: Session, task: ModelTask, 
     if model is None or mode is None or provider is None:
         raise ProviderError("model provider configuration is unavailable")
     assets = _task_assets_payload(session, task)
-    return registry.get(provider.provider_code).submit(model=model, play_mode=mode, provider=provider, task_id=task.id, prompt=task.prompt, assets=assets, resolution=task.resolution, ratio=task.ratio, duration_seconds=task.requested_duration_seconds, audio_enabled=task.audio_enabled, messages=messages)
+    # LLM 任务在 Worker 接管或恢复时同样必须携带已冻结的多模态素材。
+    # 不能退化成只有 prompt 的第二次请求，否则模型会误判图片未上传。
+    if messages is None and model.model_type == "llm":
+        frozen_context = (
+            task.provider_request.get("chat_context_messages")
+            if isinstance(task.provider_request, dict)
+            else None
+        )
+        if isinstance(frozen_context, list) and frozen_context and all(
+            isinstance(message, dict) for message in frozen_context
+        ):
+            messages = frozen_context
+        else:
+            content: list[dict[str, object]] = []
+            if task.prompt:
+                content.append({"type": "text", "text": task.prompt})
+            for kind, tag in (
+                ("image", "image_url"),
+                ("video", "video_url"),
+                ("audio", "audio_url"),
+            ):
+                for asset in assets[kind]:
+                    content.append({"type": tag, tag: {"url": asset["url"]}})
+            messages = [{"role": "user", "content": content or ""}]
+    return registry.get(provider.provider_code).submit(model=model, play_mode=mode, provider=provider, task_id=task.id, prompt=task.prompt, assets=assets, resolution=task.resolution, ratio=task.ratio, duration_seconds=task.requested_duration_seconds, audio_enabled=task.audio_enabled, options=task.provider_options, messages=messages)
 
 
 def _stage_provider_result(session: Session, task: ModelTask, result: ProviderResult) -> None:
@@ -582,7 +608,7 @@ def _fail_task(session: Session, task: ModelTask, *, code: str, message: str, re
     if refund and task.settlement_status not in {"refunded", "settled"}:
         _refund(session, task, reason="model_task_failed_refund")
     project = session.get(Project, task.project_id) if task.project_id else None
-    if project is not None:
+    if project is not None and task.task_type in AI_VIDEO_MODEL_TYPES:
         project.status = "failed"
 
 
@@ -630,11 +656,14 @@ def _mark_completed(session: Session, task: ModelTask, *, partial: bool = False)
         task.settlement_status = "billing_failed"
         return
     task.status = "succeeded_with_partial_output" if partial else "succeeded"
+    # 曾经的轮询重试错误仅表示中间态；成功落库后不能继续暴露为任务错误。
+    task.error_code = None
+    task.error_message = None
     task.next_poll_at = None
     task.poll_lease_token = None
     task.poll_lease_until = None
     project = session.get(Project, task.project_id) if task.project_id else None
-    if project is not None:
+    if project is not None and task.task_type in AI_VIDEO_MODEL_TYPES:
         project.status = "completed"
 
 
@@ -806,7 +835,12 @@ def _create_model_task(
 ) -> ModelTask:
     if project_id:
         project = _owned_project(session, user_id, project_id, lock=True)
-        if project.status not in {"draft", "ready", "failed"}:
+        reusable_statuses = {"draft", "ready", "failed"}
+        # 聊天图片复用 ai_video 项目作为素材容器。旧版本曾在 LLM 完成后错误地
+        # 将该项目标记为 completed，重试时也必须允许继续复用原始图片。
+        if task_type == "llm":
+            reusable_statuses.add("completed")
+        if project.status not in reusable_statuses:
             raise ApiError("AI_VIDEO_DRAFT_LOCKED", "AI video draft cannot accept a new task", 409)
     model_statement = select(Model).where(Model.id == body.model_id, Model.is_enabled.is_(True))
     if task_type == "ai_video":
@@ -829,7 +863,7 @@ def _create_model_task(
     validated = ValidatedInput(prompt=compiled_prompt, assets=validated.assets, mentioned_ids=mentioned_ids, resolution=validated.resolution, ratio=validated.ratio, duration_seconds=validated.duration_seconds, audio_enabled=validated.audio_enabled)
     prices = _locked_prices(session, provider, validated.resolution)
     precharge_credits = max(mode.default_credits, _estimated_credits(prices, validated.duration_seconds))
-    task = ModelTask(id=_id("mt"), project_id=project_id, user_id=user_id, model_id=model.id, play_mode_id=mode.id, provider_id=provider.id, task_type=model.model_type, status="submitting", idempotency_key="", prompt=validated.prompt, resolution=validated.resolution, ratio=validated.ratio, requested_duration_seconds=validated.duration_seconds, audio_enabled=validated.audio_enabled, default_credits_charged=precharge_credits, settlement_status="pending")
+    task = ModelTask(id=_id("mt"), project_id=project_id, user_id=user_id, model_id=model.id, play_mode_id=mode.id, provider_id=provider.id, task_type=model.model_type, status="submitting", idempotency_key="", prompt=validated.prompt, resolution=validated.resolution, ratio=validated.ratio, requested_duration_seconds=validated.duration_seconds, audio_enabled=validated.audio_enabled, provider_options=getattr(body, "provider_options", {}), default_credits_charged=precharge_credits, settlement_status="pending")
     session.add(task)
     for kind, assets in validated.assets.items():
         for order, asset in enumerate(assets):
@@ -840,7 +874,7 @@ def _create_model_task(
             ))
     _create_charge_rows(session, task, prices)
     _precharge(session, task)
-    if project_id:
+    if project_id and model.model_type in AI_VIDEO_MODEL_TYPES:
         project.status = "queued"
         project.current_stage = "generate"
     return task

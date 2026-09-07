@@ -14,6 +14,7 @@ from narrato_api.api.errors import ApiError
 from narrato_api.assets.constraints import (
     AssetDeclarationError,
     MAX_AI_VIDEO_PROJECT_VIDEO_COUNT,
+    MAX_SHORT_DRAMA_MULTIMODAL_VIDEO_SIZE_BYTES,
     validate_asset_declaration,
 )
 from narrato_api.assets.models import Asset
@@ -85,6 +86,11 @@ class UploadService:
                 if project is None:
                     raise ApiError("PROJECT_NOT_FOUND", "Project not found", 404)
                 self._ensure_asset_mutable(project)
+                self._validate_short_drama_multimodal_size(
+                    project=project,
+                    asset_type=asset_type,
+                    size_bytes=size_bytes,
+                )
                 asset = session.scalar(
                     select(Asset).where(
                         Asset.user_id == user_id,
@@ -223,6 +229,11 @@ class UploadService:
             if project is None:
                 raise ApiError("PROJECT_NOT_FOUND", "Project not found", 404)
             self._ensure_asset_mutable(project)
+            self._validate_short_drama_multimodal_size(
+                project=project,
+                asset_type=asset_type,
+                size_bytes=size_bytes,
+            )
             now = datetime.now(timezone.utc)
             session.execute(
                 delete(Asset).where(
@@ -286,6 +297,23 @@ class UploadService:
                 )
             )
             session.commit()
+
+    @staticmethod
+    def _validate_short_drama_multimodal_size(
+        *, project: Project, asset_type: str, size_bytes: int
+    ) -> None:
+        """方舟 URL 视频输入上限只约束短剧，不降低其它产品上传上限。"""
+
+        if (
+            project.product == "short_drama_narration"
+            and asset_type == "video"
+            and size_bytes > MAX_SHORT_DRAMA_MULTIMODAL_VIDEO_SIZE_BYTES
+        ):
+            raise ApiError(
+                "VIDEO_TOO_LARGE_FOR_MULTIMODAL",
+                "Short drama video must not exceed 50 MiB",
+                422,
+            )
 
     def reorder_owned_video_assets(
         self, *, user_id: str, project_id: str, asset_ids: list[str]

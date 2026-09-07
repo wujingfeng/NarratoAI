@@ -1,6 +1,6 @@
 import { clearToken, readToken } from "../features/auth/authStorage.js";
 
-const API_BASE_URL = import.meta.env?.VITE_NARRATO_API_BASE_URL || "/api/v1";
+export const API_BASE_URL = import.meta.env?.VITE_NARRATO_API_BASE_URL || "/api/v1";
 
 const ERROR_MESSAGES = {
   NETWORK_UNAVAILABLE: "网络连接失败，请检查网络后重试。",

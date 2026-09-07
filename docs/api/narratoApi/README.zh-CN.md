@@ -79,7 +79,9 @@ Core 的进程配置和当前队列隔离限制请参见 [Core 部署说明](../
 ## AI 分析编排与 Outbox 重放
 
 短剧分析依次执行 `subtitle_recognition`（ASR）、`plot_structure`、
-`conflict_highlights`、`highlight_scoring`。每一步仅在其依赖已完成时提交；
+`conflict_highlights`、`highlight_scoring`。`plot_structure` 通过 Core 生成一次
+包含剧情结构、冲突爽点和高光评分的完整分析报告；后两个节点只投影并复用同一
+分析 Artifact，不再重复调用 LLM。每一步仅在其依赖已完成时提交；
 Core 回调和轮询都通过同一幂等收口事务写回状态。Celery beat 会按
 `workflow_poll_interval_seconds` 轮询运行中的 Core task，并按
 `workflow_outbox_replay_interval_seconds` 重放未投递 Outbox。
@@ -93,6 +95,11 @@ Celery beat 还会按 `project_deletion_sweep_interval_seconds` 扫描项目删�
 
 项目中如已存在状态为 `ready` 的 `.srt` 字幕资产，`subtitle_recognition`
 会自动跳过，后续 Qwen 节点直接使用该字幕 URL；无 SRT 时才提交 ASR。
+
+脚本时间线会按约 5 个非空白字符/秒动态匹配口播时长：在不越过下一片段或
+源视频结尾时自动延长解说片段；无法延长时记录 `validation_warnings` 供编辑与
+诊断，但不再仅因建议字数超限终止整条任务。字段、来源、时间范围、顺序等结构性
+错误仍会失败，并在 Core/Business 错误中保留 `reason`、`details` 与有界诊断摘要。
 
 历史 Outbox 默认只做审计 dry-run；以下命令按项目、事件类型、状态和重试次数
 筛选，并输出事件 ID、幂等键与原状态。加 `--apply` 才会把选中项重新置为

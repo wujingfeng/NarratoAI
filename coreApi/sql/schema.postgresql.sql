@@ -7,7 +7,7 @@
 BEGIN;
 
 CREATE TABLE alembic_version (
-    version_num VARCHAR(64) NOT NULL, 
+    version_num VARCHAR(64) NOT NULL,
     CONSTRAINT alembic_version_pkc PRIMARY KEY (version_num)
 );
 
@@ -18,71 +18,71 @@ INSERT INTO alembic_version (version_num) VALUES ('0001_core_base') RETURNING al
 -- Running upgrade 0001_core_base -> 0002_core_tasks
 
 CREATE TABLE core_tasks (
-    id VARCHAR(40) NOT NULL, 
-    task_type VARCHAR(80) NOT NULL, 
-    caller VARCHAR(120) NOT NULL, 
-    caller_task_id VARCHAR(80), 
-    idempotency_scope VARCHAR(512) NOT NULL, 
-    idempotency_key VARCHAR(255) NOT NULL, 
-    request_digest VARCHAR(64) NOT NULL, 
-    input_snapshot JSON NOT NULL, 
-    status VARCHAR(10) NOT NULL, 
-    phase VARCHAR(80), 
-    progress INTEGER NOT NULL, 
-    state_version INTEGER NOT NULL, 
-    current_attempt_no INTEGER NOT NULL, 
-    max_retries INTEGER NOT NULL, 
-    error JSON, 
-    result JSON, 
-    created_at TIMESTAMP WITH TIME ZONE NOT NULL, 
-    updated_at TIMESTAMP WITH TIME ZONE NOT NULL, 
-    started_at TIMESTAMP WITH TIME ZONE, 
-    finished_at TIMESTAMP WITH TIME ZONE, 
-    PRIMARY KEY (id), 
-    CONSTRAINT uq_core_tasks_idempotency_scope UNIQUE (idempotency_scope), 
+    id VARCHAR(40) NOT NULL,
+    task_type VARCHAR(80) NOT NULL,
+    caller VARCHAR(120) NOT NULL,
+    caller_task_id VARCHAR(80),
+    idempotency_scope VARCHAR(512) NOT NULL,
+    idempotency_key VARCHAR(255) NOT NULL,
+    request_digest VARCHAR(64) NOT NULL,
+    input_snapshot JSON NOT NULL,
+    status VARCHAR(10) NOT NULL,
+    phase VARCHAR(80),
+    progress INTEGER NOT NULL,
+    state_version INTEGER NOT NULL,
+    current_attempt_no INTEGER NOT NULL,
+    max_retries INTEGER NOT NULL,
+    error JSON,
+    result JSON,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    started_at TIMESTAMP WITH TIME ZONE,
+    finished_at TIMESTAMP WITH TIME ZONE,
+    PRIMARY KEY (id),
+    CONSTRAINT uq_core_tasks_idempotency_scope UNIQUE (idempotency_scope),
     CONSTRAINT core_task_status CHECK (status IN ('queued', 'running', 'retry_wait', 'succeeded', 'failed'))
 );
 
 CREATE INDEX ix_core_tasks_status_created_at ON core_tasks (status, created_at);
 
 CREATE TABLE core_task_attempts (
-    id VARCHAR(40) NOT NULL, 
-    core_task_id VARCHAR(40) NOT NULL, 
-    attempt_no INTEGER NOT NULL, 
-    status VARCHAR(9) NOT NULL, 
-    lease_token VARCHAR(128) NOT NULL, 
-    lease_version INTEGER NOT NULL, 
-    lease_expires_at TIMESTAMP WITH TIME ZONE NOT NULL, 
-    heartbeat_at TIMESTAMP WITH TIME ZONE NOT NULL, 
-    started_at TIMESTAMP WITH TIME ZONE NOT NULL, 
-    finished_at TIMESTAMP WITH TIME ZONE, 
-    error JSON, 
-    late_result_audit JSON, 
-    PRIMARY KEY (id), 
-    FOREIGN KEY(core_task_id) REFERENCES core_tasks (id) ON DELETE CASCADE, 
-    CONSTRAINT uq_core_task_attempts_task_no UNIQUE (core_task_id, attempt_no), 
+    id VARCHAR(40) NOT NULL,
+    core_task_id VARCHAR(40) NOT NULL,
+    attempt_no INTEGER NOT NULL,
+    status VARCHAR(9) NOT NULL,
+    lease_token VARCHAR(128) NOT NULL,
+    lease_version INTEGER NOT NULL,
+    lease_expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    heartbeat_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    started_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    finished_at TIMESTAMP WITH TIME ZONE,
+    error JSON,
+    late_result_audit JSON,
+    PRIMARY KEY (id),
+    FOREIGN KEY(core_task_id) REFERENCES core_tasks (id) ON DELETE CASCADE,
+    CONSTRAINT uq_core_task_attempts_task_no UNIQUE (core_task_id, attempt_no),
     CONSTRAINT core_attempt_status CHECK (status IN ('running', 'succeeded', 'failed', 'expired'))
 );
 
 CREATE INDEX ix_core_task_attempts_lease_expiry ON core_task_attempts (status, lease_expires_at);
 
 CREATE TABLE callback_outbox (
-    id VARCHAR(40) NOT NULL, 
-    event_id VARCHAR(80) NOT NULL, 
-    core_task_id VARCHAR(40) NOT NULL, 
-    attempt_no INTEGER NOT NULL, 
-    state_version INTEGER NOT NULL, 
-    payload JSON NOT NULL, 
-    status VARCHAR(7) NOT NULL, 
-    attempt_count INTEGER NOT NULL, 
-    next_attempt_at TIMESTAMP WITH TIME ZONE NOT NULL, 
-    sent_at TIMESTAMP WITH TIME ZONE, 
-    created_at TIMESTAMP WITH TIME ZONE NOT NULL, 
-    updated_at TIMESTAMP WITH TIME ZONE NOT NULL, 
-    PRIMARY KEY (id), 
-    FOREIGN KEY(core_task_id) REFERENCES core_tasks (id) ON DELETE CASCADE, 
-    CONSTRAINT uq_callback_outbox_event_id UNIQUE (event_id), 
-    CONSTRAINT uq_callback_outbox_task_state_version UNIQUE (core_task_id, state_version), 
+    id VARCHAR(40) NOT NULL,
+    event_id VARCHAR(80) NOT NULL,
+    core_task_id VARCHAR(40) NOT NULL,
+    attempt_no INTEGER NOT NULL,
+    state_version INTEGER NOT NULL,
+    payload JSON NOT NULL,
+    status VARCHAR(7) NOT NULL,
+    attempt_count INTEGER NOT NULL,
+    next_attempt_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    sent_at TIMESTAMP WITH TIME ZONE,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    PRIMARY KEY (id),
+    FOREIGN KEY(core_task_id) REFERENCES core_tasks (id) ON DELETE CASCADE,
+    CONSTRAINT uq_callback_outbox_event_id UNIQUE (event_id),
+    CONSTRAINT uq_callback_outbox_task_state_version UNIQUE (core_task_id, state_version),
     CONSTRAINT callback_outbox_status CHECK (status IN ('pending', 'sent'))
 );
 
@@ -93,53 +93,53 @@ UPDATE alembic_version SET version_num='0002_core_tasks' WHERE alembic_version.v
 -- Running upgrade 0002_core_tasks -> 0003_core_capabilities
 
 CREATE TABLE core_providers (
-    id VARCHAR(40) NOT NULL, 
-    code VARCHAR(80) NOT NULL, 
-    name VARCHAR(160) NOT NULL, 
-    enabled BOOLEAN NOT NULL, 
-    secret_ref VARCHAR(160) NOT NULL, 
-    settings JSON NOT NULL, 
-    limits JSON NOT NULL, 
-    created_at TIMESTAMP WITH TIME ZONE NOT NULL, 
-    updated_at TIMESTAMP WITH TIME ZONE NOT NULL, 
-    PRIMARY KEY (id), 
+    id VARCHAR(40) NOT NULL,
+    code VARCHAR(80) NOT NULL,
+    name VARCHAR(160) NOT NULL,
+    enabled BOOLEAN NOT NULL,
+    secret_ref VARCHAR(160) NOT NULL,
+    settings JSON NOT NULL,
+    limits JSON NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    PRIMARY KEY (id),
     CONSTRAINT uq_core_providers_code UNIQUE (code)
 );
 
 CREATE TABLE core_models (
-    model_id VARCHAR(40) NOT NULL, 
-    provider_id VARCHAR(40) NOT NULL, 
-    provider_model_code VARCHAR(160) NOT NULL, 
-    name VARCHAR(160) NOT NULL, 
-    capability_types JSON NOT NULL, 
-    languages JSON NOT NULL, 
-    limits JSON NOT NULL, 
-    enabled BOOLEAN NOT NULL, 
-    created_at TIMESTAMP WITH TIME ZONE NOT NULL, 
-    updated_at TIMESTAMP WITH TIME ZONE NOT NULL, 
-    PRIMARY KEY (model_id), 
-    FOREIGN KEY(provider_id) REFERENCES core_providers (id) ON DELETE CASCADE, 
+    model_id VARCHAR(40) NOT NULL,
+    provider_id VARCHAR(40) NOT NULL,
+    provider_model_code VARCHAR(160) NOT NULL,
+    name VARCHAR(160) NOT NULL,
+    capability_types JSON NOT NULL,
+    languages JSON NOT NULL,
+    limits JSON NOT NULL,
+    enabled BOOLEAN NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    PRIMARY KEY (model_id),
+    FOREIGN KEY(provider_id) REFERENCES core_providers (id) ON DELETE CASCADE,
     CONSTRAINT uq_core_models_provider_code UNIQUE (provider_id, provider_model_code)
 );
 
 CREATE INDEX ix_core_models_provider_enabled ON core_models (provider_id, enabled);
 
 CREATE TABLE core_voices (
-    voice_id VARCHAR(40) NOT NULL, 
-    provider_id VARCHAR(40) NOT NULL, 
-    provider_voice_code VARCHAR(160) NOT NULL, 
-    name VARCHAR(160) NOT NULL, 
-    languages JSON NOT NULL, 
-    gender VARCHAR(32), 
-    styles JSON NOT NULL, 
-    sample_url VARCHAR(2048), 
-    supported_formats JSON NOT NULL, 
-    supported_sample_rates JSON NOT NULL, 
-    enabled BOOLEAN NOT NULL, 
-    created_at TIMESTAMP WITH TIME ZONE NOT NULL, 
-    updated_at TIMESTAMP WITH TIME ZONE NOT NULL, 
-    PRIMARY KEY (voice_id), 
-    FOREIGN KEY(provider_id) REFERENCES core_providers (id) ON DELETE CASCADE, 
+    voice_id VARCHAR(40) NOT NULL,
+    provider_id VARCHAR(40) NOT NULL,
+    provider_voice_code VARCHAR(160) NOT NULL,
+    name VARCHAR(160) NOT NULL,
+    languages JSON NOT NULL,
+    gender VARCHAR(32),
+    styles JSON NOT NULL,
+    sample_url VARCHAR(2048),
+    supported_formats JSON NOT NULL,
+    supported_sample_rates JSON NOT NULL,
+    enabled BOOLEAN NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    PRIMARY KEY (voice_id),
+    FOREIGN KEY(provider_id) REFERENCES core_providers (id) ON DELETE CASCADE,
     CONSTRAINT uq_core_voices_provider_code UNIQUE (provider_id, provider_voice_code)
 );
 
@@ -152,42 +152,42 @@ UPDATE alembic_version SET version_num='0003_core_capabilities' WHERE alembic_ve
 ALTER TABLE core_tasks ADD COLUMN initial_response JSON DEFAULT '{}' NOT NULL;
 
 CREATE TABLE core_artifacts (
-    id VARCHAR(40) NOT NULL, 
-    core_task_id VARCHAR(40) NOT NULL, 
-    attempt_no INTEGER NOT NULL, 
-    kind VARCHAR(80) NOT NULL, 
-    bucket VARCHAR(255) NOT NULL, 
-    object_key VARCHAR(1024) NOT NULL, 
-    url VARCHAR(2048) NOT NULL, 
-    content_type VARCHAR(255) NOT NULL, 
-    size INTEGER NOT NULL, 
-    checksum VARCHAR(80), 
-    created_at TIMESTAMP WITH TIME ZONE NOT NULL, 
-    PRIMARY KEY (id), 
-    FOREIGN KEY(core_task_id) REFERENCES core_tasks (id) ON DELETE CASCADE, 
-    CONSTRAINT fk_core_artifacts_task_attempt FOREIGN KEY(core_task_id, attempt_no) REFERENCES core_task_attempts (core_task_id, attempt_no) ON DELETE CASCADE, 
-    CONSTRAINT ck_core_artifacts_attempt_positive CHECK (attempt_no > 0), 
-    CONSTRAINT ck_core_artifacts_size_positive CHECK (size > 0), 
+    id VARCHAR(40) NOT NULL,
+    core_task_id VARCHAR(40) NOT NULL,
+    attempt_no INTEGER NOT NULL,
+    kind VARCHAR(80) NOT NULL,
+    bucket VARCHAR(255) NOT NULL,
+    object_key VARCHAR(1024) NOT NULL,
+    url VARCHAR(2048) NOT NULL,
+    content_type VARCHAR(255) NOT NULL,
+    size INTEGER NOT NULL,
+    checksum VARCHAR(80),
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    PRIMARY KEY (id),
+    FOREIGN KEY(core_task_id) REFERENCES core_tasks (id) ON DELETE CASCADE,
+    CONSTRAINT fk_core_artifacts_task_attempt FOREIGN KEY(core_task_id, attempt_no) REFERENCES core_task_attempts (core_task_id, attempt_no) ON DELETE CASCADE,
+    CONSTRAINT ck_core_artifacts_attempt_positive CHECK (attempt_no > 0),
+    CONSTRAINT ck_core_artifacts_size_positive CHECK (size > 0),
     CONSTRAINT uq_core_artifacts_object_key UNIQUE (object_key)
 );
 
 CREATE INDEX ix_core_artifacts_task_attempt ON core_artifacts (core_task_id, attempt_no);
 
 CREATE TABLE core_dispatch_outbox (
-    id VARCHAR(40) NOT NULL, 
-    core_task_id VARCHAR(40) NOT NULL, 
-    state_version INTEGER NOT NULL, 
-    status VARCHAR(7) NOT NULL, 
-    available_at TIMESTAMP WITH TIME ZONE NOT NULL, 
-    attempt_count INTEGER NOT NULL, 
-    last_error VARCHAR(80), 
-    sent_at TIMESTAMP WITH TIME ZONE, 
-    recover_after TIMESTAMP WITH TIME ZONE, 
-    created_at TIMESTAMP WITH TIME ZONE NOT NULL, 
-    updated_at TIMESTAMP WITH TIME ZONE NOT NULL, 
-    PRIMARY KEY (id), 
-    FOREIGN KEY(core_task_id) REFERENCES core_tasks (id) ON DELETE CASCADE, 
-    CONSTRAINT uq_core_dispatch_task_state UNIQUE (core_task_id, state_version), 
+    id VARCHAR(40) NOT NULL,
+    core_task_id VARCHAR(40) NOT NULL,
+    state_version INTEGER NOT NULL,
+    status VARCHAR(7) NOT NULL,
+    available_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    attempt_count INTEGER NOT NULL,
+    last_error VARCHAR(80),
+    sent_at TIMESTAMP WITH TIME ZONE,
+    recover_after TIMESTAMP WITH TIME ZONE,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    PRIMARY KEY (id),
+    FOREIGN KEY(core_task_id) REFERENCES core_tasks (id) ON DELETE CASCADE,
+    CONSTRAINT uq_core_dispatch_task_state UNIQUE (core_task_id, state_version),
     CONSTRAINT core_dispatch_status CHECK (status IN ('pending', 'sent'))
 );
 
@@ -207,6 +207,84 @@ INSERT INTO core_dispatch_outbox (
             WHERE status IN ('queued', 'retry_wait');
 
 UPDATE alembic_version SET version_num='0004_core_artifacts' WHERE alembic_version.version_num = '0003_core_capabilities';
+
+-- Running upgrade 0004_core_artifacts -> 0005_core_task_checkpoints
+
+ALTER TABLE core_tasks ADD COLUMN retry_count INTEGER DEFAULT '0' NOT NULL;
+
+CREATE TABLE core_task_checkpoints (
+    id VARCHAR(40) NOT NULL,
+    core_task_id VARCHAR(40) NOT NULL,
+    stage VARCHAR(80) NOT NULL,
+    stage_version INTEGER NOT NULL,
+    input_digest VARCHAR(64) NOT NULL,
+    status VARCHAR(7) NOT NULL,
+    manifest JSON NOT NULL,
+    created_by_attempt_no INTEGER NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    completed_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    invalidated_at TIMESTAMP WITH TIME ZONE,
+    PRIMARY KEY (id),
+    CONSTRAINT ck_core_task_checkpoint_attempt_positive CHECK (created_by_attempt_no > 0),
+    FOREIGN KEY(core_task_id) REFERENCES core_tasks (id) ON DELETE CASCADE,
+    CONSTRAINT uq_core_task_checkpoint_identity UNIQUE (core_task_id, stage, stage_version, input_digest),
+    CONSTRAINT core_checkpoint_status CHECK (status IN ('ready', 'invalid'))
+);
+
+CREATE INDEX ix_core_task_checkpoints_lookup ON core_task_checkpoints (core_task_id, stage, status);
+
+CREATE TABLE core_checkpoint_artifacts (
+    id VARCHAR(40) NOT NULL,
+    checkpoint_id VARCHAR(40) NOT NULL,
+    kind VARCHAR(80) NOT NULL,
+    relative_path VARCHAR(255) NOT NULL,
+    content_type VARCHAR(255) NOT NULL,
+    size INTEGER NOT NULL,
+    checksum VARCHAR(80) NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    PRIMARY KEY (id),
+    CONSTRAINT ck_core_checkpoint_artifact_size_positive CHECK (size > 0),
+    FOREIGN KEY(checkpoint_id) REFERENCES core_task_checkpoints (id) ON DELETE CASCADE,
+    CONSTRAINT uq_core_checkpoint_artifact_kind UNIQUE (checkpoint_id, kind)
+);
+
+CREATE INDEX ix_core_checkpoint_artifacts_checkpoint ON core_checkpoint_artifacts (checkpoint_id);
+
+UPDATE alembic_version SET version_num='0005_core_task_checkpoints' WHERE alembic_version.version_num = '0004_core_artifacts';
+
+-- Running upgrade 0005_core_task_checkpoints -> 0006_volcengine_multilingual_voices
+
+UPDATE core_voices SET languages = '["zh-CN","en","ja","ko","de","fr","es","pt","ru","vi","th","id","ar"]'::jsonb WHERE provider_id = (SELECT id FROM core_providers WHERE code = 'volcengine');
+
+UPDATE alembic_version SET version_num='0006_volcengine_multilingual_voices' WHERE alembic_version.version_num = '0005_core_task_checkpoints';
+
+-- Running upgrade 0006_volcengine_multilingual_voices -> 0007_asr_provider_jobs
+
+CREATE TABLE asr_provider_jobs (
+    id VARCHAR(40) NOT NULL,
+    core_task_id VARCHAR(40) NOT NULL,
+    source_index INTEGER NOT NULL,
+    source_asset_id VARCHAR(80) NOT NULL,
+    provider VARCHAR(40) NOT NULL,
+    provider_task_id VARCHAR(160),
+    callback_key VARCHAR(128) NOT NULL,
+    prepared_audio_url VARCHAR(2048),
+    status VARCHAR(24) NOT NULL,
+    response_payload JSON,
+    error JSON,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    PRIMARY KEY (id),
+    CONSTRAINT ck_asr_provider_jobs_status CHECK (status IN ('preparing', 'submitted', 'succeeded', 'failed')),
+    FOREIGN KEY(core_task_id) REFERENCES core_tasks (id) ON DELETE CASCADE,
+    CONSTRAINT uq_asr_provider_jobs_task_source UNIQUE (core_task_id, source_index),
+    CONSTRAINT uq_asr_provider_jobs_remote UNIQUE (provider, provider_task_id),
+    CONSTRAINT uq_asr_provider_jobs_callback_key UNIQUE (callback_key)
+);
+
+CREATE INDEX ix_asr_provider_jobs_status ON asr_provider_jobs (status, updated_at);
+
+UPDATE alembic_version SET version_num='0007_asr_provider_jobs' WHERE alembic_version.version_num = '0006_volcengine_multilingual_voices';
 
 -- ============================================================================
 -- 数据字典：Core 任务、能力目录与产物
@@ -239,7 +317,7 @@ COMMENT ON COLUMN core_dispatch_outbox.recover_after IS '发送中记录被判�
 COMMENT ON COLUMN alembic_version.version_num IS '当前已应用的 Alembic 迁移版本号。';
 
 COMMENT ON COLUMN core_tasks.id IS '带 ctask_ 前缀的 Core 任务业务主键。';
-COMMENT ON COLUMN core_tasks.task_type IS '原子能力类型：media_probe=媒体探测；asr=语音识别；video_analysis=视频分析；script_generation=文案生成；tts=语音合成；subtitle=字幕处理；video_render=视频渲染。';
+COMMENT ON COLUMN core_tasks.task_type IS '原子能力类型：media_probe=媒体探测；asr=通用语音识别；audio_understanding=短剧内嵌音频理解；video_analysis=视频分析；script_generation=文案生成；tts=语音合成；subtitle=字幕处理；video_render=视频渲染。';
 COMMENT ON COLUMN core_tasks.caller IS '创建任务的调用方服务标识。';
 COMMENT ON COLUMN core_tasks.caller_task_id IS '调用方的关联任务标识；无关联时为空。';
 COMMENT ON COLUMN core_tasks.idempotency_key IS '调用方提交的原始幂等键。';

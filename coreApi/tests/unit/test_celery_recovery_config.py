@@ -1,5 +1,9 @@
 from core_api.celery_app import create_celery_app
-from core_api.tasks.celery_tasks import publish_callback_outbox, wake_core_task
+from core_api.tasks.celery_tasks import (
+    _create_source_transcriber,
+    publish_callback_outbox,
+    wake_core_task,
+)
 
 
 def test_worker_lost_delivery_and_recovery_scanner_are_configured(settings):
@@ -44,3 +48,23 @@ def test_invalid_callback_configuration_does_not_touch_outbox(
     )
 
     publish_callback_outbox.run()
+
+
+def test_non_asr_task_does_not_validate_volcengine_callback(settings):
+    """火山回调尚未配置时，媒体探测等非 ASR 任务仍必须正常启动。"""
+
+    invalid_asr = settings.model_copy(
+        update={
+            "asr_provider": "volcengine",
+            "volcengine_asr_callback_base_url": "",
+        }
+    )
+
+    assert (
+        _create_source_transcriber(
+            task_type="media_probe",
+            settings=invalid_asr,
+            job_store=object(),  # type: ignore[arg-type]
+        )
+        is None
+    )

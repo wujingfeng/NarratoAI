@@ -94,7 +94,7 @@ def create_script_generation_task(
     )
     if replay is not None:
         return replay
-    capabilities = CapabilityService(session, settings.provider_secrets)
+    capabilities = CapabilityService(session, settings.resolved_provider_secrets)
     model = capabilities.require_model(
         payload.model_id, "script_generation", language=payload.language
     )

@@ -32,6 +32,7 @@ class MessageRecorder:
         self,
         task_id: str,
         *,
+        task_type: str,
         expected_state_version: int,
         not_before,
         dispatch_id: str,
@@ -39,6 +40,7 @@ class MessageRecorder:
         self.messages.append(
             {
                 "task_id": task_id,
+                "task_type": task_type,
                 "expected_state_version": expected_state_version,
                 "not_before": not_before,
                 "dispatch_id": dispatch_id,
@@ -92,7 +94,8 @@ def test_dispatch_message_is_fenced_and_future_event_cannot_be_forced(session):
     )
     assert recorder.messages == [
         {
-            "task_id": task.id,
+                "task_id": task.id,
+                "task_type": "media_probe",
             "expected_state_version": task.state_version,
             "not_before": future,
             "dispatch_id": row.id,
@@ -257,11 +260,12 @@ def test_production_recovery_task_rearms_and_dispatches_in_one_scan(
     monkeypatch.setattr(celery_tasks, "get_cached_settings", lambda: settings)
     monkeypatch.setattr(
         celery_tasks.wake_core_task,
-        "delay",
-        lambda *args: delivered.append(args),
+        "apply_async",
+        lambda *, args, queue: delivered.append((*args, queue)),
     )
     celery_tasks.recover_stalled_core_tasks.run()
     assert len(delivered) == 1
+    assert delivered[0][-1] == "narrato.core.default"
     assert delivered[0][0] == task_id
     assert delivered[0][1] == 0
 

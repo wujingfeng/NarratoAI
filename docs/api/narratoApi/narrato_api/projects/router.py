@@ -150,7 +150,8 @@ class NarrationSettingsData(StrictModel):
     subtitle_style: str | None = None
     custom_style: str | None = None
     requirements: str | None = None
-    original_sound_ratio: int = Field(default=30, ge=0, le=90, multiple_of=10)
+    target_duration_seconds: int | None = Field(default=None, ge=10, le=1800)
+    original_sound_ratio: int = Field(default=30, ge=0, le=100)
     execution_mode: Literal["manual", "auto"] = "manual"
     source_subtitle_layouts: dict[str, SourceSubtitleLayoutData] = Field(default_factory=dict)
     narration_subtitle_position: NarrationSubtitlePositionData = Field(default_factory=NarrationSubtitlePositionData)
@@ -167,7 +168,8 @@ class NarrationSettingsPatchRequest(StrictModel):
     subtitle_style: str | None = None
     custom_style: str | None = None
     requirements: str | None = None
-    original_sound_ratio: int = Field(default=30, ge=0, le=90, multiple_of=10)
+    target_duration_seconds: int | None = Field(default=None, ge=10, le=1800)
+    original_sound_ratio: int = Field(default=30, ge=0, le=100)
     execution_mode: Literal["manual", "auto"] = "manual"
     source_subtitle_layouts: dict[str, SourceSubtitleLayoutData] | None = None
     narration_subtitle_position: NarrationSubtitlePositionData | None = None
@@ -180,7 +182,8 @@ class NarrationSettingsStartRequest(StrictModel):
     subtitle_style: str
     custom_style: str | None = None
     requirements: str | None = None
-    original_sound_ratio: int = Field(default=30, ge=0, le=90, multiple_of=10)
+    target_duration_seconds: int | None = Field(default=None, ge=10, le=1800)
+    original_sound_ratio: int = Field(default=30, ge=0, le=100)
     execution_mode: Literal["manual", "auto"] = "manual"
     source_subtitle_layouts: dict[str, SourceSubtitleLayoutData]
     narration_subtitle_position: NarrationSubtitlePositionData
@@ -192,6 +195,8 @@ class AnalysisTaskData(StrictModel):
     state: str
     updated_at: datetime | None = None
     error_code: str | None = None
+    error_reason: str | None = None
+    error_details: dict[str, object] | None = None
 
 
 class ProjectVideoAssetData(StrictModel):
@@ -247,6 +252,7 @@ def _narration_data(
         subtitle_style=settings.get("subtitle_style"),
         custom_style=settings.get("custom_style"),
         requirements=settings.get("requirements"),
+        target_duration_seconds=settings.get("target_duration_seconds"),
         original_sound_ratio=settings.get("original_sound_ratio", 30),
         execution_mode=settings.get("execution_mode", "manual"),
         source_subtitle_layouts=settings.get("source_subtitle_layouts") or {},
@@ -335,6 +341,7 @@ def update_narration_settings(
                         "subtitle_style",
                         "custom_style",
                         "requirements",
+                        "target_duration_seconds",
                         "original_sound_ratio",
                         "execution_mode",
                         "source_subtitle_layouts",

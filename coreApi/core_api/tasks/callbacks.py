@@ -57,6 +57,8 @@ def validate_callback_url(value: str) -> str:
         or len(host) > 253
         or any(not _DNS_LABEL.fullmatch(label) for label in labels)
         or host == "localhost"
+        or host == "example.com"
+        or host.endswith(".example.com")
         or host.endswith((".localhost", ".local", ".internal"))
         or parsed.username is not None
         or parsed.password is not None

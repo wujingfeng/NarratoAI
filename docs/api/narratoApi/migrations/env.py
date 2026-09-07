@@ -17,6 +17,7 @@ from narrato_api.workflows import models as _workflow_models
 from narrato_api.products import video_translation as _video_translation_models
 from narrato_api.products import ai_video as _ai_video_models
 from narrato_api.admin import models as _admin_models
+from narrato_api.conversations import models as _conversation_models
 
 assert _auth_models.User.__tablename__ == "users"
 assert _billing_models.CreditAccount.__tablename__ == "credit_accounts"
@@ -30,6 +31,7 @@ assert _workflow_models.Workflow.__tablename__ == "workflows"
 assert _video_translation_models.VideoTranslationSettings.__tablename__ == "project_video_translation_settings"
 assert _ai_video_models.AiVideoModel.__tablename__ == "models"
 assert _admin_models.AdminUser.__tablename__ == "admin_users"
+assert _conversation_models.ConversationThread.__tablename__ == "conversation_threads"
 
 config = context.config
 if config.config_file_name is not None:

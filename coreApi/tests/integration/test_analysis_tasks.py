@@ -41,7 +41,7 @@ def seed_fake_models(settings) -> tuple[str, str]:
             provider=provider,
             provider_model_code="analysis-v1",
             name="Fake Analysis",
-            capability_types=["video_analysis"],
+            capability_types=["audio_understanding", "video_analysis"],
             languages=["zh-CN"],
             limits={},
             enabled=True,
@@ -81,12 +81,16 @@ def analysis_body(model_id: str) -> dict[str, object]:
             {
                 "source_asset_id": "asset_b",
                 "video_url": "https://cdn.example.test/narrato/api/b.mp4",
+                "video_name": "episode-b.mp4",
+                "subtitle_name": "episode-b.srt",
                 "subtitle_url": "https://cdn.example.test/narrato/api/b.srt",
                 "duration_seconds": 10,
             },
             {
                 "source_asset_id": "asset_a",
                 "video_url": "https://cdn.example.test/narrato/api/a.mp4",
+                "video_name": "episode-a.mp4",
+                "subtitle_name": "episode-a.srt",
                 "subtitle_artifact": {
                     "artifact_id": "art_subtitle_a",
                     "url": "https://cdn.example.test/narrato/coreApi/a.srt",
@@ -125,6 +129,56 @@ def test_analysis_post_requires_auth_and_model_capability(analysis_client):
     assert unavailable.json()["code"] == "CAPABILITY_UNAVAILABLE"
 
 
+def test_audio_understanding_freezes_public_video_sampling_without_unknown_field(
+    analysis_client, settings
+):
+    client, dispatcher, analysis_model, _ = analysis_client
+    body = {
+        "model_id": analysis_model,
+        "language": "zh-CN",
+        "sources": [{
+            "source_asset_id": "asset_audio",
+            "video_url": "https://cdn.example.test/narrato/api/audio-source.mp4",
+            "video_name": "audio-source.mp4",
+            "duration_seconds": 120,
+        }],
+        "fps": 1,
+        "min_frame_tokens": 64,
+        "min_frame_tokens_mode": "provider_default",
+        "caller_task_id": "node_audio_1",
+    }
+    response = client.post(
+        "/api/v1/audio-understanding/tasks",
+        headers=headers("audio-understanding"),
+        json=body,
+    )
+    assert response.status_code == 202
+    task_id = response.json()["data"]["core_task_id"]
+    assert dispatcher.task_ids[-1] == task_id
+    from sqlalchemy.orm import Session
+
+    with Session(get_engine(settings)) as session:
+        task = session.get(CoreTask, task_id)
+        assert task is not None and task.task_type == "audio_understanding"
+        assert task.input_snapshot["config_snapshot"] == {
+            "fps": 1,
+            "min_frame_tokens": 64,
+            "min_frame_tokens_mode": "provider_default",
+        }
+        assert task.input_snapshot["sources"][0]["video_url"].startswith("https://")
+
+    too_long = {
+        **body,
+        "sources": [{**body["sources"][0], "duration_seconds": 601}],
+    }
+    rejected = client.post(
+        "/api/v1/audio-understanding/tasks",
+        headers=headers("audio-too-long"),
+        json=too_long,
+    )
+    assert rejected.status_code == 422
+
+
 def test_analysis_rejects_max_tokens_above_frozen_model_limit(
     analysis_client, settings
 ):
@@ -149,18 +203,24 @@ def test_analysis_rejects_max_tokens_above_frozen_model_limit(
     assert response.json()["code"] == "MAX_TOKENS_EXCEEDED"
 
 
-def test_analysis_rejects_original_sound_ratio_outside_streamlit_options(
-    analysis_client,
-):
+def test_analysis_accepts_any_integer_original_sound_ratio_in_range(analysis_client):
     client, _, analysis_model, _ = analysis_client
     body = analysis_body(analysis_model)
     body["config_snapshot"] = {"original_sound_ratio": 35}
     response = client.post(
         "/api/v1/video-analysis/tasks",
-        headers=headers("invalid-original-sound-ratio"),
+        headers=headers("arbitrary-original-sound-ratio"),
         json=body,
     )
-    assert response.status_code == 422
+    assert response.status_code == 202
+
+    body["config_snapshot"] = {"original_sound_ratio": 101}
+    rejected = client.post(
+        "/api/v1/video-analysis/tasks",
+        headers=headers("out-of-range-original-sound-ratio"),
+        json=body,
+    )
+    assert rejected.status_code == 422
 
 
 def test_analysis_post_is_idempotent_and_extra_forbid(analysis_client, settings):
@@ -195,6 +255,13 @@ def test_analysis_post_is_idempotent_and_extra_forbid(analysis_client, settings)
         )
         assert task is not None
         assert task.input_snapshot["source_order"] == ["asset_b", "asset_a"]
+        assert [source["video_name"] for source in task.input_snapshot["sources"]] == [
+            "episode-b.mp4",
+            "episode-a.mp4",
+        ]
+        assert [
+            source["subtitle_name"] for source in task.input_snapshot["sources"]
+        ] == ["episode-b.srt", "episode-a.srt"]
         assert task.input_snapshot["model_snapshot"]["model_id"] == analysis_model
         assert task.input_snapshot["model_snapshot"]["catalog_version"].startswith(
             "catalog_"
@@ -207,7 +274,7 @@ def test_analysis_post_is_idempotent_and_extra_forbid(analysis_client, settings)
             "provider_settings": {},
             "provider_limits": {},
             "model_limits": {},
-            "capability_types": ["video_analysis"],
+            "capability_types": ["audio_understanding", "video_analysis"],
             "languages": ["zh-CN"],
         }
 
@@ -248,11 +315,15 @@ def test_script_generation_post_validates_analysis_url_and_model(analysis_client
             {
                 "source_asset_id": "asset_b",
                 "video_url": "https://cdn.example.test/narrato/api/b.mp4",
+                "video_name": "episode-b.mp4",
+                "subtitle_name": "episode-b.srt",
                 "duration_seconds": 10,
             },
             {
                 "source_asset_id": "asset_a",
                 "video_url": "https://cdn.example.test/narrato/api/a.mp4",
+                "video_name": "episode-a.mp4",
+                "subtitle_name": "episode-a.srt",
                 "duration_seconds": 9,
             },
         ],

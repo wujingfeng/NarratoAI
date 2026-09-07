@@ -1,6 +1,11 @@
+import pytest
+from pydantic import ValidationError
+
 from narrato_api.config import Settings
 from narrato_api.integrations.core_client import CoreVoiceCapability
 from narrato_api.products.narration_config import get_short_drama_narration_config
+from narrato_api.projects.router import NarrationSettingsData
+from narrato_api.projects.service import _validate_complete_narration_settings
 
 
 class FakeCoreClient:
@@ -72,4 +77,20 @@ def test_short_drama_config_exposes_only_core_catalog_voices(monkeypatch) -> Non
         "经典白色",
         "白字蓝边",
     ]
-    assert config.original_sound_ratios == list(range(0, 100, 10))
+    assert config.original_sound_ratios == list(range(0, 101))
+
+
+def test_original_sound_ratio_accepts_every_integer_from_zero_to_one_hundred() -> None:
+    for value in (0, 1, 37, 99, 100):
+        assert NarrationSettingsData(original_sound_ratio=value).original_sound_ratio == value
+        settings = {
+            "narration_style": "悬疑/犯罪",
+            "video_ratio": "9:16",
+            "voice_id": "voice-1",
+            "subtitle_style": "经典白色",
+            "original_sound_ratio": value,
+        }
+        assert _validate_complete_narration_settings(settings)["original_sound_ratio"] == value
+
+    with pytest.raises(ValidationError):
+        NarrationSettingsData(original_sound_ratio=101)

@@ -94,7 +94,7 @@ def test_outbox_lease_migration_accepts_bootstrap_schema_drift(tmp_path) -> None
     }
     with engine.connect() as connection:
         assert connection.scalar(text("SELECT version_num FROM alembic_version")) == (
-            "0027_video_translation_voice_replacement_charge"
+                "0046_apimart_video_provider_profiles"
         )
 
 

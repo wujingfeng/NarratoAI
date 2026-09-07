@@ -22,13 +22,22 @@ from core_api.config import Settings
 from core_api.infrastructure.oss_client import CdnUrlPolicy, InputSecurityError
 
 
-class AsrTaskRequest(BaseModel):
-    """ASR 原子任务的稳定公共输入。"""
+class AsrSource(BaseModel):
+    """批量 ASR 中的一条有序媒体来源。"""
 
     model_config = ConfigDict(extra="forbid")
 
+    source_asset_id: str = Field(min_length=1, max_length=80)
     source_url: str = Field(min_length=1, max_length=2048)
     declared_extension: str = Field(min_length=1, max_length=8)
+
+
+class AsrTaskRequest(BaseModel):
+    """ASR 原子任务仅接受批量来源；单来源也必须放入 sources。"""
+
+    model_config = ConfigDict(extra="forbid")
+
+    sources: list[AsrSource] = Field(min_length=1, max_length=5)
     caller_task_id: str | None = Field(default=None, max_length=80)
 
 
@@ -46,16 +55,28 @@ def create_asr_task(
 ) -> dict[str, object]:
     """幂等创建异步 ASR 任务。"""
 
-    try:
-        source_url = CdnUrlPolicy(set(settings.cdn_allowed_hosts)).validate(
-            payload.source_url
+    policy = CdnUrlPolicy(set(settings.cdn_allowed_hosts))
+    validated_sources: list[dict[str, str]] = []
+    seen_asset_ids: set[str] = set()
+    for source in payload.sources:
+        if source.source_asset_id in seen_asset_ids:
+            raise ApiError("ASR_SOURCE_DUPLICATED", "ASR 来源素材重复", 422)
+        seen_asset_ids.add(source.source_asset_id)
+        try:
+            source_url = policy.validate(source.source_url)
+        except (InputSecurityError, ValueError) as exc:
+            raise ApiError(
+                "SOURCE_URL_REJECTED", "媒体 URL 不符合 CDN 安全策略", 422
+            ) from exc
+        validated_sources.append(
+            {
+                "source_asset_id": source.source_asset_id,
+                "source_url": source_url,
+                "declared_extension": source.declared_extension,
+            }
         )
-    except (InputSecurityError, ValueError) as exc:
-        raise ApiError(
-            "SOURCE_URL_REJECTED", "媒体 URL 不符合 CDN 安全策略", 422
-        ) from exc
     snapshot = payload.model_dump(exclude={"caller_task_id"})
-    snapshot["source_url"] = source_url
+    snapshot["sources"] = validated_sources
     return create_atomic_task(
         session=session,
         dispatcher=dispatcher,

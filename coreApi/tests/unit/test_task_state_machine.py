@@ -83,6 +83,48 @@ def test_stale_attempt_cannot_complete_task(task_service, task, session):
     assert task.status == CoreTaskStatus.SUCCEEDED
 
 
+def test_running_attempt_persists_reconnectable_stream_snapshots(task_service, task):
+    """流式草稿按阶段累积，最终结果仍由完成协议覆盖。"""
+
+    attempt = task_service.start_attempt(task.id)
+    task_service.update_attempt_stream(
+        attempt.id,
+        attempt.lease_token,
+        attempt.lease_version,
+        stage="analysis",
+        content="剧情结构草稿",
+    )
+    streamed = task_service.update_attempt_stream(
+        attempt.id,
+        attempt.lease_token,
+        attempt.lease_version,
+        stage="generation",
+        content="解说文案草稿",
+        completed=True,
+    )
+
+    assert streamed.result == {
+        "stream": {
+            "sequence": 2,
+            "stage": "generation",
+            "content": "解说文案草稿",
+            "outputs": {
+                "analysis": "剧情结构草稿",
+                "generation": "解说文案草稿",
+            },
+            "completed": True,
+            "updated_at": streamed.result["stream"]["updated_at"],
+        }
+    }
+    completed = task_service.complete_attempt(
+        attempt.id,
+        attempt.lease_token,
+        {"artifact": "final"},
+        lease_version=attempt.lease_version,
+    )
+    assert completed.result == {"artifact": "final"}
+
+
 def test_lease_expiration_does_not_consume_business_retry_budget(task_service):
     """进程中断可持续创建新 attempt，不能因服务重启耗尽业务重试。"""
 
@@ -213,7 +255,12 @@ def test_processing_failures_still_respect_business_retry_budget(task_service):
     )
     failed = task_service.get_task(core_task.id)
     assert failed.status == CoreTaskStatus.FAILED
-    assert failed.error == {"code": "RETRY_EXHAUSTED", "retryable": False}
+    assert failed.error == {
+        "code": "PROVIDER_TEMPORARY",
+        "retryable": False,
+        "retry_exhausted": True,
+        "attempts": 2,
+    }
 
 
 def test_deterministic_failure_enters_terminal_failed(task_service, task):

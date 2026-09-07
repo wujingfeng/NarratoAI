@@ -9,6 +9,7 @@ import {
   Scissors,
   Translate,
   VideoCamera,
+  ChatCenteredText,
   UserCircle,
 } from "@phosphor-icons/react";
 
@@ -25,6 +26,7 @@ export const dashboardNavItems = [
   navItem("overview", House, "main", "/dashboard"),
   navItem("create", MagicWand, "main", "/dashboard/create"),
   navItem("projects", ClockCounterClockwise, "main", "/dashboard/projects"),
+  navItem("aiAssistant", ChatCenteredText, "main", "/dashboard/ai-assistant"),
   navItem("narration", FilmSlate, "tools", "/dashboard/narration/settings"),
   navItem("translation", Translate, "tools", "/dashboard/video-translation/upload"),
   navItem("remix", Scissors, "tools"),

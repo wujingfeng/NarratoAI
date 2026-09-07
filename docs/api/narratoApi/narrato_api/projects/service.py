@@ -259,9 +259,7 @@ def _validate_complete_narration_settings(settings: dict | None) -> dict:
             "PROJECT_SETTINGS_INCOMPLETE", "Execution mode is invalid"
         )
     original_sound_ratio = settings.get("original_sound_ratio", 30)
-    if type(original_sound_ratio) is not int or original_sound_ratio not in range(
-        0, 100, 10
-    ):
+    if type(original_sound_ratio) is not int or not 0 <= original_sound_ratio <= 100:
         raise ProjectLifecycleConflict(
             "PROJECT_SETTINGS_INCOMPLETE", "Original sound ratio is invalid"
         )
@@ -340,6 +338,16 @@ def _validate_source_subtitle_layouts(
                 "SOURCE_SUBTITLE_LAYOUT_INVALID",
                 "No-subtitle videos cannot have a subtitle region",
             )
+    target_duration = settings.get("target_duration_seconds")
+    if target_duration is not None and (
+        not isinstance(target_duration, int)
+        or isinstance(target_duration, bool)
+        or not 10 <= target_duration <= 1800
+    ):
+        raise ProjectLifecycleConflict(
+            "TARGET_DURATION_INVALID",
+            "Target duration must be an integer between 10 and 1800 seconds",
+        )
     position = settings.get("narration_subtitle_position")
     if (
         not isinstance(position, dict)
@@ -636,6 +644,15 @@ def _ready_quote(session: Session, *, project: Project) -> tuple[int, int, int, 
         raise ProjectLifecycleConflict(
             "PROJECT_DURATION_UNAVAILABLE", "Project media duration is unavailable"
         )
+    if project.product == "short_drama_narration" and any(
+        not (0 < float(asset.duration_seconds or 0) <= 600) for asset in videos
+    ):
+        # 方舟公网 video_url 多模态输入按单素材限制十分钟。必须在报价和
+        # start_project 扣费之前拒绝，不能依赖下游 Core 再失败退款。
+        raise ProjectLifecycleConflict(
+            "PROJECT_VIDEO_DURATION_UNSUPPORTED",
+            "Each short drama video must be longer than 0 and no longer than 600 seconds",
+        )
     price = session.scalar(
         select(ProductPrice)
         .where(ProductPrice.product == project.product)
@@ -915,6 +932,18 @@ def get_project_stage_detail(
                 raw_error.get("code")
                 if isinstance(raw_error, dict)
                 and isinstance(raw_error.get("code"), str)
+                else None
+            ),
+            "error_reason": (
+                raw_error.get("reason")
+                if isinstance(raw_error, dict)
+                and isinstance(raw_error.get("reason"), str)
+                else None
+            ),
+            "error_details": (
+                raw_error.get("details")
+                if isinstance(raw_error, dict)
+                and isinstance(raw_error.get("details"), dict)
                 else None
             ),
         }

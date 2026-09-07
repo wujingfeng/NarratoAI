@@ -130,6 +130,7 @@ class PlayModeUpdateRequest(StrictModel):
 
 
 class ProviderUpdateRequest(StrictModel):
+    request_profile: str | None = Field(default=None, min_length=1, max_length=64)
     provider_model_id: str | None = Field(default=None, min_length=1, max_length=128)
     submit_url: str | None = Field(default=None, min_length=1, max_length=2048)
     status_query_url: str | None = Field(default=None, max_length=2048)
@@ -1338,6 +1339,7 @@ def providers(
         "id",
         "play_mode_id",
         "provider_code",
+        "request_profile",
         "provider_model_id",
         "submit_url",
         "status_query_url",
@@ -1369,6 +1371,7 @@ def update_provider(
     if provider is None:
         raise ApiError("ADMIN_RESOURCE_NOT_FOUND", "Resource not found", 404)
     allowed_fields = (
+        "request_profile",
         "provider_model_id",
         "submit_url",
         "status_query_url",
@@ -1398,6 +1401,7 @@ def update_provider(
                     "id",
                     "play_mode_id",
                     "provider_code",
+                    "request_profile",
                     "provider_model_id",
                     "submit_url",
                     "status_query_url",

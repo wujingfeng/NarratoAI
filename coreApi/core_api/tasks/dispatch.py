@@ -23,6 +23,7 @@ class TaskDispatcher(Protocol):
         self,
         task_id: str,
         *,
+        task_type: str,
         expected_state_version: int,
         not_before: datetime,
         dispatch_id: str,
@@ -100,8 +101,14 @@ class DispatchOutboxPublisher:
         if row is None:
             return False
         try:
+            task_type = self.session.scalar(
+                select(CoreTask.task_type).where(CoreTask.id == task_id)
+            )
+            if not isinstance(task_type, str):
+                raise RuntimeError("TASK_NOT_FOUND")
             dispatcher.dispatch(
                 task_id,
+                task_type=task_type,
                 expected_state_version=row.state_version,
                 not_before=row.available_at,
                 dispatch_id=row.id,

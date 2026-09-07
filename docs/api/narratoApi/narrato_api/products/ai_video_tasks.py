@@ -171,7 +171,12 @@ class AiVideoPollingWorker:
             if not output.provider_url:
                 continue
             extension = self._extension(output.provider_url, output.output_type)
-            stored = self._oss.copy_from_url(bucket=self._settings.oss_bucket, object_key=f"narrato/model-results/{task.id}/{output.sort_order}.{extension}", source_url=output.provider_url, content_type=output.content_type)
+            stored = self._oss.copy_from_url(
+                bucket=self._settings.oss_bucket,
+                object_key=f"narrato/model-results/{task.id}/{output.sort_order}.{extension}",
+                source_url=output.provider_url,
+                content_type=output.content_type,
+            )
             with self._sessions.begin() as session:
                 row = session.get(ai.ModelTaskOutput, output.id)
                 locked_task = self._locked(session, claim)
@@ -182,6 +187,8 @@ class AiVideoPollingWorker:
                 row.cdn_url = stored.cdn_url
                 row.size_bytes = stored.size_bytes
                 row.content_type = stored.content_type
+        if task_type == "video" and self._complete_fixed_duration_video(claim):
+            return
         if task_type == "video":
             self._probe_videos(claim)
         with self._sessions.begin() as session:
@@ -209,6 +216,39 @@ class AiVideoPollingWorker:
             else:
                 ai._mark_completed(session, task)
 
+    def _complete_fixed_duration_video(self, claim: PollClaim) -> bool:
+        """Finish a playable fixed-duration generation without Core probing.
+
+        Video-generation Agent tasks always freeze the user's requested
+        duration. Once all video outputs are durably copied to our CDN, that
+        fixed value is the billing and display contract. Core probe failures
+        must not leave an otherwise successful, playable video in finalizing.
+        """
+
+        ai = _ai()
+        with self._sessions.begin() as session:
+            task = self._locked(session, claim)
+            if task is None or task.requested_duration_seconds is None or task.requested_duration_seconds <= 0:
+                return False
+            rows = list(
+                session.scalars(
+                    select(ai.ModelTaskOutput)
+                    .where(ai.ModelTaskOutput.task_id == task.id)
+                    .order_by(ai.ModelTaskOutput.sort_order)
+                )
+            )
+            video_rows = [row for row in rows if row.output_type == "video"]
+            if not video_rows or any(row.cdn_url is None for row in video_rows):
+                return False
+            for row in video_rows:
+                if row.duration_seconds is None:
+                    row.duration_seconds = float(task.requested_duration_seconds)
+            task.actual_output_duration_seconds = sum(
+                float(row.duration_seconds or 0) for row in video_rows
+            )
+            ai._mark_completed(session, task)
+            return True
+
     def _probe_videos(self, claim: PollClaim) -> None:
         ai = _ai()
         assert self._core is not None
@@ -235,6 +275,18 @@ class AiVideoPollingWorker:
                 row.core_task_id = result.core_task_id
                 if result.valid is True and result.duration_seconds is not None:
                     row.duration_seconds = result.duration_seconds
+                elif (
+                    result.valid is None
+                    and not result.core_task_id
+                    and task.requested_duration_seconds is not None
+                    and task.requested_duration_seconds > 0
+                ):
+                    # Some Core deployments acknowledge neither a completed
+                    # probe nor an async probe ID. The video is already copied
+                    # to our CDN and playable at this point; retain the user's
+                    # fixed duration instead of leaving the task finalizing
+                    # forever and blocking settlement.
+                    row.duration_seconds = float(task.requested_duration_seconds)
 
     def _reschedule_error(self, claim: PollClaim, reason: str) -> None:
         ai = _ai()

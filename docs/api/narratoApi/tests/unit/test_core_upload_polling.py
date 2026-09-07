@@ -8,6 +8,7 @@ import pytest
 
 from narrato_api.integrations.core_client import (
     CoreClientRejectedError,
+    CoreTaskResult,
     HttpCoreClient,
     MediaProbeResult,
 )
@@ -84,3 +85,47 @@ def test_core_client_reports_core_validation_rejection_separately(monkeypatch) -
             declared_extension="mp3",
             caller_task_id="ast_audio",
         )
+
+
+def test_core_task_polling_preserves_safe_terminal_error(monkeypatch) -> None:
+    @contextmanager
+    def fake_urlopen(_request, timeout: int):
+        assert timeout == 10
+        yield FakeResponse(
+            status=200,
+            payload={
+                "data": {
+                    "core_task_id": "core_failed",
+                    "status": "failed",
+                    "state_version": 8,
+                    "progress": 0,
+                    "result": None,
+                    "artifacts": [],
+                    "error": {
+                        "code": "SCRIPT_VALIDATION_FAILED",
+                        "retryable": False,
+                        "reason": "SCRIPT_SOURCE_UNKNOWN",
+                        "details": {"item_index": 2},
+                        "diagnostics": {
+                            "stage": "repair_after_timeline_validation"
+                        },
+                    },
+                }
+            },
+        )
+
+    monkeypatch.setattr("narrato_api.integrations.core_client.urlopen", fake_urlopen)
+    client = HttpCoreClient(base_url="https://core.example.test", request_token="token")
+
+    assert client.get_task_result("core_failed") == CoreTaskResult(
+        core_task_id="core_failed",
+        status="failed",
+        state_version=8,
+        error={
+            "code": "SCRIPT_VALIDATION_FAILED",
+            "retryable": False,
+            "reason": "SCRIPT_SOURCE_UNKNOWN",
+            "details": {"item_index": 2},
+            "diagnostics": {"stage": "repair_after_timeline_validation"},
+        },
+    )

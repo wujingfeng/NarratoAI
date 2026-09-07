@@ -14,6 +14,9 @@ from types import SimpleNamespace
 
 import pytest
 
+from core_api.adapters.narrato.prompts.short_drama_plot_analysis import (
+    PLOT_ANALYSIS_SYSTEM_PROMPT,
+)
 from core_api.adapters.narrato.short_drama import (
     FakeShortDramaProvider,
     ScriptValidationError,
@@ -28,6 +31,12 @@ from core_api.adapters.narrato.short_drama import (
     ProviderOutputError,
     ProviderResponseError,
     ShortDramaInputError,
+)
+
+
+VALID_PLOT_ANALYSIS = (
+    "## 三、整体剧情概括\n"
+    "当前剧情围绕主角面对危机并寻找解决办法展开，角色关系、核心冲突和故事悬念均来自字幕内容。"
 )
 
 
@@ -117,7 +126,66 @@ def test_streamlit_numeric_string_fields_are_normalized_before_core_mapping():
     ]
 
 
-def test_timeline_enforces_original_ratio_and_total_duration():
+def test_original_sound_marker_is_canonicalized_without_model_flag():
+    from core_api.adapters.narrato.short_drama import _legacy_script_to_timeline
+
+    timeline = _legacy_script_to_timeline(
+        {
+            "items": [
+                {
+                    "source_asset_id": "asset_a",
+                    "start": 1,
+                    "end": 2,
+                    "narration": "播放原片_1",
+                }
+            ]
+        },
+        request_sources(),
+    )
+
+    assert timeline[0]["original_sound"] is True
+    assert validate_timeline(timeline, request_sources())[0]["original_sound"] is True
+
+
+def test_timeline_validator_canonicalizes_original_sound_marker_directly():
+    items = [
+        valid_script_fixture()[0],
+        {
+            "source_asset_id": "asset_a",
+            "start": 2.0,
+            "end": 3.0,
+            "narration": "播放原片 2",
+            "original_sound": False,
+        },
+    ]
+
+    normalized = validate_timeline(items, request_sources())
+
+    assert normalized[1]["original_sound"] is True
+
+
+def test_legacy_ost_string_zero_is_not_truthy():
+    from core_api.adapters.narrato.short_drama import _legacy_script_to_timeline
+
+    timeline = _legacy_script_to_timeline(
+        {
+            "items": [
+                {
+                    "source_asset_id": "asset_a",
+                    "start": 0,
+                    "end": 1,
+                    "narration": "普通解说",
+                    "OST": "0",
+                }
+            ]
+        },
+        request_sources(),
+    )
+
+    assert "original_sound" not in timeline[0]
+
+
+def test_timeline_treats_original_ratio_and_total_duration_as_generation_hints():
     source = replace(request_sources()[0], duration_seconds=100.0)
     no_original = [
         {
@@ -129,31 +197,18 @@ def test_timeline_enforces_original_ratio_and_total_duration():
         }
         for index in range(10)
     ]
-    with pytest.raises(ScriptValidationError, match="SCRIPT_ORIGINAL_SOUND_REQUIRED"):
-        validate_timeline(no_original, [source], original_sound_ratio=30)
-
-    correct_ratio = [dict(item) for item in no_original]
-    for index in (2, 5, 8):
-        correct_ratio[index]["original_sound"] = True
-        correct_ratio[index]["narration"] = f"播放原片_{index + 1}"
     assert (
         len(
             validate_timeline(
-                correct_ratio,
+                no_original,
                 [source],
                 original_sound_ratio=30,
-                max_total_duration=10.0,
+                max_total_duration=9.9,
+                target_duration_seconds=60,
             )
         )
         == 10
     )
-    with pytest.raises(ScriptValidationError, match="SCRIPT_TOTAL_DURATION_TOO_LONG"):
-        validate_timeline(
-            correct_ratio,
-            [source],
-            original_sound_ratio=30,
-            max_total_duration=9.9,
-        )
 
 
 def test_timeline_rejects_original_sound_as_first_item():
@@ -167,6 +222,44 @@ def test_timeline_rejects_original_sound_as_first_item():
         validate_timeline([item], request_sources(), original_sound_ratio=30)
 
 
+def test_timeline_treats_target_duration_as_hint_and_scales_narration_length():
+    source = replace(request_sources()[0], duration_seconds=120.0)
+    items = [
+        {
+            "source_asset_id": "asset_a",
+            "start": float(index * 6),
+            "end": float((index + 1) * 6),
+            "narration": f"第{index + 1}段解说。",
+            "original_sound": index == 5,
+        }
+        for index in range(10)
+    ]
+    items[5]["narration"] = "播放原片_6"
+    assert len(
+        validate_timeline(
+            items,
+            [source],
+            original_sound_ratio=10,
+            target_duration_seconds=60,
+            narration_chars_per_second=5,
+        )
+    ) == 10
+
+    assert len(
+        validate_timeline(items[:-2], [source], target_duration_seconds=60)
+    ) == 8
+
+    too_long = [dict(items[0], end=10.0, narration="字" * 51)]
+    assert validate_timeline(
+        too_long, [source], narration_chars_per_second=5
+    )[0]["end"] == pytest.approx(10.2)
+
+    longer_segment = [dict(items[0], end=20.0, narration="字" * 100)]
+    assert len(
+        validate_timeline(longer_segment, [source], narration_chars_per_second=5)
+    ) == 1
+
+
 def test_production_resolver_wraps_existing_narrato_adapter_without_network():
     calls = {}
 
@@ -176,7 +269,7 @@ def test_production_resolver_wraps_existing_narrato_adapter_without_network():
 
         def analyze_subtitle(self, content):
             calls["analyze"] = content
-            return {"status": "success", "analysis": "剧情分析"}
+            return {"status": "success", "analysis": VALID_PLOT_ANALYSIS}
 
         def generate_narration_copy(self, **kwargs):
             calls["generate"] = kwargs
@@ -287,18 +380,18 @@ def test_request_local_openai_four_stage_contract_with_fake_transport():
                 content = json.dumps(
                     {
                         "items": [
-                            {
-                                "video_id": 1,
-                                "timestamp": "00:00:00,000-00:00:01,000",
-                                "narration": "修复后的真实契约",
-                                "OST": 0,
+                                    {
+                                        "video_id": 1,
+                                        "timestamp": "00:00:00,000-00:00:02,000",
+                                        "narration": "修复后的真实契约",
+                                        "OST": 0,
                             }
                         ]
                     },
                     ensure_ascii=False,
                 )
             else:
-                content = "真实剧情分析"
+                content = VALID_PLOT_ANALYSIS
             return SimpleNamespace(
                 choices=[SimpleNamespace(message=SimpleNamespace(content=content))]
             )
@@ -346,67 +439,23 @@ def test_request_local_openai_four_stage_contract_with_fake_transport():
     for request in calls["requests"][2:]:
         assert request["response_format"] == {"type": "json_object"}
 
-    from app.services.prompts import PromptManager
-    from app.services.short_drama_narration_service import (
-        build_narration_char_range,
-    )
-
-    subtitle_content = "# 视频 1: asset_a.mp4\n字幕文件: asset_a.srt\n真实字幕内容"
-    char_range = build_narration_char_range(
-        10.0,
-        prompt_category="short_drama_narration",
-        original_sound_ratio=30,
-    )
-    expected_parameters = [
-        {"subtitle_content": subtitle_content},
-        {
-            "drama_name": "测试短剧",
-            "drama_genre": "逆袭/复仇",
-            "plot_analysis": "真实剧情分析",
-            "subtitle_content": subtitle_content,
-            "narration_language": "简体中文（中国）",
-            "narration_char_range": char_range,
-        },
-        {
-            "drama_name": "测试短剧",
-            "drama_genre": "逆袭/复仇",
-            "plot_analysis": "真实剧情分析",
-            "subtitle_content": subtitle_content,
-            "narration_copy": "真实解说正文",
-            "narration_language": "简体中文（中国）",
-            "original_sound_ratio": 30,
-        },
-        {
-            "drama_name": "测试短剧",
-            "drama_genre": "逆袭/复仇",
-            "plot_analysis": "真实剧情分析",
-            "subtitle_content": subtitle_content,
-            "invalid_script": json.dumps(
-                {"items": [{"bad": True}]}, ensure_ascii=False
-            ),
-            "validation_errors": "PROVIDER_RESPONSE_INVALID",
-            "narration_language": "简体中文（中国）",
-        },
+    prompts = [request["messages"][-1]["content"] for request in calls["requests"]]
+    assert [prompt.splitlines()[0] for prompt in prompts] == [
+        "# 角色",
+        "# 短剧解说正文创作任务",
+        "# 短剧解说文案画面匹配任务",
+        "# 短剧解说脚本修复任务",
     ]
-    prompt_names = [
-        "plot_analysis",
-        "narration_copy",
-        "script_matching",
-        "script_repair",
-    ]
-    for request, name, parameters in zip(
-        calls["requests"], prompt_names, expected_parameters, strict=True
-    ):
-        prompt_object = PromptManager.get_prompt_object("short_drama_narration", name)
-        assert request["messages"] == [
-            {"role": "system", "content": prompt_object.get_system_prompt()},
-            {
-                "role": "user",
-                "content": PromptManager.get_prompt(
-                    "short_drama_narration", name, parameters=parameters
-                ),
-            },
-        ]
+    assert calls["requests"][0]["messages"][0]["content"] == (
+        PLOT_ANALYSIS_SYSTEM_PROMPT
+    )
+    assert "# 视频 1: asset_a.mp4" in prompts[0]
+    assert "字幕文件: asset_a.srt" in prompts[0]
+    for prompt in prompts[2:]:
+        assert "解说片段不设固定时长" in prompt
+        assert "每秒约 5 个非空白字符" in prompt
+        assert "10 秒片段尽量不超过 50 字" in prompt
+        assert "禁止用一个片段覆盖整段源视频" in prompt
 
 
 def test_request_max_tokens_cannot_exceed_frozen_model_limit():
@@ -423,6 +472,49 @@ def test_request_max_tokens_cannot_exceed_frozen_model_limit():
             language="zh-CN",
             config={"max_tokens": 513},
         )
+
+
+def test_request_local_provider_streams_public_analysis_snapshots():
+    snapshots: list[tuple[str, str, bool]] = []
+
+    def client_factory(**_settings):
+        def create(**kwargs):
+            assert kwargs["stream"] is True
+            return iter(
+                [
+                    SimpleNamespace(
+                        choices=[SimpleNamespace(delta=SimpleNamespace(content="剧情"))]
+                    ),
+                    SimpleNamespace(
+                        choices=[SimpleNamespace(delta=SimpleNamespace(content="结构草稿"))]
+                    ),
+                ]
+            )
+
+        return SimpleNamespace(
+            chat=SimpleNamespace(completions=SimpleNamespace(create=create))
+        )
+
+    provider = create_short_drama_provider(
+        "openai",
+        provider_model_code="gpt-frozen",
+        api_key="secret",
+        base_url="https://llm.test/v1",
+        client_factory=client_factory,
+    )
+    provider.set_stream_sink(
+        lambda stage, content, completed: snapshots.append(
+            (stage, content, completed)
+        )
+    )
+
+    result = provider._completion(
+        "analysis", "prompt", temperature=0.7, max_tokens=128
+    )
+
+    assert result == "剧情结构草稿"
+    assert snapshots[0] == ("analysis", "", False)
+    assert snapshots[-1] == ("analysis", "剧情结构草稿", True)
 
 
 def test_real_unified_provider_chain_never_logs_sensitive_exception(monkeypatch):
@@ -559,7 +651,7 @@ def test_real_provider_dict_items_ratio_prompt_limits_and_exactly_one_repair(
     monkeypatch.setattr(
         provider.analyzer,
         "analyze_subtitle",
-        lambda content: {"status": "success", "analysis": "剧情"},
+        lambda content: {"status": "success", "analysis": VALID_PLOT_ANALYSIS},
     )
     monkeypatch.setattr(
         provider.analyzer,
@@ -612,7 +704,7 @@ def test_frozen_model_limits_bound_input_and_output():
             pass
 
         def analyze_subtitle(self, content):
-            return {"status": "success", "analysis": "剧情"}
+            return {"status": "success", "analysis": VALID_PLOT_ANALYSIS}
 
     provider = create_short_drama_provider(
         "openai",
@@ -680,7 +772,7 @@ def test_concurrent_providers_use_frozen_model_secret_and_base_url_without_cross
             elif "# 短剧解说正文创作任务" in prompt:
                 content = "解说正文"
             else:
-                content = "剧情摘要"
+                content = VALID_PLOT_ANALYSIS
             return SimpleNamespace(
                 choices=[SimpleNamespace(message=SimpleNamespace(content=content))]
             )
@@ -723,7 +815,11 @@ def test_core_provider_logs_only_redacted_metadata():
     def client_factory(**settings):
         def create(**kwargs):
             return SimpleNamespace(
-                choices=[SimpleNamespace(message=SimpleNamespace(content="剧情摘要"))]
+                choices=[
+                    SimpleNamespace(
+                        message=SimpleNamespace(content=VALID_PLOT_ANALYSIS)
+                    )
+                ]
             )
 
         return SimpleNamespace(
@@ -869,7 +965,7 @@ def test_invalid_script_is_repaired_once():
     assert fake_llm.repair_calls == 1
 
 
-def test_coarse_narration_segment_is_repaired_with_specific_error():
+def test_narration_too_long_for_segment_is_extended_without_llm_repair():
     sources = [replace(request_sources()[0], duration_seconds=60.0)]
     fake_llm = FakeShortDramaProvider(
         match_results=[
@@ -877,8 +973,8 @@ def test_coarse_narration_segment_is_repaired_with_specific_error():
                 {
                     "source_asset_id": "asset_a",
                     "start": 0,
-                    "end": 20,
-                    "narration": "这是一句需要匹配真实字幕窗口的解说。",
+                    "end": 10,
+                    "narration": "字" * 51,
                 }
             ]
         ],
@@ -889,19 +985,18 @@ def test_coarse_narration_segment_is_repaired_with_specific_error():
         analysis={"summary": "测试剧情"}, sources=sources
     )
 
-    assert result == valid_script_fixture()
-    assert fake_llm.repair_calls == 1
-    assert fake_llm.repair_validation_errors == ["SCRIPT_NARRATION_SEGMENT_TOO_LONG"]
+    assert result[0]["end"] == pytest.approx(10.2)
+    assert fake_llm.repair_calls == 0
 
 
-def test_repair_provider_failure_keeps_original_script_successful():
+def test_repair_provider_failure_fails_closed():
     sources = [replace(request_sources()[0], duration_seconds=60.0)]
     coarse_script = [
         {
-            "source_asset_id": "asset_a",
+            "source_asset_id": "unknown_asset",
             "start": 0,
-            "end": 20,
-            "narration": "这是一句需要匹配真实字幕窗口的解说。",
+            "end": 10,
+            "narration": "结构错误",
         }
     ]
 
@@ -912,12 +1007,42 @@ def test_repair_provider_failure_keeps_original_script_successful():
 
     fake_llm = FailedRepairProvider(match_results=[coarse_script])
 
-    result = ShortDramaAdapter(provider=fake_llm).generate_script(
-        analysis={"summary": "测试剧情"}, sources=sources
+    with pytest.raises(ProviderTemporaryError):
+        ShortDramaAdapter(provider=fake_llm).generate_script(
+            analysis={"summary": "测试剧情"}, sources=sources
+        )
+    assert fake_llm.repair_calls == 1
+
+
+def test_failed_repair_preserves_exact_validation_diagnostics():
+    invalid = [
+        {
+            "source_asset_id": "unknown_asset",
+            "start": 0,
+            "end": 10,
+            "narration": "结构错误",
+        }
+    ]
+    fake_llm = FakeShortDramaProvider(
+        match_results=[invalid],
+        repair_result=invalid,
     )
 
-    assert result == coarse_script
-    assert fake_llm.repair_calls == 1
+    with pytest.raises(ScriptValidationError) as caught:
+        ShortDramaAdapter(provider=fake_llm).generate_script(
+            analysis={"summary": "测试剧情"}, sources=request_sources()
+        )
+
+    payload = caught.value.error_payload()
+    assert payload["reason"] == "SCRIPT_SOURCE_UNKNOWN"
+    assert payload["details"] == {
+        "item_index": 0,
+        "source_asset_id": "unknown_asset",
+    }
+    assert payload["diagnostics"]["stage"] == (
+        "repair_after_timeline_validation"
+    )
+    assert payload["diagnostics"]["item_count"] == 1
 
 
 def test_script_preserves_explicit_video_source_order():
@@ -938,14 +1063,14 @@ def test_script_preserves_explicit_video_source_order():
     assert [item["source_asset_id"] for item in result[:2]] == ["asset_b", "asset_a"]
 
 
-def test_invalid_repair_keeps_original_script_without_second_repair():
+def test_invalid_repair_fails_closed_without_second_repair():
     sources = [replace(request_sources()[0], duration_seconds=60.0)]
     original = [
         {
-            "source_asset_id": "asset_a",
+            "source_asset_id": "unknown_asset",
             "start": 0,
-            "end": 20,
-            "narration": "模型已经正常返回，但片段超过后端建议时长。",
+            "end": 10,
+            "narration": "结构错误",
         }
     ]
     fake_llm = FakeShortDramaProvider(
@@ -953,15 +1078,14 @@ def test_invalid_repair_keeps_original_script_without_second_repair():
         repair_result=[{"still_invalid": True}],
     )
 
-    result = ShortDramaAdapter(provider=fake_llm).generate_script(
-        analysis={"summary": "测试剧情"}, sources=sources
-    )
-
-    assert result == original
+    with pytest.raises(ScriptValidationError, match="SCRIPT_FIELDS_INVALID"):
+        ShortDramaAdapter(provider=fake_llm).generate_script(
+            analysis={"summary": "测试剧情"}, sources=sources
+        )
     assert fake_llm.repair_calls == 1
 
 
-def test_validator_runtime_failure_keeps_original_script(monkeypatch):
+def test_validator_runtime_failure_is_not_silently_accepted(monkeypatch):
     import core_api.adapters.narrato.short_drama as short_drama
 
     original = valid_script_fixture()
@@ -973,12 +1097,11 @@ def test_validator_runtime_failure_keeps_original_script(monkeypatch):
         raise RuntimeError("validator implementation failed")
 
     monkeypatch.setattr(short_drama, "validate_timeline", broken_validator)
-    result = ShortDramaAdapter(provider=fake_llm).generate_script(
-        analysis={"summary": "测试剧情"}, sources=request_sources()
-    )
-
-    assert result == original
-    assert fake_llm.repair_calls == 1
+    with pytest.raises(RuntimeError, match="validator implementation failed"):
+        ShortDramaAdapter(provider=fake_llm).generate_script(
+            analysis={"summary": "测试剧情"}, sources=request_sources()
+        )
+    assert fake_llm.repair_calls == 0
 
 
 @pytest.mark.parametrize(
@@ -1010,34 +1133,68 @@ def test_validator_rejects_first_seen_source_order_change():
         validate_timeline(items, request_sources(["asset_b", "asset_a"]))
 
 
-def test_validator_rejects_coarse_narration_text_and_duration():
+def test_validator_scales_narration_text_limit_with_segment_duration():
     sources = [replace(request_sources()[0], duration_seconds=60.0)]
-    with pytest.raises(ScriptValidationError, match="SCRIPT_NARRATION_ITEM_TOO_LONG"):
-        validate_timeline(
-            [
-                {
-                    "source_asset_id": "asset_a",
-                    "start": 0,
-                    "end": 12,
-                    "narration": "字" * 61,
-                }
-            ],
-            sources,
-        )
-    with pytest.raises(
-        ScriptValidationError, match="SCRIPT_NARRATION_SEGMENT_TOO_LONG"
-    ):
-        validate_timeline(
-            [
-                {
-                    "source_asset_id": "asset_a",
-                    "start": 0,
-                    "end": 12.001,
-                    "narration": "细粒度解说",
-                }
-            ],
-            sources,
-        )
+    adjusted = validate_timeline(
+        [
+            {
+                "source_asset_id": "asset_a",
+                "start": 0,
+                "end": 12,
+                "narration": "字" * 61,
+            }
+        ],
+        sources,
+    )
+    assert adjusted[0]["end"] == pytest.approx(12.2)
+    assert validate_timeline(
+        [
+            {
+                "source_asset_id": "asset_a",
+                "start": 0,
+                "end": 20,
+                "narration": "字" * 100,
+            }
+        ],
+        sources,
+    )
+
+
+def test_narration_overflow_at_next_clip_is_a_diagnostic_warning_not_failure():
+    source = replace(request_sources()[0], duration_seconds=60.0)
+    warnings = []
+    timeline = validate_timeline(
+        [
+            {
+                "source_asset_id": "asset_a",
+                "start": 0,
+                "end": 10,
+                "narration": "字" * 51,
+            },
+            {
+                "source_asset_id": "asset_a",
+                "start": 10,
+                "end": 12,
+                "narration": "第二段",
+            },
+        ],
+        [source],
+        warnings=warnings,
+    )
+
+    assert timeline[0]["end"] == 10.0
+    assert warnings == [
+        {
+            "code": "SCRIPT_NARRATION_ITEM_TOO_LONG",
+            "item_index": 0,
+            "source_asset_id": "asset_a",
+            "start": 0.0,
+            "end": 10.0,
+            "segment_duration": 10.0,
+            "char_count": 51,
+            "max_chars": 50,
+        }
+    ]
 
 
 def test_unknown_provider_fields_are_not_preserved():

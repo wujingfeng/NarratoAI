@@ -37,13 +37,21 @@ export function createEditorDraft({ clips, cues, voiceRole, volume, rate, subtit
   }
   return {
     version: EDITOR_DRAFT_VERSION,
-    clips: clips.map(({ id, trackId, start, duration, sourceStart, assetId, assetUrl, text, regionId, picture, originalSound }) => ({
+    clips: clips.map(({ id, trackId, start, duration, sourceStart, assetId, assetUrl, text, regionId, picture, originalSound, eventId, visualAnchor, narrationAnchorText, matchConfidence, visualLead, narrationStartOffset }) => ({
       id, track_id: trackId, start, duration, ...(Number.isFinite(sourceStart) ? { source_start: sourceStart } : {}),
       ...(typeof assetId === 'string' ? { asset_id: assetId } : {}), ...(typeof assetUrl === 'string' ? { asset_url: assetUrl } : {}), ...(typeof text === 'string' ? { text } : {}),
       ...(typeof regionId === 'string' ? { region_id: regionId } : {}),
       ...(trackId === 'script' ? {
         picture: typeof picture === 'string' ? picture : '',
         original_sound: originalSound === true,
+        ...(typeof narrationAnchorText === 'string' && narrationAnchorText && typeof text === 'string' && text.includes(narrationAnchorText) ? {
+          ...(typeof eventId === 'string' && eventId ? { event_id: eventId } : {}),
+          ...(Number.isFinite(visualAnchor) ? { visual_anchor: visualAnchor } : {}),
+          narration_anchor_text: narrationAnchorText,
+          ...(Number.isFinite(matchConfidence) ? { match_confidence: matchConfidence } : {}),
+          ...(Number.isFinite(visualLead) ? { visual_lead: visualLead } : {}),
+          ...(Number.isFinite(narrationStartOffset) ? { narration_start_offset: narrationStartOffset } : {}),
+        } : {}),
       } : {}),
     })),
     subtitles: cues.map(({ start, end, text, regionId }) => ({
@@ -66,6 +74,12 @@ export function readEditorDraft(content) {
     ...(clip.track_id === 'script' ? {
       picture: typeof clip.picture === 'string' ? clip.picture : '',
       originalSound: clip.original_sound === true,
+      ...(typeof clip.event_id === 'string' ? { eventId: clip.event_id } : {}),
+      ...(Number.isFinite(Number(clip.visual_anchor)) ? { visualAnchor: Number(clip.visual_anchor) } : {}),
+      ...(typeof clip.narration_anchor_text === 'string' ? { narrationAnchorText: clip.narration_anchor_text } : {}),
+      ...(Number.isFinite(Number(clip.match_confidence)) ? { matchConfidence: Number(clip.match_confidence) } : {}),
+      ...(Number.isFinite(Number(clip.visual_lead)) ? { visualLead: Number(clip.visual_lead) } : {}),
+      ...(Number.isFinite(Number(clip.narration_start_offset)) ? { narrationStartOffset: Number(clip.narration_start_offset) } : {}),
     } : {}),
   })).filter(validClip) : [];
   if (!clips.length) return null;

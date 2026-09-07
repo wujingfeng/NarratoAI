@@ -4,14 +4,14 @@ from collections.abc import Iterator
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session, sessionmaker
 
 from narrato_api.assets.models import Asset
 from narrato_api.assets.router import get_upload_service
 from narrato_api.auth.models import User
 from narrato_api.auth.router import get_auth_service
-from narrato_api.billing.models import CreditAccount, ProductPrice
+from narrato_api.billing.models import CreditAccount, CreditLedger, ProductPrice
 from narrato_api.config import Settings
 from narrato_api.database import Base
 from narrato_api.main import create_app
@@ -149,6 +149,10 @@ def _start_analysis(client: TestClient, project_id: str):
             "video_ratio": "9:16",
             "voice_id": "BV700_V2_streaming",
             "subtitle_style": "经典白色",
+            "source_subtitle_layouts": {
+                "ast_ready": {"status": "none", "region": None}
+            },
+            "narration_subtitle_position": {"y": 0.82, "font_scale": 0.9},
         },
     )
 
@@ -209,6 +213,31 @@ def test_authenticated_owner_can_create_estimate_and_start_ready_project(
     with Session(lifecycle_client.app.state.database_engine) as session:
         saved = session.get(ProjectNarrationSettings, project_id)
     assert saved is not None and saved.settings["original_sound_ratio"] == 30
+
+
+def test_start_rejects_video_over_ten_minutes_before_charge_or_workflow(
+    lifecycle_client: TestClient,
+) -> None:
+    project_id = _create_project(lifecycle_client)
+    _ready_video(lifecycle_client, project_id, duration_seconds=601)
+
+    start = _start_analysis(lifecycle_client, project_id)
+
+    assert (start.status_code, start.json()["code"]) == (
+        409,
+        "PROJECT_VIDEO_DURATION_UNSUPPORTED",
+    )
+    with Session(lifecycle_client.app.state.database_engine) as session:
+        account = session.get(CreditAccount, "usr_owner")
+        workflows = session.scalars(
+            select(Workflow).where(Workflow.project_id == project_id)
+        ).all()
+        charges = session.scalars(
+            select(CreditLedger).where(CreditLedger.reference_id == project_id)
+        ).all()
+    assert account is not None and account.balance == 100
+    assert workflows == []
+    assert charges == []
 
 
 def test_start_rejects_original_sound_ratio_outside_streamlit_options(

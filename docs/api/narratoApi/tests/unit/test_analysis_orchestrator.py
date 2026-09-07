@@ -19,7 +19,7 @@ from narrato_api.workflows.models import (
     WorkflowTemplateSnapshot,
 )
 from narrato_api.workflows.dispatcher import WorkflowOutboxDispatcher
-from narrato_api.workflows.orchestrator import WorkflowOrchestrator
+from narrato_api.workflows.orchestrator import WorkflowOrchestrator, _qwen_config_snapshot
 from narrato_api.workflows.reconciler import WorkflowReconciler
 
 
@@ -30,17 +30,13 @@ class FakeCore:
         self.analysis_configs: list[dict[str, object]] = []
         self.script_configs: list[dict[str, object]] = []
 
-    def submit_asr(self, *, caller_task_id: str, **_kwargs: object) -> str:
-        self.calls.append(("asr", caller_task_id))
-        return f"core:{caller_task_id}"
-
-    def submit_asr_batch(
-        self, *, caller_task_id: str, sources: list[dict[str, object]]
+    def submit_audio_understanding(
+        self, *, model_id: str, caller_task_id: str, sources: list[dict[str, object]]
     ) -> str:
-        self.calls.append(("asr", caller_task_id))
-        assert all(item.get("source_asset_id") for item in sources)
+        self.calls.append(("audio_understanding", caller_task_id))
+        assert model_id == "model_volcengine_ark"
+        assert all(item.get("source_asset_id") and item.get("video_url") for item in sources)
         return f"core:{caller_task_id}"
-
     def submit_video_analysis(
         self,
         *,
@@ -53,7 +49,7 @@ class FakeCore:
         self.calls.append(("qwen", caller_task_id))
         self.analysis_sources.extend(sources)
         self.analysis_configs.append(config_snapshot)
-        assert model_id == "model_qwen_plus"
+        assert model_id == "model_volcengine_ark"
         return f"core:{caller_task_id}"
 
     def submit_script_generation(
@@ -68,14 +64,79 @@ class FakeCore:
     ) -> str:
         self.calls.append(("script", caller_task_id))
         self.script_configs.append(config_snapshot)
-        assert model_id == "model_qwen_plus"
+        assert model_id == "model_volcengine_ark"
         assert analysis_artifact == {
             "artifact_id": "art_analysis",
             "url": "https://cdn.example/analysis.json",
         }
         assert [item["source_asset_id"] for item in sources] == ["ast2", "ast"]
         assert [item["duration_seconds"] for item in sources] == [20, 10]
+        assert [item["video_name"] for item in sources] == [
+            "episode-2.mp4",
+            "episode.mp4",
+        ]
+        assert [item["subtitle_name"] for item in sources] == [
+            "episode-2.srt",
+            "episode.srt",
+        ]
         return f"core:{caller_task_id}"
+
+
+def test_qwen_snapshot_preserves_agent_requirements_and_target_duration() -> None:
+    assert _qwen_config_snapshot(
+        {
+            "narration_style": "悬疑/犯罪",
+            "requirements": "60秒内完成，结尾强反转",
+            "target_duration_seconds": 60,
+            "original_sound_ratio": 10,
+        }
+    ) == {
+        "drama_genre": "悬疑/犯罪",
+        "narration_style": "悬疑/犯罪",
+        "requirements": "60秒内完成，结尾强反转",
+        "target_duration_seconds": 60,
+        "original_sound_ratio": 10,
+        "fps": 1,
+        "min_frame_tokens": 64,
+        "min_frame_tokens_mode": "provider_default",
+    }
+
+
+def test_single_source_uses_audio_understanding_public_video_contract() -> None:
+    engine = create_engine("sqlite:///:memory:")
+    Base.metadata.create_all(engine)
+    sessions = sessionmaker(bind=engine, expire_on_commit=False)
+    with sessions.begin() as session:
+        session.add(User(id="usr_single", email="single@example.com", password_hash="hash"))
+        session.add(Project(id="prj_single", user_id="usr_single", product="short_drama_narration", status="queued", current_stage="analysis"))
+        session.add(Asset(id="ast_single", user_id="usr_single", project_id="prj_single", asset_type="video", status="ready", filename="episode.mp4", bucket="b", object_key="o", cdn_url="https://cdn.example/episode.mp4", size_bytes=1, duration_seconds=10))
+        session.add(ProjectNarrationSettings(project_id="prj_single", settings={"voice_id": "v"}))
+        session.add(WorkflowTemplateSnapshot(id="tpl_single", template_name="short_drama_narration", version="v2", definition={"nodes": []}))
+        session.add(Workflow(id="wfl_single", user_id="usr_single", project_id="prj_single", template_snapshot_id="tpl_single", state="queued"))
+        session.add(WorkflowNode(id="node_single", workflow_id="wfl_single", name="subtitle_recognition"))
+
+    class BatchOnlyCore:
+        def __init__(self) -> None:
+            self.called = False
+
+        def submit_audio_understanding(
+            self, *, model_id: str, caller_task_id: str, sources: list[dict[str, object]]
+        ) -> str:
+            self.called = True
+            assert model_id == "model_volcengine_ark"
+            assert sources == [
+                {
+                    "source_asset_id": "ast_single",
+                    "video_url": "https://cdn.example/episode.mp4",
+                    "video_name": "episode.mp4",
+                    "duration_seconds": 10,
+                }
+            ]
+            return f"core:{caller_task_id}"
+
+    core = BatchOnlyCore()
+    assert WorkflowOrchestrator(sessions).dispatch_ready(workflow_id="wfl_single", core_client=core)  # type: ignore[arg-type]
+    assert core.called
 
 
 def test_analysis_nodes_are_dispatched_in_dependency_order_and_replay_is_idempotent() -> (
@@ -168,7 +229,12 @@ def test_analysis_nodes_are_dispatched_in_dependency_order_and_replay_is_idempot
     orchestrator = WorkflowOrchestrator(sessions)
     reconciler = WorkflowReconciler(sessions)
     assert orchestrator.dispatch_ready(workflow_id="wfl", core_client=core)  # type: ignore[arg-type]
-    for index, name in enumerate(names):
+    executable_names = (
+        "subtitle_recognition",
+        "plot_structure",
+        "script_generation",
+    )
+    for index, name in enumerate(executable_names):
         with sessions() as session:
             attempt = session.scalar(
                 select(WorkflowNodeAttempt)
@@ -199,7 +265,7 @@ def test_analysis_nodes_are_dispatched_in_dependency_order_and_replay_is_idempot
                     },
                 ]
             }
-        elif name == "highlight_scoring":
+        elif name == "plot_structure":
             result = {
                 "artifacts": [
                     {
@@ -216,7 +282,7 @@ def test_analysis_nodes_are_dispatched_in_dependency_order_and_replay_is_idempot
             state="succeeded",
             result=result,
         )
-        if index < len(names) - 1:
+        if index < len(executable_names) - 1:
             with sessions() as session:
                 outbox_id = session.scalar(
                     select(WorkflowOutbox.id)
@@ -235,7 +301,7 @@ def test_analysis_nodes_are_dispatched_in_dependency_order_and_replay_is_idempot
                 ),
             )
 
-    assert [kind for kind, _ in core.calls] == ["asr", "qwen", "qwen", "qwen", "script"]
+    assert [kind for kind, _ in core.calls] == ["audio_understanding", "qwen", "script"]
     assert (
         core.analysis_sources
         == [
@@ -262,20 +328,32 @@ def test_analysis_nodes_are_dispatched_in_dependency_order_and_replay_is_idempot
                 },
             },
         ]
-        * 3
     )
-    assert (
-        core.analysis_configs
-        == [{"original_sound_ratio": 30, "drama_name": "episode-2"}] * 3
-    )
-    assert core.script_configs == [
-        {"original_sound_ratio": 30, "drama_name": "episode-2"}
-    ]
+    assert core.analysis_configs == [{"original_sound_ratio": 30, "fps": 1, "min_frame_tokens": 64, "min_frame_tokens_mode": "provider_default"}]
+    assert core.script_configs == [{"original_sound_ratio": 30, "fps": 1, "min_frame_tokens": 64, "min_frame_tokens_mode": "provider_default"}]
     with sessions() as session:
         nodes = list(session.scalars(select(WorkflowNode).order_by(WorkflowNode.name)))
         workflow = session.get(Workflow, "wfl")
+        projections = list(
+            session.scalars(
+                select(WorkflowNodeAttempt)
+                .join(WorkflowNode)
+                .where(
+                    WorkflowNode.name.in_(
+                        ["conflict_highlights", "highlight_scoring"]
+                    )
+                )
+                .order_by(WorkflowNode.name)
+            )
+        )
     assert all(node.state == "completed" for node in nodes)
     assert workflow is not None and workflow.state == "waiting_for_edit"
+    assert len(projections) == 2
+    assert all(attempt.core_task_id is None for attempt in projections)
+    assert all(
+        attempt.result["projection"]["reused_analysis_artifact"] is True
+        for attempt in projections
+    )
 
 
 def test_failed_node_cancels_its_unstarted_descendants() -> None:
@@ -532,6 +610,7 @@ def test_uploaded_srt_skips_asr_and_is_sent_to_qwen() -> None:
                 object_key="video",
                 cdn_url="https://cdn.example/episode.mp4",
                 size_bytes=1,
+                duration_seconds=10,
             )
         )
         session.add(
@@ -541,7 +620,7 @@ def test_uploaded_srt_skips_asr_and_is_sent_to_qwen() -> None:
                 project_id="prj",
                 asset_type="subtitle",
                 status="ready",
-                filename="episode.srt",
+                filename="custom-caption.srt",
                 bucket="b",
                 object_key="subtitle",
                 cdn_url="https://cdn.example/episode.srt",
@@ -594,6 +673,7 @@ def test_uploaded_srt_skips_asr_and_is_sent_to_qwen() -> None:
             {
                 "source_asset_id": "video",
                 "subtitle_url": "https://cdn.example/episode.srt",
+                "subtitle_name": "custom-caption.srt",
                 "asset_id": "srt",
             }
         ]
@@ -606,13 +686,12 @@ def test_uploaded_srt_skips_asr_and_is_sent_to_qwen() -> None:
             "source_asset_id": "video",
             "video_url": "https://cdn.example/episode.mp4",
             "video_name": "episode.mp4",
-            "subtitle_name": "episode.srt",
+            "subtitle_name": "custom-caption.srt",
             "subtitle_url": "https://cdn.example/episode.srt",
+            "duration_seconds": 10,
         }
     ]
-    assert core.analysis_configs == [
-        {"original_sound_ratio": 30, "drama_name": "episode"}
-    ]
+    assert core.analysis_configs == [{"original_sound_ratio": 30, "fps": 1, "min_frame_tokens": 64, "min_frame_tokens_mode": "provider_default"}]
 
 
 def test_qwen_client_emits_core_video_analysis_source_contract(monkeypatch) -> None:

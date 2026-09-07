@@ -83,6 +83,43 @@ def test_script_timeline_materializes_non_empty_editor_draft_and_render_snapshot
     }
 
 
+def test_original_sound_marker_restores_legacy_script_audio_semantics() -> None:
+    assets = [Asset("a", "https://cdn.example/a.mp4", 30)]
+    draft = editor_draft_from_script(
+        timeline=[
+            {
+                "source_asset_id": "a",
+                "start": 0,
+                "end": 3,
+                "narration": "普通解说",
+            },
+            {
+                "source_asset_id": "a",
+                "start": 3,
+                "end": 6,
+                "narration": "播放原片_1",
+                "original_sound": False,
+            },
+        ],
+        assets=assets,
+        voice_id="voice-1",
+    )
+
+    script_clips = [clip for clip in draft["clips"] if clip["track_id"] == "script"]
+    assert script_clips[1]["original_sound"] is True
+
+    # 同时覆盖已经落库、但 original_sound=false 的历史编辑草稿。
+    script_clips[1]["original_sound"] = False
+    snapshot = render_snapshot_from_draft(
+        content=draft,
+        assets=assets,
+        narration_settings={"voice_id": "voice-1"},
+    )
+
+    assert snapshot["timeline"][1]["original_sound"] is True
+    assert snapshot["render_config"]["original_sound_volume"] == 100
+
+
 def test_render_snapshot_uses_edited_first_seen_source_order_and_only_used_assets() -> None:
     assets = [
         Asset("a", "https://cdn.example/a.mp4", 30),
@@ -230,3 +267,64 @@ def test_render_snapshot_rejects_blank_script_text() -> None:
             assets=[Asset("a", "https://cdn.example/a.mp4", 30)],
             narration_settings={"voice_id": "voice-1"},
         )
+
+
+def test_render_snapshot_preserves_valid_alignment_and_drops_stale_trimmed_anchor() -> None:
+    assets = [Asset("a", "https://cdn.example/a.mp4", 30)]
+    draft = editor_draft_from_script(
+        timeline=[
+            {
+                "source_asset_id": "a",
+                "start": 2,
+                "end": 8,
+                "narration": "他推门后发现了真相",
+                "event_id": "a:event-1",
+                "visual_anchor": 6,
+                "narration_anchor_text": "发现了真相",
+                "match_confidence": 0.92,
+                "visual_lead": 0.3,
+                "narration_start_offset": 1.2,
+            }
+        ],
+        assets=assets,
+        voice_id="voice-1",
+    )
+
+    snapshot = render_snapshot_from_draft(
+        content=draft,
+        assets=assets,
+        narration_settings={"voice_id": "voice-1"},
+    )
+    assert snapshot["timeline"][0] | {"subtitle": None} == {
+        "source_asset_id": "a",
+        "start": 2.0,
+        "end": 8.0,
+        "narration": "他推门后发现了真相",
+        "subtitle": None,
+        "original_sound": False,
+        "event_id": "a:event-1",
+        "visual_anchor": 6.0,
+        "narration_anchor_text": "发现了真相",
+        "match_confidence": 0.92,
+        "visual_lead": 0.3,
+        "narration_start_offset": 1.2,
+    }
+
+    # 用户修剪画面后旧视觉锚点落在区间外：冻结快照应整体降级，不阻断渲染。
+    video_clip = next(clip for clip in draft["clips"] if clip["track_id"] == "video")
+    video_clip["source_start"] = 2
+    video_clip["duration"] = 3
+    stale_snapshot = render_snapshot_from_draft(
+        content=draft,
+        assets=assets,
+        narration_settings={"voice_id": "voice-1"},
+    )
+    for key in (
+        "event_id",
+        "visual_anchor",
+        "narration_anchor_text",
+        "match_confidence",
+        "visual_lead",
+        "narration_start_offset",
+    ):
+        assert key not in stale_snapshot["timeline"][0]

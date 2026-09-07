@@ -102,7 +102,7 @@ export const zhCN = {
   },
   dashboard: {
     routeHeading: "工作台概览", footer: "影创工坊 · 让 AI 创作更简单", thumbnailUnavailable: "{name}缩略图不可用", thumbnailAlt: "{name}缩略图", coverAlt: "{name}封面",
-    nav: { overview: "工作台概览", create: "新建创作", projects: "我的项目", narration: "短剧解说", translation: "视频翻译", remix: "短剧混剪", credits: "创作点", account: "账户中心" },
+    nav: { overview: "工作台概览", create: "新建创作", projects: "我的项目", aiAssistant: "AI助手", narration: "短剧解说", translation: "视频翻译", remix: "短剧混剪", credits: "创作点", account: "账户中心" },
     mobile: { navigation: "移动工作台导航", overview: "概览", create: "新建", projects: "项目", account: "我的" },
     sidebar: { navigation: "工作台主导航", tools: "工具", account: "账户" },
     header: { home: "影创工坊", accountActions: "账户快捷操作", viewBalance: "查看创作点余额 {balance}", recharge: "去充值" },

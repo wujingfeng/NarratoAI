@@ -21,6 +21,7 @@ import { useI18n } from "../i18n/useI18n.js";
 
 const VIDEO_EXTENSIONS = new Set(["mp4", "mov", "avi"]);
 const VIDEO_SIZE_LIMIT = 300 * 1024 * 1024;
+const SHORT_DRAMA_VIDEO_SIZE_LIMIT = 50 * 1024 * 1024;
 const SUBTITLE_SIZE_LIMIT = 5 * 1024 * 1024;
 const newClientVideoId = () => globalThis.crypto?.randomUUID?.() || `local-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 
@@ -281,11 +282,18 @@ export function CreateUploadFlow({ fixedType = null, initialProjectId = null, re
 
   const handleVideoFiles = async (files) => {
     if (isUploading || isReordering || uploadInFlight.current) return;
+    const videoSizeLimit = selectedType === "narration"
+      ? SHORT_DRAMA_VIDEO_SIZE_LIMIT
+      : VIDEO_SIZE_LIMIT;
     const validFiles = files.filter((file) => {
       const extension = file.name.split(".").pop()?.toLowerCase();
-      return VIDEO_EXTENSIONS.has(extension) && file.size <= VIDEO_SIZE_LIMIT;
+      return VIDEO_EXTENSIONS.has(extension) && file.size <= videoSizeLimit;
     });
-    if (validFiles.length !== files.length) onFeedback("仅支持 300 MiB 以内的 MP4、MOV 或 AVI 文件");
+    if (validFiles.length !== files.length) {
+      onFeedback(selectedType === "narration"
+        ? "短剧解说仅支持 50 MiB 以内的 MP4、MOV 或 AVI 文件"
+        : "仅支持 300 MiB 以内的 MP4、MOV 或 AVI 文件");
+    }
     if (!validFiles.length) return;
     const availableCount = selectedCreationType.maxVideos - videos.length;
     if (availableCount <= 0) {

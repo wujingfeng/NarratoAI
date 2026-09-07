@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 import pytest
+from types import SimpleNamespace
 
+from narrato_api.api.errors import ApiError
 from narrato_api.assets.constraints import (
     AssetDeclarationError,
     AssetLimitError,
     validate_asset_declaration,
 )
+from narrato_api.assets.service import UploadService
 
 
 def test_video_declaration_accepts_the_fifth_video_at_300_mib() -> None:
@@ -51,3 +54,19 @@ def test_video_declaration_rejects_a_sixth_video_for_one_project() -> None:
             size_bytes=1,
             existing_video_count=5,
         )
+
+
+def test_short_drama_multimodal_limit_does_not_lower_other_product_limits() -> None:
+    with pytest.raises(ApiError) as caught:
+        UploadService._validate_short_drama_multimodal_size(
+            project=SimpleNamespace(product="short_drama_narration"),
+            asset_type="video",
+            size_bytes=52_428_801,
+        )
+    assert caught.value.code == "VIDEO_TOO_LARGE_FOR_MULTIMODAL"
+
+    UploadService._validate_short_drama_multimodal_size(
+        project=SimpleNamespace(product="video_translation"),
+        asset_type="video",
+        size_bytes=314_572_800,
+    )

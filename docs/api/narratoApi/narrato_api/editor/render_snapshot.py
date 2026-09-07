@@ -3,16 +3,24 @@
 from __future__ import annotations
 
 import math
+import re
 from collections.abc import Mapping, Sequence
 from typing import Any
 
 
 DEFAULT_VIDEO_RATIO = "16:9"
 DEFAULT_SUBTITLE_STYLE = "经典白色"
+_ORIGINAL_SOUND_MARKER = re.compile(r"^\s*播放原片(?:[_\-\s]*\d+)?\s*$")
 
 
 class RenderSnapshotError(ValueError):
     """草稿无法安全转换为最终渲染快照。"""
+
+
+def _is_original_sound_marker(value: object) -> bool:
+    """兜底识别历史脚本中的原片播放标记。"""
+
+    return isinstance(value, str) and _ORIGINAL_SOUND_MARKER.fullmatch(value) is not None
 
 
 def _number(value: object, *, field: str) -> float:
@@ -74,6 +82,10 @@ def editor_draft_from_script(
         clip_duration = source_end - source_start
         region_id = f"script-{index:04}"
         picture = raw.get("picture")
+        original_sound = (
+            raw.get("original_sound") is True
+            or _is_original_sound_marker(narration)
+        )
         clips.extend((
             {
                 "id": f"video-{index:04}", "track_id": "video", "start": cursor,
@@ -84,7 +96,19 @@ def editor_draft_from_script(
                 "id": f"script-{index:04}", "track_id": "script", "start": cursor,
                 "duration": clip_duration, "text": narration.strip(), "region_id": region_id,
                 "picture": picture.strip() if isinstance(picture, str) else "",
-                "original_sound": raw.get("original_sound") is True,
+                "original_sound": original_sound,
+                **{
+                    key: raw[key]
+                    for key in (
+                        "event_id",
+                        "visual_anchor",
+                        "narration_anchor_text",
+                        "match_confidence",
+                        "visual_lead",
+                        "narration_start_offset",
+                    )
+                    if key in raw
+                },
             },
         ))
         subtitles.append({
@@ -155,7 +179,22 @@ def render_snapshot_from_draft(
                     if isinstance(raw.get("picture"), str)
                     else ""
                 ),
-                "original_sound": raw.get("original_sound") is True,
+                "original_sound": (
+                    raw.get("original_sound") is True
+                    or _is_original_sound_marker(raw.get("text"))
+                ),
+                **{
+                    key: raw[key]
+                    for key in (
+                        "event_id",
+                        "visual_anchor",
+                        "narration_anchor_text",
+                        "match_confidence",
+                        "visual_lead",
+                        "narration_start_offset",
+                    )
+                    if key in raw
+                },
             }
         elif track_id == "video":
             videos.append(raw)
@@ -233,13 +272,54 @@ def render_snapshot_from_draft(
             candidate = matched_subtitle.get("text")
             if isinstance(candidate, str) and candidate.strip():
                 subtitle = candidate.strip()
+        original_sound = (
+            script.get("original_sound") is True
+            or _is_original_sound_marker(narration)
+        )
+        anchor_text = script.get("narration_anchor_text")
+        visual_anchor = script.get("visual_anchor")
+        confidence = script.get("match_confidence")
+        event_id = script.get("event_id")
+        anchor_valid = (
+            not original_sound
+            and isinstance(anchor_text, str)
+            and bool(anchor_text.strip())
+            and anchor_text.strip() in narration
+            and isinstance(event_id, str)
+            and bool(event_id.strip())
+            and type(visual_anchor) in (int, float)
+            and math.isfinite(float(visual_anchor))
+            and source_start <= float(visual_anchor) <= source_end
+            and type(confidence) in (int, float)
+            and math.isfinite(float(confidence))
+            and 0 <= float(confidence) <= 1
+        )
+        alignment: dict[str, object] = {}
+        if anchor_valid:
+            alignment = {
+                "event_id": event_id,
+                "visual_anchor": float(visual_anchor),
+                "narration_anchor_text": anchor_text.strip(),
+                "match_confidence": float(confidence),
+            }
+            lead = script.get("visual_lead")
+            if type(lead) in (int, float) and math.isfinite(float(lead)):
+                alignment["visual_lead"] = float(lead)
+            offset = script.get("narration_start_offset")
+            if (
+                type(offset) in (int, float)
+                and math.isfinite(float(offset))
+                and float(offset) >= 0
+            ):
+                alignment["narration_start_offset"] = float(offset)
         timeline.append({
             "source_asset_id": asset_id,
             "start": source_start,
             "end": source_end,
             "narration": narration,
             "subtitle": subtitle,
-            "original_sound": script.get("original_sound") is True,
+            "original_sound": original_sound,
+            **alignment,
         })
     if not timeline:
         raise RenderSnapshotError("editor draft has no renderable timeline")

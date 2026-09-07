@@ -68,7 +68,7 @@ def build_voice_snapshot(
     settings = {
         key: value
         for key, value in (voice.provider.settings or {}).items()
-        if key in {"base_url", "api_base", "tts_endpoint"}
+        if key in {"base_url", "api_base", "tts_endpoint", "cluster"}
     }
     return {
         "voice_id": voice.id,
@@ -106,7 +106,7 @@ def create_tts_task(
     )
     if replay is not None:
         return replay
-    service = CapabilityService(session, settings.provider_secrets)
+    service = CapabilityService(session, settings.resolved_provider_secrets)
     voice = service.require_voice(
         payload.voice_id,
         language=payload.language,

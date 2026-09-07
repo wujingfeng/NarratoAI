@@ -19,6 +19,7 @@ from core_api.tasks.celery_tasks import wake_core_task
 from core_api.tasks.dispatch import TaskDispatcher
 from core_api.tasks.models import CallbackOutbox, CoreArtifact
 from core_api.tasks.service import TaskNotFoundError, TaskService
+from core_api.tasks.queueing import queue_for_task_type
 
 
 class CeleryTaskDispatcher:
@@ -28,17 +29,21 @@ class CeleryTaskDispatcher:
         self,
         task_id: str,
         *,
+        task_type: str,
         expected_state_version: int,
         not_before: datetime,
         dispatch_id: str,
     ) -> None:
         """发送可安全重复的数据库事实源唤醒。"""
 
-        wake_core_task.delay(
-            task_id,
-            expected_state_version,
-            not_before.isoformat(),
-            dispatch_id,
+        wake_core_task.apply_async(
+            args=(
+                task_id,
+                expected_state_version,
+                not_before.isoformat(),
+                dispatch_id,
+            ),
+            queue=queue_for_task_type(task_type),
         )
 
 
@@ -54,6 +59,11 @@ class CoreTaskErrorDTO(BaseModel):
     model_config = ConfigDict(extra="forbid")
     code: str
     retryable: bool | None = None
+    retry_exhausted: bool | None = None
+    attempts: int | None = None
+    reason: str | None = None
+    details: dict[str, Any] | None = None
+    diagnostics: dict[str, Any] | None = None
 
 
 class CoreTaskArtifactDTO(BaseModel):
@@ -74,6 +84,7 @@ class CoreTaskDTO(BaseModel):
     model_config = ConfigDict(extra="forbid")
     core_task_id: str
     status: str
+    state_version: int
     phase: str | None
     progress: int
     result: list[dict[str, Any]] | dict[str, Any] | None
@@ -127,6 +138,7 @@ def get_core_task(
     data = {
         "core_task_id": task.id,
         "status": task.status.value,
+        "state_version": task.state_version,
         "phase": task.phase,
         "progress": task.progress,
         "result": task.result,
@@ -152,7 +164,7 @@ def get_core_task(
 
 
 def _safe_event_error(value: object) -> dict[str, object] | None:
-    """只公开稳定错误码与 retryable 标记。"""
+    """公开稳定错误码以及经过 Core 构造的有界校验诊断。"""
 
     if not isinstance(value, dict):
         return None
@@ -163,6 +175,13 @@ def _safe_event_error(value: object) -> dict[str, object] | None:
     retryable = value.get("retryable")
     if isinstance(retryable, bool):
         safe["retryable"] = retryable
+    reason = value.get("reason")
+    if isinstance(reason, str) and reason:
+        safe["reason"] = reason[:128]
+    for key in ("details", "diagnostics"):
+        item = value.get(key)
+        if isinstance(item, dict):
+            safe[key] = item
     return safe
 
 
